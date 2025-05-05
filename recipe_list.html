@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recipe Selector & Shopping List</title>
+    <style>
+        /* Import a modern font */
+        @import url('https://fonts.googleapis.com/css2?family=Lato:wght@400;700&display=swap');
+
+        /* --- Global Styles & Variables --- */
+        :root {
+            --primary-color: #0d6efd; /* A nice blue */
+            --secondary-color: #6c757d; /* Muted grey */
+            --light-grey: #f8f9fa;
+            --dark-grey: #343a40;
+            --white: #ffffff;
+            --border-color: #dee2e6;
+            --success-color: #198754; /* Green for checked items maybe */
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.1);
+            --shadow-md: 0 4px 8px rgba(0,0,0,0.1);
+            --border-radius: 8px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Lato', sans-serif;
+            line-height: 1.6;
+            background-color: var(--light-grey);
+            color: var(--dark-grey);
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px; /* Limit width on large screens */
+            margin: 20px auto; /* Center the container */
+            background-color: var(--white);
+            padding: 30px;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow-md);
+        }
+
+        h1, h2, h3 {
+            color: var(--primary-color);
+            margin-bottom: 1em;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 1.5em;
+            color: var(--dark-grey);
+        }
+
+        h2 {
+           border-bottom: 2px solid var(--primary-color);
+           padding-bottom: 0.3em;
+           font-weight: 700;
+        }
+
+        h3 {
+            font-weight: 700;
+            color: var(--dark-grey);
+        }
+
+        /* --- Recipe Selection Area --- */
+        #recipe-list-container {
+            margin-bottom: 30px;
+        }
+
+        #recipe-list {
+            max-height: 400px; /* Limit height and make scrollable */
+            overflow-y: auto;
+            padding: 15px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
+            background-color: #fdfdfd; /* Slightly off-white */
+        }
+
+        .recipe-item {
+            margin-bottom: 12px;
+            display: block;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+         .recipe-item:last-child {
+             border-bottom: none;
+         }
+
+        /* Custom Checkbox Styling */
+        .recipe-item label {
+            cursor: pointer;
+            margin-left: 10px;
+            vertical-align: middle;
+            position: relative;
+            user-select: none; /* Prevent text selection on click */
+        }
+
+        .recipe-item input[type="checkbox"] {
+            opacity: 0; /* Hide default checkbox */
+            position: absolute;
+        }
+
+        .recipe-item label::before { /* Custom box */
+            content: '';
+            display: inline-block;
+            width: 18px;
+            height: 18px;
+            border: 2px solid var(--secondary-color);
+            border-radius: 4px;
+            margin-right: 10px;
+            vertical-align: middle;
+            transition: background-color 0.2s ease, border-color 0.2s ease;
+        }
+
+        .recipe-item input[type="checkbox"]:checked + label::before { /* Checked box style */
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+
+        .recipe-item label::after { /* Custom checkmark */
+            content: '\2714'; /* Checkmark symbol */
+            font-size: 14px;
+            font-weight: bold;
+            color: var(--white);
+            position: absolute;
+            left: 4px; /* Adjust position */
+            top: 1px;  /* Adjust position */
+            opacity: 0; /* Hidden by default */
+            transition: opacity 0.2s ease;
+        }
+
+        .recipe-item input[type="checkbox"]:checked + label::after { /* Show checkmark when checked */
+            opacity: 1;
+        }
+
+         .recipe-item input[type="checkbox"]:focus + label::before { /* Focus style */
+             box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.25);
+         }
+
+
+        /* --- Button Styling --- */
+        button#generate-list-button {
+            display: block; /* Make button block level */
+            width: 100%; /* Full width */
+            max-width: 300px; /* Limit max width */
+            margin: 30px auto; /* Center button */
+            padding: 15px 20px;
+            background-color: var(--primary-color);
+            color: var(--white);
+            border: none;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            font-size: 1.1em;
+            font-weight: 700;
+            transition: background-color 0.2s ease, box-shadow 0.2s ease;
+            box-shadow: var(--shadow-sm);
+        }
+
+        button#generate-list-button:hover:not(:disabled) {
+            background-color: #0b5ed7; /* Darker blue on hover */
+            box-shadow: var(--shadow-md);
+        }
+
+        button#generate-list-button:disabled {
+            background-color: var(--secondary-color);
+            cursor: not-allowed;
+            opacity: 0.7;
+            box-shadow: none;
+        }
+
+        /* --- Shopping List Area --- */
+        #shopping-list-output {
+             background-color: var(--white);
+        }
+
+        #shopping-list-ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        /* Section Headers */
+        #shopping-list-ul .section-header {
+            margin-top: 25px;
+            margin-bottom: 10px;
+            padding-bottom: 5px;
+            font-weight: 700;
+            font-size: 1.2em;
+            color: var(--dark-grey);
+            border-bottom: 2px solid var(--primary-color);
+            /* Ensure header takes full width and isn't part of the grid */
+            grid-column: 1 / -1; /* Span all columns if parent is grid (it isn't, but good practice) */
+        }
+         #shopping-list-ul .section-header:first-of-type {
+             margin-top: 10px;
+         }
+
+
+        /* Ingredient Items - Using CSS Grid for Alignment */
+        #shopping-list-ul .ingredient-item {
+            display: grid;
+            /* Columns: Ingredient Name (flexible), Quantity (fit content), Units (fit content) */
+            grid-template-columns: 1fr auto auto;
+            gap: 10px 20px; /* Row gap, Column gap */
+            align-items: baseline; /* Align text nicely */
+            padding: 10px 5px;
+            border-bottom: 1px solid #eee;
+        }
+         #shopping-list-ul .ingredient-item:last-child {
+            border-bottom: none;
+        }
+
+
+        .ingredient-name {
+            grid-column: 1 / 2;
+            font-weight: normal;
+        }
+
+        .ingredient-qty {
+            grid-column: 2 / 3;
+            font-weight: 700; /* Make quantity stand out */
+            text-align: right;
+        }
+
+        .ingredient-unit {
+            grid-column: 3 / 4;
+            color: var(--secondary-color); /* Mute the units slightly */
+            text-align: left;
+        }
+
+
+        .error-message {
+            color: #dc3545; /* Bootstrap danger color */
+            font-weight: bold;
+            padding: 10px;
+            background-color: #f8d7da;
+            border: 1px solid #f5c2c7;
+            border-radius: var(--border-radius);
+        }
+
+         /* --- Mobile Responsiveness --- */
+         @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            .container {
+                padding: 20px;
+                margin: 10px auto;
+            }
+            h1 {
+                font-size: 1.8em;
+            }
+             h2 {
+                 font-size: 1.4em;
+             }
+             button#generate-list-button {
+                 padding: 12px 15px;
+                 font-size: 1em;
+             }
+             #shopping-list-ul .ingredient-item {
+                 gap: 5px 10px; /* Reduce gap on smaller screens */
+             }
+         }
+
+         @media (max-width: 480px) {
+             .container {
+                 padding: 15px;
+             }
+             h1 {
+                 font-size: 1.5em;
+             }
+             h2 {
+                 font-size: 1.2em;
+             }
+             /* Stack ingredient parts if needed on very small screens (optional) */
+             /*
+             #shopping-list-ul .ingredient-item {
+                 grid-template-columns: 1fr; // Stack everything
+                 gap: 2px;
+                 padding: 8px 0;
+             }
+             .ingredient-qty, .ingredient-unit {
+                 text-align: left;
+                 padding-left: 15px; // Indent quantity and unit
+             }
+             .ingredient-unit {
+                  color: var(--secondary-color);
+             }
+             */
+         }
+
+
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Recipe Selector</h1>
+
+        <div id="recipe-list-container">
+            <h2>Choose recipes to make:</h2>
+            <div id="recipe-list">
+                <p>Loading recipes...</p> <!-- Initial loading message -->
+            </div>
+        </div>
+
+        <button id="generate-list-button" disabled>Loading Recipes...</button>
+
+        <div id="shopping-list-output">
+            <h3>Shopping List:</h3>
+            <ul id="shopping-list-ul">
+                <li>Select recipes and click generate.</li>
+            </ul>
+        </div>
+    </div> <!-- End of container -->
+
+    <script>
+        // --- Embedded Recipe Data ---
+        // (Using the same large data block from the previous 'simpler' version)
+        const recipeData = [
+            { recipeName: "Veggie jumble", ingredient: "Grilling cheese", quantity: 4, units: "oz", section: "3: Cheese area" },
+            { recipeName: "Veggie jumble", ingredient: "Israeli couscous", quantity: 0.75, units: "cups", section: "6: Cooking" },
+            { recipeName: "Veggie jumble", ingredient: "Olive oil", quantity: 4, units: "tsp", section: "6: Cooking" },
+            { recipeName: "Veggie jumble", ingredient: "Sliced almonds", quantity: 1, units: "oz", section: "6: Cooking" },
+            { recipeName: "Veggie jumble", ingredient: "Veggie stock concentrate", quantity: 1, units: "count", section: "6: Cooking" },
+            { recipeName: "Veggie jumble", ingredient: "Asparagus", quantity: 1, units: "count", section: "2: Produce" },
+            { recipeName: "Veggie jumble", ingredient: "Cilantro", quantity: 1, units: "count", section: "2: Produce" },
+            { recipeName: "Veggie jumble", ingredient: "Fresh thyme", quantity: 1, units: "count", section: "2: Produce" },
+            { recipeName: "Veggie jumble", ingredient: "Garlic", quantity: 1, units: "count", section: "2: Produce" },
+            { recipeName: "Veggie jumble", ingredient: "Grape tomatoes", quantity: 4, units: "oz", section: "2: Produce" },
+            { recipeName: "Veggie jumble", ingredient: "Lemon", quantity: 1, units: "count", section: "2: Produce" },
+            { recipeName: "Veggie jumble", ingredient: "Red onion", quantity: 1, units: "count", section: "2: Produce" },
+            { recipeName: "Veggie jumble", ingredient: "Scallions", quantity: 1, units: "count", section: "2: Produce" },
+            { recipeName: "Veggie jumble", ingredient: "Sweet potatoes", quantity: 2, units: "count", section: "2: Produce" },
+            { recipeName: "Med baked veggies", ingredient: "Feta cheese / goats cheese", quantity: 0.5, units: "c", section: "3: Cheese area" },
+            { recipeName: "Med baked veggies", ingredient: "Garlic", quantity: 1, units: "count", section: "2: Produce" },
+            { recipeName: "Med baked veggies", ingredient: "Grape tomatoes", quantity: 4, units: "oz", section: "2: Produce" },
+            { recipeName: "Mushroom burata pizza", ingredient: "Pizza dough", quantity: 1, units: "count", section: "5: Frozen aisle" },
+            { recipeName: "Mushroom burata pizza", ingredient: "Buratta", quantity: 1, units: "balls", section: "4: Dairy" },
+            { recipeName: "Mushroom burata pizza", ingredient: "Arugula", quantity: 1, units: "count", section: "2: Produce" },
+            { recipeName: "Mushroom burata pizza", ingredient: "Garlic", quantity: 1, units: "count", section: "2: Produce" },
+            { recipeName: "Mushroom burata pizza", ingredient: "Mushrooms", quantity: 10, units: "oz", section: "2: Produce" },
+            { recipeName: "Mushroom burata pizza", ingredient: "Shallots", quantity: 2, units: "count", section: "2: Produce" },
+            { recipeName: "Burrito bowls", ingredient: "Mexican cheese", quantity: 0.5, units: "c", section: "3: Cheese area" },
+            { recipeName: "Burrito bowls", ingredient: "Tortilla chips", quantity: 1, units: "count", section: "2: Produce area" },
+            { recipeName: "Burrito bowls", ingredient: "Canned black beans", quantity: 1, units: "count", section: "6: Cooking" },
+            { recipeName: "Burrito bowls", ingredient: "Canned corn", quantity: 1, units: "count", section: "6: Cooking" },
+            { recipeName: "Burrito bowls", ingredient: "Jasmine rice", quantity: 0.5, units: "cup", section: "6: Cooking" },
+            { recipeName: "Burrito bowls", ingredient: "Sour cream", quantity: 4, units: "tbsp", section: "4: Dairy" },
+            { recipeName: "Burrito bowls", ingredient: "Avocado", quantity: 1, units: "count", section: "2: Produce" },
+            { recipeName: "Burrito bowls", ingredient: "Cilantro", quantity: 1, units: "count", section: "2: Produce" },
+            { recipeName: "Burrito bowls", ingredient: "Grape tomatoes", quantity: 4, units: "oz", section: "2: Produce" },
+            { recipeName: "Burrito bowls", ingredient: "Lime", quantity: 1, units: "count", section: "2: Produce" },
+            { recipeName: "Burrito bowls", ingredient: "Yellow onion", quantity: 1, units: "count", section: "2: Produce" },
+            { recipeName: "Margarita pizza", ingredient: "Pizza dough", quantity: 1, units: "count", section: "5: Frozen aisle" },
+            { recipeName: "Margarita pizza", ingredient: "Tomato sauce", quantity: 1, units: "can", section: "6: Cooking" },
+            { recipeName: "Margarita pizza", ingredient: "Buratta", quantity: 1, units: "balls", section: "4: Dairy" },
+            { recipeName: "Margarita pizza", ingredient: "Basil", quantity: 1, units: "T", section: "2: Produce" },
+            { recipeName: "Sweet potato pita pocket", ingredient: "Pitas", quantity: 1, units: "packet", section: "1: Bread" },
+            { recipeName: "Sweet potato pita pocket", ingredient: "Mayonnaise", quantity: 1, units: "count", section: "6: Cooking" },
+            { recipeName: "Sweet potato pita pocket", ingredient: "Sour cream", quantity: 4, units: "tbsp", section: "4: Dairy" },
+            { recipeName: "Sweet potato pita pocket", ingredient: "Avocado", quantity: 1, units: "count", section: "2: Produce" },
+            { recipeName: "Sweet potato pita pocket", ingredient: "Cucumber", quantity: 1, units: "count", section: "2: Produce" },
+            { recipeName: "Sweet potato pita pocket", ingredient: "Garlic", quantity: 1, units: "count", section: "2: Produce" },
+            { recipeName: "Sweet potato pita pocket", ingredient: "Sweet potatoes", quantity: 2, units: "count", section: "2: Produce" },
+            { recipeName: "Mushroom ravioli", ingredient: "Parmesan cheese", quantity: 1.75, units: "cup", section: "3: Cheese area" },
+            { recipeName: "Mushroom ravioli", ingredient: "Olive oil", quantity: 12, units: "tsp", section: "6: Cooking" },
+            { recipeName: "Mushroom ravioli", ingredient: "Mushroom ravioli", quantity: 1, units: "count", section: "4: Dairy" },
+            { recipeName: "Mushroom ravioli", ingredient: "Garlic", quantity: 1, units: "count", section: "2: Produce" },
+            { recipeName: "Mushroom ravioli", ingredient: "Grape tomatoes", quantity: 4, units: "oz", section: "2: Produce" },
+            { recipeName: "Mushroom ravioli", ingredient: "Mushrooms", quantity: 10, units: "oz", section: "2: Produce" },
+            { recipeName: "Mushroom ravioli", ingredient: "Shallots", quantity: 1, units: "count", section: "2: Produce" },
+            { recipeName: "Broccoli Farro Salad", ingredient: "Parmesan cheese", quantity: 1, units: "cup", section: "3: Cheese area" },
+            { recipeName: "Broccoli Farro Salad", ingredient: "Semi pearled farro", quantity: 1, units: "cups", section: "6: Cooking" },
+            { recipeName: "Broccoli Farro Salad", ingredient: "Basil", quantity: 1, units: "T", section: "2: Produce" },
+            { recipeName: "Broccoli Farro Salad", ingredient: "Broccolini", quantity: 1, units: "lbs", section: "2: Produce" },
+            { recipeName: "Broccoli Farro Salad", ingredient: "Garlic", quantity: 1, units: "count", section: "2: Produce" },
+            { recipeName: "Broccoli Farro Salad", ingredient: "Lemon", quantity: 1, units: "count", section: "2: Produce" },
+            { recipeName: "One pot farro with Tomato", ingredient: "Feta cheese / goats cheese", quantity: 0.5, units: "c", section: "3: Cheese area" },
+            { recipeName: "One pot farro with Tomato", ingredient: "Parmesan cheese", quantity: 0.25, units: "cup", section: "3: Cheese area" },
+            { recipeName: "One pot farro with Tomato", ingredient: "Olive oil", quantity: 1, units: "tsp", section: "6: Cooking" },
+            { recipeName: "One pot farro with Tomato", ingredient: "Semi pearled farro", quantity: 1, units: "cups", section: "6: Cooking" },
+            { recipeName: "One pot farro with Tomato", ingredient: "Garlic", quantity: 1, units: "count", section: "2: Produce" },
+            { recipeName: "One pot farro with Tomato", ingredient: "Grape tomatoes", quantity: 9, units: "oz", section: "2: Produce" },
+            { recipeName: "One pot farro with Tomato", ingredient: "White onion", quantity: 0.5, units: "count", section: "2: Produce" },
+            { recipeName: "Shakshuka", ingredient: "Feta cheese / goats cheese", quantity: 1, units: "c", section: "3: Cheese area" },
+            { recipeName: "Shakshuka", ingredient: "Canned whole tomatoes", quantity: 1, units: "28 oz", section: "6: Cooking" },
+            { recipeName: "Shakshuka", ingredient: "Cumin", quantity: 1, units: "count", section: "6: Cooking" },
+            { recipeName: "Shakshuka", ingredient: "Olive oil", quantity: 4, units: "tsp", section: "6: Cooking" },
+            { recipeName: "Shakshuka", ingredient: "Paprika", quantity: 1, units: "count", section: "6: Cooking" },
+            { recipeName: "Shakshuka", ingredient: "Eggs", quantity: 6, units: "count", section: "4: Dairy" },
+            { recipeName: "Shakshuka", ingredient: "Garlic", quantity: 1, units: "count", section: "2: Produce" },
+            { recipeName: "Shakshuka", ingredient: "Yellow onion", quantity: 1, units: "count", section: "2: Produce" },
+            { recipeName: "Grazing platter", ingredient: "Cheddar cheese", quantity: 1, units: "count", section: "3: Cheese area" },
+            { recipeName: "Grazing platter", ingredient: "Hummus", quantity: 1, units: "count", section: "3: Cheese area" },
+            { recipeName: "Grazing platter", ingredient: "Pitas", quantity: 1, units: "packet", section: "1: Bread" },
+            { recipeName: "Grazing platter", ingredient: "Crackers", quantity: 1, units: "count", section: "5: Frozen aisle" },
+            { recipeName: "Grazing platter", ingredient: "Apples", quantity: 1, units: "count", section: "2: Produce" },
+            { recipeName: "Grazing platter", ingredient: "Grape tomatoes", quantity: 1, units: "oz", section: "2: Produce" },
+            { recipeName: "Grazing platter", ingredient: "Grapes", quantity: 1, units: "count", section: "2: Produce" },
+            { recipeName: "Sausage dogs", ingredient: "Cheddar cheese", quantity: 1, units: "count", section: "3: Cheese area" },
+            { recipeName: "Sausage dogs", ingredient: "Hot dog buns", quantity: 1, units: "count", section: "1: Bread" },
+            { recipeName: "Sausage dogs", ingredient: "Veggie sausage", quantity: 1, units: "count", section: "3: Cheese area" },
+            { recipeName: "Spaghetti Aglio e Olio with Lots of Kale", ingredient: "Parmesan cheese", quantity: 1, units: "cup", section: "3: Cheese area" },
+            { recipeName: "Spaghetti Aglio e Olio with Lots of Kale", ingredient: "Olive oil", quantity: 12, units: "tsp", section: "6: Cooking" },
+            { recipeName: "Spaghetti Aglio e Olio with Lots of Kale", ingredient: "Garlic", quantity: 5, units: "count", section: "2: Produce" },
+            { recipeName: "Spaghetti Aglio e Olio with Lots of Kale", ingredient: "Spaghetti", quantity: 12, units: "oz", section: "6: Cooking" },
+            { recipeName: "Spaghetti Aglio e Olio with Lots of Kale", ingredient: "Kale", quantity: 1.5, units: "lbs", section: "2: Produce" },
+            { recipeName: "Creamy mushroom pasta", ingredient: "Parmesan cheese", quantity: 1, units: "cup", section: "3: Cheese area" },
+            { recipeName: "Creamy mushroom pasta", ingredient: "Mushrooms", quantity: 4, units: "oz", section: "2: Produce" },
+            { recipeName: "Creamy mushroom pasta", ingredient: "Yellow onion", quantity: 0.5, units: "count", section: "2: Produce" },
+            { recipeName: "Creamy mushroom pasta", ingredient: "Orchiette", quantity: 1, units: "lb", section: "6: Cooking" },
+            { recipeName: "Creamy mushroom pasta", ingredient: "Heavy cream", quantity: 4, units: "T", section: "4: Dairy" },
+            { recipeName: "Creamy mushroom pasta", ingredient: "Chives", quantity: 1, units: "bunch", section: "2: Produce" },
+            { recipeName: "Chickpea and carrot curry", ingredient: "Jasmine rice", quantity: 0.5, units: "cup", section: "6: Cooking" },
+            { recipeName: "Chickpea and carrot curry", ingredient: "Cumin", quantity: 2, units: "t", section: "6: Cooking" },
+            { recipeName: "Chickpea and carrot curry", ingredient: "Carrots", quantity: 2, units: "ct", section: "2: Produce" },
+            { recipeName: "Chickpea and carrot curry", ingredient: "Canned chopped tomatoes", quantity: 1, units: "28 oz", section: "6: Cooking" },
+            { recipeName: "Chickpea and carrot curry", ingredient: "Chickpeas", quantity: 15, units: "oz", section: "6: Cooking" },
+            { recipeName: "Chickpea and carrot curry", ingredient: "Spinach", quantity: 2, units: "oz", section: "2: Produce" },
+            { recipeName: "Chickpea and carrot curry", ingredient: "Garlic", quantity: 1, units: "count", section: "2: Produce" },
+            { recipeName: "Quinoa spaghetti with broccoli", ingredient: "Parmesan cheese", quantity: 1, units: "cup", section: "3: Cheese area" },
+            { recipeName: "Quinoa spaghetti with broccoli", ingredient: "Olive oil", quantity: 12, units: "tsp", section: "6: Cooking" },
+            { recipeName: "Quinoa spaghetti with broccoli", ingredient: "Broccolini", quantity: 1, units: "lbs", section: "2: Produce" },
+            { recipeName: "Quinoa spaghetti with broccoli", ingredient: "Garlic", quantity: 6, units: "count", section: "2: Produce" },
+            { recipeName: "Quinoa spaghetti with broccoli", ingredient: "Spaghetti", quantity: 12, units: "oz", section: "6: Cooking" },
+            { recipeName: "Skillet pasta with 5 cheeses", ingredient: "Ricotta", quantity: 0.5, units: "c", section: "4: Dairy" },
+            { recipeName: "Skillet pasta with 5 cheeses", ingredient: "Whole milk", quantity: 1, units: "count", section: "4: Dairy" },
+            { recipeName: "Skillet pasta with 5 cheeses", ingredient: "Mozzarella", quantity: 3, units: "oz", section: "4: Dairy" },
+            { recipeName: "Skillet pasta with 5 cheeses", ingredient: "Gruyere or gouda", quantity: 3, units: "oz", section: "4: Dairy" },
+            { recipeName: "Skillet pasta with 5 cheeses", ingredient: "Orchiette", quantity: 1, units: "lb", section: "6: Cooking" },
+            { recipeName: "Caprese sandwiches", ingredient: "Olive oil", quantity: 3, units: "tsp", section: "6: Cooking" },
+            { recipeName: "Caprese sandwiches", ingredient: "Basil", quantity: 1, units: "T", section: "2: Produce" },
+            { recipeName: "Caprese sandwiches", ingredient: "Plum tomatoes", quantity: 1, units: "count", section: "2: Produce" },
+            { recipeName: "Caprese sandwiches", ingredient: "Mozzarella", quantity: 1, units: "oz", section: "4: Dairy" },
+            { recipeName: "Caprese sandwiches", ingredient: "Baguette", quantity: 1, units: "count", section: "1: Bread" },
+            { recipeName: "Roasted tomatoes with garlic", ingredient: "Olive oil", quantity: 4, units: "tsp", section: "6: Cooking" },
+            { recipeName: "Roasted tomatoes with garlic", ingredient: "Garlic", quantity: 12, units: "count", section: "2: Produce" },
+            { recipeName: "Roasted tomatoes with garlic", ingredient: "Plum tomatoes", quantity: 2, units: "count", section: "2: Produce" },
+            { recipeName: "Enchilada bake", ingredient: "Mexican cheese", quantity: 0.5, units: "c", section: "3: Cheese area" },
+            { recipeName: "Enchilada bake", ingredient: "Tortilla chips", quantity: 1, units: "count", section: "2: Produce area" },
+            { recipeName: "Enchilada bake", ingredient: "Sour cream", quantity: 2, units: "tbsp", section: "4: Dairy" },
+            { recipeName: "Enchilada bake", ingredient: "Avocado", quantity: 1, units: "count", section: "2: Produce" },
+            { recipeName: "Enchilada bake", ingredient: "Cilantro", quantity: 1, units: "count", section: "2: Produce" },
+            { recipeName: "Enchilada bake", ingredient: "Lime", quantity: 2, units: "count", section: "2: Produce" },
+            { recipeName: "Enchilada bake", ingredient: "Scallions", quantity: 2, units: "count", section: "2: Produce" },
+            { recipeName: "Enchilada bake", ingredient: "Kidney beans", quantity: 1, units: "count", section: "6: Cooking" },
+            { recipeName: "Enchilada bake", ingredient: "Enchilada sauce", quantity: 1, units: "count", section: "6: Cooking" },
+            { recipeName: "Minestrone soup", ingredient: "Parmesan cheese", quantity: 0.25, units: "cup", section: "3: Cheese area" },
+            { recipeName: "Minestrone soup", ingredient: "Veggie stock concentrate", quantity: 1, units: "count", section: "6: Cooking" },
+            { recipeName: "Minestrone soup", ingredient: "Basil", quantity: 1, units: "T", section: "2: Produce" },
+            { recipeName: "Minestrone soup", ingredient: "Garlic", quantity: 1, units: "count", section: "2: Produce" },
+            { recipeName: "Minestrone soup", ingredient: "Yellow onion", quantity: 1, units: "count", section: "2: Produce" },
+            { recipeName: "Minestrone soup", ingredient: "Kidney beans", quantity: 1, units: "count", section: "6: Cooking" },
+            { recipeName: "Minestrone soup", ingredient: "White beans", quantity: 1, units: "count", section: "6: Cooking" },
+            { recipeName: "Minestrone soup", ingredient: "Celery", quantity: 1, units: "count", section: "2: Produce" },
+            { recipeName: "Minestrone soup", ingredient: "Carrots", quantity: 1, units: "ct", section: "2: Produce" },
+            { recipeName: "Minestrone soup", ingredient: "Panko", quantity: 1, units: "count", section: "6: Cooking" },
+            { recipeName: "Minestrone soup", ingredient: "Diced tomatoes", quantity: 1, units: "can", section: "6: Cooking" },
+            { recipeName: "Roasted yams and chickpeas with yogurt", ingredient: "Greek yogurt", quantity: 1, units: "count", section: "4: Dairy" },
+            { recipeName: "Roasted yams and chickpeas with yogurt", ingredient: "Sweet potatoes", quantity: 3, units: "count", section: "2: Produce" },
+            { recipeName: "Roasted yams and chickpeas with yogurt", ingredient: "Chickpeas", quantity: 15, units: "oz", section: "6: Cooking" },
+            { recipeName: "Roasted yams and chickpeas with yogurt", ingredient: "Garlic", quantity: 1, units: "count", section: "2: Produce" },
+            { recipeName: "Roasted yams and chickpeas with yogurt", ingredient: "Lemon", quantity: 1, units: "count", section: "2: Produce" },
+            { recipeName: "Roast butternut squash and red onion with tahini and zaatar", ingredient: "Tahini", quantity: 1, units: "Tb", section: "6: Cooking" },
+            { recipeName: "Roast butternut squash and red onion with tahini and zaatar", ingredient: "Red onion", quantity: 2, units: "count", section: "2: Produce" },
+            { recipeName: "Roast butternut squash and red onion with tahini and zaatar", ingredient: "Butternut squash", quantity: 1, units: "count", section: "2: Produce" },
+            { recipeName: "Roast butternut squash and red onion with tahini and zaatar", ingredient: "Za'atar", quantity: 1, units: "count", section: "6: Cooking" },
+            { recipeName: "Kale salad", ingredient: "Feta cheese / goats cheese", quantity: 1, units: "c", section: "3: Cheese area" },
+            { recipeName: "Kale salad", ingredient: "Hazelnuts", quantity: 1, units: "count", section: "2: Produce" },
+            { recipeName: "Kale salad", ingredient: "Olive oil", quantity: 1, units: "tsp", section: "6: Cooking" },
+            { recipeName: "Kale salad", ingredient: "Avocado", quantity: 1, units: "count", section: "2: Produce" },
+            { recipeName: "Kale salad", ingredient: "Garlic", quantity: 1, units: "count", section: "2: Produce" },
+            { recipeName: "Kale salad", ingredient: "Kale", quantity: 1, units: "lbs", section: "2: Produce" },
+            { recipeName: "Kale salad", ingredient: "Pine nuts", quantity: 1, units: "count", section: "2: Produce" },
+            { recipeName: "Peach Panzanella with Burrata & Mint ", ingredient: "Hummus", quantity: 1, units: "count", section: "3: Cheese area" },
+            { recipeName: "Peach Panzanella with Burrata & Mint ", ingredient: "Buratta", quantity: 1, units: "balls", section: "4: Dairy" },
+            { recipeName: "Peach Panzanella with Burrata & Mint ", ingredient: "Mint", quantity: 1, units: "t", section: "2: Produce" },
+            { recipeName: "Peach Panzanella with Burrata & Mint ", ingredient: "Peaches", quantity: 1, units: "count", section: "2: Produce" },
+            { recipeName: "Peach Panzanella with Burrata & Mint ", ingredient: "Baguette", quantity: 1, units: "count", section: "1: Bread" },
+            { recipeName: "Simple cauliflower tacos", ingredient: "Cilantro", quantity: 1, units: "count", section: "2: Produce" },
+            { recipeName: "Simple cauliflower tacos", ingredient: "Lime", quantity: 1, units: "count", section: "2: Produce" },
+            { recipeName: "Simple cauliflower tacos", ingredient: "Red onion", quantity: 1, units: "count", section: "2: Produce" },
+            { recipeName: "Simple cauliflower tacos", ingredient: "Cauliflower", quantity: 1, units: "count", section: "2: Produce" },
+            { recipeName: "Simple cauliflower tacos", ingredient: "Tortillas", quantity: 1, units: "count", section: "6: Cooking" },
+            { recipeName: "Haricots Verts with Minty Tahini", ingredient: "Hazelnuts", quantity: 0.25, units: "count", section: "2: Produce" },
+            { recipeName: "Haricots Verts with Minty Tahini", ingredient: "Semi pearled farro", quantity: 0.25, units: "cups", section: "6: Cooking" },
+            { recipeName: "Haricots Verts with Minty Tahini", ingredient: "Olive oil", quantity: 1, units: "tsp", section: "6: Cooking" },
+            { recipeName: "Haricots Verts with Minty Tahini", ingredient: "Green beans", quantity: 1, units: "lb", section: "2: Produce" },
+            { recipeName: "Haricots Verts with Minty Tahini", ingredient: "Tahini", quantity: 2, units: "Tb", section: "6: Cooking" },
+            { recipeName: "Haricots Verts with Minty Tahini", ingredient: "Mint", quantity: 0.5, units: "t", section: "2: Produce" },
+            { recipeName: "Haricots Verts with Minty Tahini", ingredient: "Garlic", quantity: 1, units: "count", section: "2: Produce" },
+            { recipeName: "Haricots Verts with Minty Tahini", ingredient: "Lemon", quantity: 1, units: "count", section: "2: Produce" },
+            { recipeName: "Haricots Verts with Minty Tahini", ingredient: "Maple syrup", quantity: 0.5, units: "t", section: "6: Cooking" },
+         ];
+         // ... (rest of the recipeData array)
+
+
+        // --- DOM References ---
+        const recipeListDiv = document.getElementById('recipe-list');
+        const generateButton = document.getElementById('generate-list-button');
+        const shoppingListUl = document.getElementById('shopping-list-ul');
+
+        // --- Get Unique Recipe Names from Data ---
+        const availableRecipes = [...new Set(recipeData.map(item => item.recipeName))];
+        const selectableRecipes = availableRecipes.filter(name =>
+            name &&
+            name.toLowerCase() !== 'everday staples' &&
+            name.toLowerCase() !== 'infrequent staples'
+        ).sort();
+
+
+        // --- Dynamically Create Recipe Checkboxes ---
+        function populateRecipeCheckboxes() {
+            recipeListDiv.innerHTML = ''; // Clear loading message
+
+            if (selectableRecipes.length === 0) {
+                recipeListDiv.innerHTML = '<p class="error-message">No recipes found in the data.</p>';
+                generateButton.textContent = 'No Recipes';
+                return;
+            }
+
+            selectableRecipes.forEach(recipeName => {
+                const div = document.createElement('div');
+                div.classList.add('recipe-item');
+
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                const safeId = `recipe-${recipeName.replace(/[^a-zA-Z0-9_-]/g, '') || Math.random().toString(36).substring(2, 8)}`;
+                checkbox.id = safeId;
+                checkbox.name = 'recipe';
+                checkbox.value = recipeName;
+
+                const label = document.createElement('label');
+                label.htmlFor = safeId;
+                label.textContent = recipeName;
+
+                div.appendChild(checkbox);
+                div.appendChild(label);
+                recipeListDiv.appendChild(div);
+            });
+
+            // Enable the button now that recipes are loaded
+            generateButton.disabled = false;
+            generateButton.textContent = 'Generate Shopping List';
+        }
+
+        // --- Event Listener for Button ---
+        generateButton.addEventListener('click', () => {
+            const selectedRecipeNames = [];
+            const recipeCheckboxes = recipeListDiv.querySelectorAll('input[name="recipe"]:checked');
+            recipeCheckboxes.forEach(checkbox => selectedRecipeNames.push(checkbox.value));
+
+            const shoppingList = {};
+
+            recipeData.forEach(item => {
+                if (selectedRecipeNames.includes(item.recipeName)) {
+                    const { ingredient, quantity, units, section } = item;
+                    const ingredientKey = ingredient.toLowerCase();
+
+                    if (shoppingList[ingredientKey]) {
+                        if (shoppingList[ingredientKey].units.toLowerCase() === units.toLowerCase()) {
+                            shoppingList[ingredientKey].quantity += quantity;
+                        } else {
+                            const uniqueKey = `${ingredientKey} (${units})`;
+                            if (shoppingList[uniqueKey]) {
+                                shoppingList[uniqueKey].quantity += quantity;
+                            } else {
+                                shoppingList[uniqueKey] = {
+                                    quantity: quantity, units: units, section: section,
+                                    originalName: `${ingredient} (${units})`
+                                };
+                            }
+                        }
+                    } else {
+                        shoppingList[ingredientKey] = {
+                            quantity: quantity, units: units,
+                            section: section || 'Unknown Section',
+                            originalName: ingredient
+                        };
+                    }
+                }
+            });
+
+            // --- Display Shopping List ---
+            shoppingListUl.innerHTML = ''; // Clear previous list
+            const ingredientKeys = Object.keys(shoppingList);
+
+            if (ingredientKeys.length === 0) {
+                const listItem = document.createElement('li');
+                listItem.textContent = selectedRecipeNames.length > 0 ? 'No ingredients found for selected recipes.' : 'No recipes selected.';
+                shoppingListUl.appendChild(listItem);
+            } else {
+                ingredientKeys.sort((aKey, bKey) => {
+                    const itemA = shoppingList[aKey];
+                    const itemB = shoppingList[bKey];
+                    const sectionA = itemA.section || 'Unknown Section';
+                    const sectionB = itemB.section || 'Unknown Section';
+                    const sectionCompare = sectionA.localeCompare(sectionB);
+                    if (sectionCompare !== 0) return sectionCompare;
+                    const nameA = itemA.originalName || aKey;
+                    const nameB = itemB.originalName || bKey;
+                    return nameA.localeCompare(nameB);
+                });
+
+                let currentSection = null;
+                ingredientKeys.forEach(ingredientKey => {
+                    const item = shoppingList[ingredientKey];
+
+                    // Add Section Header
+                    if (item.section !== currentSection) {
+                        const headerLi = document.createElement('li');
+                        headerLi.classList.add('section-header'); // Add class for styling
+                        headerLi.textContent = item.section || 'Unknown Section';
+                        shoppingListUl.appendChild(headerLi);
+                        currentSection = item.section;
+                    }
+
+                    // Add Ingredient Item using Grid structure
+                    const listItem = document.createElement('li');
+                    listItem.classList.add('ingredient-item'); // Add class for grid styling
+
+                    const nameSpan = document.createElement('span');
+                    nameSpan.classList.add('ingredient-name');
+                    nameSpan.textContent = item.originalName || ingredientKey;
+
+                    const qtySpan = document.createElement('span');
+                    qtySpan.classList.add('ingredient-qty');
+                    const displayQuantity = Number.isInteger(item.quantity) ? item.quantity : item.quantity.toFixed(2).replace(/\.?0+$/, "");
+                    qtySpan.textContent = displayQuantity;
+
+                    const unitSpan = document.createElement('span');
+                    unitSpan.classList.add('ingredient-unit');
+                    unitSpan.textContent = item.units;
+
+                    listItem.appendChild(nameSpan);
+                    listItem.appendChild(qtySpan);
+                    listItem.appendChild(unitSpan);
+                    shoppingListUl.appendChild(listItem);
+                });
+            }
+        });
+
+        // --- Initial Setup ---
+        try {
+           populateRecipeCheckboxes();
+        } catch (error) {
+            console.error("Error initializing recipe list:", error);
+            recipeListDiv.innerHTML = '<p class="error-message">An error occurred loading the recipe list.</p>';
+            generateButton.disabled = true;
+            generateButton.textContent = 'Error Loading';
+        }
+
+    </script>
+
+</body>
+</html>
