@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shopping List</title>
+    <style>
+        /* Import a modern font */
+        @import url('https://fonts.googleapis.com/css2?family=Source+Serif+Pro:wght@400;600;700&display=swap');
+
+        /* --- Global Styles & Variables --- */
+        :root {
+            --primary-color: #2E7D32;  /* Organic green */
+            --secondary-color: #666666;
+            --light-grey: #F9F9F7;     /* Warm off-white */
+            --dark-grey: #2C2C2C;
+            --white: #ffffff;
+            --border-color: #E8E8E8;
+            --success-color: #2E7D32;
+            --shadow-sm: 0 2px 4px rgba(0,0,0,0.05);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+            --border-radius: 12px;
+            --section-bg: #F5F5F3;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Source Serif Pro', serif;
+            line-height: 1.6;
+            background-color: var(--light-grey);
+            color: var(--dark-grey);
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 20px auto;
+            background-color: var(--white);
+            padding: 40px;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow-md);
+        }
+
+        h1, h2, h3 {
+            color: var(--dark-grey);
+            margin-bottom: 1em;
+            font-weight: 600;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 1.5em;
+            font-size: 2.2em;
+            letter-spacing: -0.02em;
+        }
+
+        h2 {
+           border-bottom: 2px solid var(--border-color);
+           padding-bottom: 0.5em;
+           font-weight: 600;
+           font-size: 1.4em;
+           letter-spacing: -0.01em;
+        }
+
+        h3 {
+            font-weight: 600;
+            color: var(--dark-grey);
+            margin-top: 0;
+            font-size: 1.3em;
+            letter-spacing: -0.01em;
+        }
+
+        /* Back Button */
+        .back-button {
+            display: inline-flex;
+            align-items: center;
+            padding: 8px 16px;
+            background-color: var(--white);
+            color: var(--dark-grey);
+            text-decoration: none;
+            border-radius: var(--border-radius);
+            margin-bottom: 20px;
+            transition: all 0.2s ease;
+            border: 1px solid var(--border-color);
+            font-size: 0.95em;
+        }
+
+        .back-button:hover {
+            background-color: var(--light-grey);
+            border-color: var(--secondary-color);
+        }
+
+        /* Shopping List & Links Area */
+        #shopping-list-output {
+            background-color: var(--white);
+            padding-top: 10px;
+        }
+
+        /* Styling for Recipe Links Area */
+        #selected-recipe-links {
+            margin-bottom: 30px;
+            padding: 20px;
+            background-color: var(--section-bg);
+            border-radius: var(--border-radius);
+            display: none;
+        }
+
+        #selected-recipe-links h4 {
+            margin: 0 0 15px 0;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--dark-grey);
+            font-size: 1.1em;
+            font-weight: 600;
+            letter-spacing: -0.01em;
+        }
+
+        #selected-recipe-links div {
+            margin-bottom: 10px;
+        }
+
+        #selected-recipe-links div:last-child {
+            margin-bottom: 0;
+        }
+
+        #selected-recipe-links a {
+            color: var(--primary-color);
+            text-decoration: none;
+            font-weight: 500;
+            display: inline-block;
+            padding: 2px 0;
+            transition: color 0.2s ease;
+            font-size: 1.05em;
+        }
+
+        #selected-recipe-links a:hover {
+            color: #1B5E20;
+        }
+
+        #shopping-list-ul {
+            list-style: none;
+            padding-left: 0;
+            margin-top: 20px;
+        }
+
+        /* Section Headers */
+        #shopping-list-ul .section-header {
+            margin-top: 30px;
+            margin-bottom: 15px;
+            padding-bottom: 8px;
+            font-weight: 600;
+            font-size: 1.2em;
+            color: var(--dark-grey);
+            border-bottom: 2px solid var(--border-color);
+            grid-column: 1 / -1;
+            letter-spacing: -0.01em;
+        }
+
+        #shopping-list-ul .section-header:first-of-type {
+            margin-top: 10px;
+        }
+
+        /* Ingredient Items */
+        #shopping-list-ul .ingredient-item {
+            display: grid;
+            grid-template-columns: auto 1fr minmax(60px, auto) minmax(60px, auto);
+            gap: 12px 20px;
+            align-items: center;
+            padding: 12px 8px;
+            border-bottom: 1px solid var(--border-color);
+            transition: all 0.2s ease;
+        }
+
+        #shopping-list-ul .ingredient-item:hover {
+            background-color: var(--light-grey);
+            padding-left: 12px;
+        }
+
+        #shopping-list-ul .ingredient-item:last-child {
+            border-bottom: none;
+        }
+
+        .shopping-list-checkbox {
+            grid-column: 1 / 2;
+            margin: 0;
+            accent-color: var(--primary-color);
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        .ingredient-item label.ingredient-name {
+            grid-column: 2 / 3;
+            font-weight: 500;
+            margin: 0;
+            cursor: pointer;
+            transition: color 0.3s ease, text-decoration 0.3s ease;
+            font-size: 1.05em;
+        }
+
+        .ingredient-qty {
+            grid-column: 3 / 4;
+            font-weight: 600;
+            text-align: right;
+            padding-right: 8px;
+            transition: color 0.3s ease, text-decoration 0.3s ease;
+            min-width: 60px;
+            color: var(--dark-grey);
+        }
+
+        .ingredient-unit {
+            grid-column: 4 / 5;
+            color: var(--secondary-color);
+            text-align: left;
+            transition: color 0.3s ease, text-decoration 0.3s ease;
+            min-width: 60px;
+            font-size: 0.95em;
+        }
+
+        .ingredient-item input[type="checkbox"]:checked + label.ingredient-name,
+        .ingredient-item input[type="checkbox"]:checked ~ .ingredient-qty,
+        .ingredient-item input[type="checkbox"]:checked ~ .ingredient-unit {
+            text-decoration: line-through;
+            color: var(--secondary-color);
+        }
+
+        .ingredient-item input[type="checkbox"]:checked ~ * {
+            opacity: 0.7;
+        }
+
+        .ingredient-item input[type="checkbox"]:checked {
+            opacity: 0.7;
+        }
+
+        /* Share Button */
+        .share-button {
+            color: var(--secondary-color);
+            text-decoration: none;
+            font-size: 0.9em;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 8px 12px;
+            border-radius: var(--border-radius);
+        }
+
+        .share-button:hover {
+            color: var(--primary-color);
+            background-color: var(--light-grey);
+        }
+
+        .share-button svg {
+            width: 14px;
+            height: 14px;
+        }
+
+        .button-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .share-link-container {
+            display: flex;
+            align-items: center;
+        }
+
+        /* Share Dialog */
+        .share-dialog {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--white);
+            padding: 30px;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow-md);
+            z-index: 1000;
+            max-width: 90%;
+            width: 400px;
+        }
+
+        .share-dialog.active {
+            display: block;
+        }
+
+        .share-dialog h3 {
+            margin-bottom: 20px;
+            color: var(--dark-grey);
+            font-size: 1.3em;
+            letter-spacing: -0.01em;
+        }
+
+        .share-dialog textarea {
+            width: 100%;
+            height: 120px;
+            margin-bottom: 20px;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
+            resize: vertical;
+            font-family: 'Source Serif Pro', serif;
+            font-size: 0.95em;
+            line-height: 1.5;
+        }
+
+        .share-dialog-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+        }
+
+        .share-dialog button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 0.95em;
+            transition: all 0.2s ease;
+            font-family: 'Source Serif Pro', serif;
+        }
+
+        .share-dialog .copy-button {
+            background-color: var(--primary-color);
+            color: var(--white);
+        }
+
+        .share-dialog .copy-button:hover {
+            background-color: #1B5E20;
+            transform: translateY(-1px);
+        }
+
+        .share-dialog .close-button {
+            background-color: var(--light-grey);
+            color: var(--dark-grey);
+        }
+
+        .share-dialog .close-button:hover {
+            background-color: var(--border-color);
+            transform: translateY(-1px);
+        }
+
+        .overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.4);
+            z-index: 999;
+            backdrop-filter: blur(2px);
+        }
+
+        .overlay.active {
+            display: block;
+        }
+
+        .toast {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--dark-grey);
+            color: var(--white);
+            padding: 14px 28px;
+            border-radius: var(--border-radius);
+            z-index: 1001;
+            font-size: 0.95em;
+            box-shadow: var(--shadow-md);
+        }
+
+        .toast.active {
+            display: block;
+            animation: fadeInOut 2.5s ease-in-out;
+        }
+
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: translate(-50%, 20px); }
+            10% { opacity: 1; transform: translate(-50%, 0); }
+            90% { opacity: 1; transform: translate(-50%, 0); }
+            100% { opacity: 0; transform: translate(-50%, -20px); }
+        }
+
+        /* Mobile Responsiveness */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            .container {
+                padding: 25px;
+                margin: 10px auto;
+            }
+            h1 {
+                font-size: 1.8em;
+            }
+            h2 {
+                font-size: 1.3em;
+            }
+            #shopping-list-ul .ingredient-item {
+                grid-template-columns: auto 1fr minmax(50px, auto) minmax(50px, auto);
+                gap: 10px 15px;
+                padding: 10px 5px;
+            }
+            .ingredient-qty {
+                min-width: 50px;
+                padding-right: 5px;
+            }
+            .ingredient-unit {
+                min-width: 50px;
+            }
+            .ingredient-item label.ingredient-name {
+                font-size: 1em;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 20px;
+            }
+            h1 {
+                font-size: 1.6em;
+            }
+            h2 {
+                font-size: 1.2em;
+            }
+            #shopping-list-ul .ingredient-item {
+                grid-template-columns: auto 1fr minmax(40px, auto) minmax(40px, auto);
+                gap: 8px 12px;
+            }
+            .ingredient-qty {
+                min-width: 40px;
+                padding-right: 4px;
+            }
+            .ingredient-unit {
+                min-width: 40px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="button-container">
+            <a href="RecipeMonday3.html" class="back-button">← Back to Recipe Selection</a>
+            <div class="share-link-container">
+                <a href="#" class="share-button" id="share-button">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/>
+                    </svg>
+                    Share
+                </a>
+            </div>
+        </div>
+        <h1>Shopping List</h1>
+
+        <div id="shopping-list-output">
+            <div id="selected-recipe-links">
+                <h4>Recipe Links:</h4>
+                <!-- Recipe links will be populated here -->
+            </div>
+
+            <ul id="shopping-list-ul">
+                <!-- Shopping list will be populated here -->
+            </ul>
+        </div>
+    </div>
+
+    <!-- Share Dialog -->
+    <div class="overlay" id="overlay"></div>
+    <div class="share-dialog" id="share-dialog">
+        <h3>Share Shopping List</h3>
+        <textarea id="share-text" readonly></textarea>
+        <div class="share-dialog-buttons">
+            <button class="copy-button" id="copy-button">Copy to Clipboard</button>
+            <button class="close-button" id="close-dialog">Close</button>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="toast" id="toast">Copied to clipboard!</div>
+
+    <script>
+        // Recipe URL mappings
+        const recipeUrls = {
+            "Burrito bowls": "https://www.hellofresh.com/recipes/veggie-burrito-bowls-5bc0bfaaae08b5032c3a6bf2",
+            "Enchilada bake": "https://www.hellofresh.com/recipes/one-pan-rice-bean-enchilada-bake-614b499eebe91d735a1d62a9",
+            "Simple cauliflower tacos by Smitten Kitchen": "https://smittenkitchen.com/2020/10/simple-cauliflower-tacos/",
+            "Peach panzanella with burrata & mint by Good Eggs": "https://www.goodeggs.com/bundlessfbay/peach-panzanella-with-burrata-mint/5cd5c7e536ac96000eceb455",
+            "Roasted yams and chickpeas with yogurt by Smitten Kitchen": "https://smittenkitchen.com/2016/02/roasted-yams-and-chickpeas-with-yogurt/",
+            "Roast butternut squash and red onion with za'atar tahini by Ottolenghi": "https://ottolenghi.co.uk/recipes/roast-butternut-squash-and-red-onion-with-tahini-and-za-atar",
+            "Shakshuka by Smitten Kitchen": "https://smittenkitchen.com/2010/04/shakshuka/",
+            "Veggie jumble": "https://www.hellofresh.com/recipes/w19-r8-58d3c741d56afa563047ade3",
+            "Mediteranean baked veggies": "https://www.hellofresh.com/recipes/mediterranean-baked-veggies-5a958ac730006c32be67bfd2",
+            "Mushroom buratta pizza by Good Eggs": "https://www.goodeggs.com/sfbay/bundlessfbay/mushroom-pizza-with-burrata-arugula/5b58e54d9c68f5000ff4e2ad",
+            "Sweet potato pita pocket": "https://www.hellofresh.com/recipes/harissa-sweet-potato-pitas-58b99736d56afa17de02ce53",
+            "Mushroom ravioli": "https://www.hellofresh.com/recipes/creamiest-mushroom-ravioli-5aaac3ac30006c55e74b0644",
+            "Broccoli farro salad by Smitten Kitchen": "https://smittenkitchen.com/2017/05/broccoli-rubble-farro-salad/",
+            "One pot farro with tomato by Smitten Kitchen": "https://smittenkitchen.com/2013/07/one-pan-farro-with-tomatoes/",
+            "Spaghetti aglio e olio by Bon Appetit": "https://www.bonappetit.com/recipe/spaghetti-aglio-e-olio-with-lots-of-kale",
+            "Creamy mushroom pasta by Bon Appetit": "https://www.bonappetit.com/test-kitchen/inside-our-kitchen/article/brown-butter-mushroom-orecchiette",
+            "Chickpea and carrot curry": "https://www.williams-sonoma.com/recipe/chickpea--spinach-and-carrot-curry.html",
+            "Quinoa spaghetti with broccoli": "https://www.williams-sonoma.com/recipe/quinoa-spaghetti-with-broccoli-rabe--feta-and-mint.html",
+            "Skillet pasta with 5 cheeses by Smitten Kitchen": "https://smittenkitchen.com/2016/10/skillet-baked-pasta-with-five-cheeses/",
+            "Roasted tomatoes with garlic by Smitten Kitchen": "https://smittenkitchen.com/2008/08/slow-roasted-tomatoes/",
+            "Haricots verts with minty tahini by Ottolenghi": "https://www.bonappetit.com/recipe/haricots-verts-and-freekeh-with-minty-tahini-dressing"
+        };
+
+        // DOM References
+        const recipeLinksDiv = document.getElementById('selected-recipe-links');
+        const shoppingListUl = document.getElementById('shopping-list-ul');
+
+        // Load and display data
+        function loadShoppingList() {
+            const selectedRecipes = JSON.parse(localStorage.getItem('selectedRecipes') || '[]');
+            const recipeData = JSON.parse(localStorage.getItem('recipeData') || '[]');
+
+            // Display recipe links
+            if (selectedRecipes.length > 0) {
+                recipeLinksDiv.style.display = 'block';
+                recipeLinksDiv.innerHTML = '<h4>Recipe Links:</h4>';
+                
+                selectedRecipes.sort().forEach(recipeName => {
+                    const url = recipeUrls[recipeName];
+                    if (url) {
+                        const linkContainer = document.createElement('div');
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.textContent = recipeName;
+                        link.target = "_blank";
+                        link.rel = "noopener noreferrer";
+                        linkContainer.appendChild(link);
+                        recipeLinksDiv.appendChild(linkContainer);
+                    }
+                });
+            } else {
+                recipeLinksDiv.style.display = 'none';
+            }
+
+            // Generate shopping list
+            const shoppingList = {};
+            recipeData.forEach(item => {
+                if (selectedRecipes.includes(item.recipeName)) {
+                    const { ingredient, quantity, units, section } = item;
+                    const numQuantity = Number(quantity);
+                    if (isNaN(numQuantity)) return;
+
+                    const ingredientKey = ingredient.toLowerCase().trim();
+                    const unitKey = units ? units.toLowerCase().trim() : '';
+                    const combinedKey = `${ingredientKey}|${unitKey}`;
+
+                    // Normalize section name
+                    const normalizedSection = section === 'Cheese area' ? 'Dairy' : section;
+
+                    if (shoppingList[combinedKey]) {
+                        shoppingList[combinedKey].quantity += numQuantity;
+                    } else {
+                        shoppingList[combinedKey] = {
+                            quantity: numQuantity,
+                            units: units || '',
+                            section: normalizedSection || 'Uncategorized',
+                            originalName: ingredient
+                        };
+                    }
+                }
+            });
+
+            // Display shopping list
+            shoppingListUl.innerHTML = '';
+            const ingredientEntries = Object.entries(shoppingList);
+
+            if (ingredientEntries.length === 0) {
+                shoppingListUl.innerHTML = '<li>No ingredients needed for selected recipes.</li>';
+            } else {
+                // Define category order
+                const categoryOrder = [
+                    'Bread',
+                    'Nuts',
+                    'Produce',
+                    'Dairy',
+                    'Frozen',
+                    'Cooking'
+                ];
+
+                ingredientEntries.sort(([, itemA], [, itemB]) => {
+                    const sectionA = itemA.section || 'ZZZ';
+                    const sectionB = itemB.section || 'ZZZ';
+                    
+                    // Get index in category order, or use a large number for uncategorized
+                    const indexA = categoryOrder.indexOf(sectionA);
+                    const indexB = categoryOrder.indexOf(sectionB);
+                    
+                    // If both categories are in our order list, sort by their position
+                    if (indexA !== -1 && indexB !== -1) {
+                        return indexA - indexB;
+                    }
+                    
+                    // If only one category is in our order list, prioritize it
+                    if (indexA !== -1) return -1;
+                    if (indexB !== -1) return 1;
+                    
+                    // If neither category is in our order list, sort alphabetically
+                    return sectionA.localeCompare(sectionB);
+                });
+
+                let currentSection = null;
+                ingredientEntries.forEach(([combinedKey, item], index) => {
+                    if (item.section !== currentSection) {
+                        const headerLi = document.createElement('li');
+                        headerLi.classList.add('section-header');
+                        headerLi.textContent = item.section;
+                        shoppingListUl.appendChild(headerLi);
+                        currentSection = item.section;
+                    }
+
+                    const listItem = document.createElement('li');
+                    listItem.classList.add('ingredient-item');
+
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    const safeKey = combinedKey.replace(/[^a-zA-Z0-9_-]/g, '');
+                    const checkboxId = `item-${safeKey}-${index}`;
+                    checkbox.id = checkboxId;
+                    checkbox.classList.add('shopping-list-checkbox');
+
+                    const label = document.createElement('label');
+                    label.htmlFor = checkboxId;
+                    label.classList.add('ingredient-name');
+                    label.textContent = item.originalName;
+
+                    const qtySpan = document.createElement('span');
+                    qtySpan.classList.add('ingredient-qty');
+                    const displayQuantity = Number.isInteger(item.quantity)
+                        ? item.quantity
+                        : parseFloat(item.quantity.toFixed(2));
+                    qtySpan.textContent = displayQuantity;
+
+                    const unitSpan = document.createElement('span');
+                    unitSpan.classList.add('ingredient-unit');
+                    unitSpan.textContent = item.units;
+
+                    listItem.appendChild(checkbox);
+                    listItem.appendChild(label);
+                    listItem.appendChild(qtySpan);
+                    listItem.appendChild(unitSpan);
+                    shoppingListUl.appendChild(listItem);
+                });
+            }
+        }
+
+        // Load data when page loads
+        window.addEventListener('load', loadShoppingList);
+
+        // Share functionality
+        function formatShoppingList() {
+            const selectedRecipes = JSON.parse(localStorage.getItem('selectedRecipes') || '[]');
+            const recipeData = JSON.parse(localStorage.getItem('recipeData') || '[]');
+            
+            let text = 'Shopping List:\n\n';
+            
+            // Add recipe names
+            if (selectedRecipes.length > 0) {
+                text += 'Recipes:\n';
+                selectedRecipes.sort().forEach(recipe => {
+                    text += `- ${recipe}\n`;
+                });
+                text += '\n';
+            }
+
+            // Generate shopping list
+            const shoppingList = {};
+            recipeData.forEach(item => {
+                if (selectedRecipes.includes(item.recipeName)) {
+                    const { ingredient, quantity, units, section } = item;
+                    const numQuantity = Number(quantity);
+                    if (isNaN(numQuantity)) return;
+
+                    const ingredientKey = ingredient.toLowerCase().trim();
+                    const unitKey = units ? units.toLowerCase().trim() : '';
+                    const combinedKey = `${ingredientKey}|${unitKey}`;
+
+                    // Normalize section name
+                    const normalizedSection = section === 'Cheese area' ? 'Dairy' : section;
+
+                    if (shoppingList[combinedKey]) {
+                        shoppingList[combinedKey].quantity += numQuantity;
+                    } else {
+                        shoppingList[combinedKey] = {
+                            quantity: numQuantity,
+                            units: units || '',
+                            section: normalizedSection || 'Uncategorized',
+                            originalName: ingredient
+                        };
+                    }
+                }
+            });
+
+            // Sort and format ingredients
+            const ingredientEntries = Object.entries(shoppingList);
+            
+            // Define category order
+            const categoryOrder = [
+                'Bread',
+                'Nuts',
+                'Produce',
+                'Dairy',
+                'Frozen',
+                'Cooking'
+            ];
+
+            ingredientEntries.sort(([, itemA], [, itemB]) => {
+                const sectionA = itemA.section || 'ZZZ';
+                const sectionB = itemB.section || 'ZZZ';
+                
+                // Get index in category order, or use a large number for uncategorized
+                const indexA = categoryOrder.indexOf(sectionA);
+                const indexB = categoryOrder.indexOf(sectionB);
+                
+                // If both categories are in our order list, sort by their position
+                if (indexA !== -1 && indexB !== -1) {
+                    return indexA - indexB;
+                }
+                
+                // If only one category is in our order list, prioritize it
+                if (indexA !== -1) return -1;
+                if (indexB !== -1) return 1;
+                
+                // If neither category is in our order list, sort alphabetically
+                return sectionA.localeCompare(sectionB);
+            });
+
+            let currentSection = null;
+            ingredientEntries.forEach(([, item]) => {
+                if (item.section !== currentSection) {
+                    text += `\n${item.section}:\n`;
+                    currentSection = item.section;
+                }
+
+                const displayQuantity = Number.isInteger(item.quantity)
+                    ? item.quantity
+                    : parseFloat(item.quantity.toFixed(2));
+                text += `- ${item.originalName}: ${displayQuantity} ${item.units}\n`;
+            });
+
+            return text;
+        }
+
+        // Share button functionality
+        const shareButton = document.getElementById('share-button');
+        const shareDialog = document.getElementById('share-dialog');
+        const overlay = document.getElementById('overlay');
+        const closeDialog = document.getElementById('close-dialog');
+        const copyButton = document.getElementById('copy-button');
+        const shareText = document.getElementById('share-text');
+        const toast = document.getElementById('toast');
+
+        shareButton.addEventListener('click', async () => {
+            const text = formatShoppingList();
+
+            if (navigator.share) {
+                try {
+                    await navigator.share({
+                        title: 'Shopping List',
+                        text: text
+                    });
+                } catch (err) {
+                    if (err.name !== 'AbortError') {
+                        showShareDialog(text);
+                    }
+                }
+            } else {
+                showShareDialog(text);
+            }
+        });
+
+        function showShareDialog(text) {
+            shareText.value = text;
+            shareDialog.classList.add('active');
+            overlay.classList.add('active');
+        }
+
+        function hideShareDialog() {
+            shareDialog.classList.remove('active');
+            overlay.classList.remove('active');
+        }
+
+        closeDialog.addEventListener('click', hideShareDialog);
+        overlay.addEventListener('click', hideShareDialog);
+
+        copyButton.addEventListener('click', async () => {
+            try {
+                await navigator.clipboard.writeText(shareText.value);
+                showToast();
+            } catch (err) {
+                console.error('Failed to copy text: ', err);
+            }
+        });
+
+        function showToast() {
+            toast.classList.add('active');
+            setTimeout(() => {
+                toast.classList.remove('active');
+            }, 2500);
+        }
+    </script>
+</body>
+</html> 
