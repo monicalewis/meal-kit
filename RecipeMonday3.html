@@ -45,6 +45,7 @@
             padding: 40px;
             border-radius: var(--border-radius);
             box-shadow: var(--shadow-md);
+            padding-bottom: 80px; /* Ensure content is not hidden behind sticky button */
         }
 
         h1, h2, h3 {
@@ -178,29 +179,31 @@
         }
         @media (max-width: 600px) {
             .recipe-grid {
-                grid-template-columns: 1fr;
+                grid-template-columns: repeat(2, 1fr);
             }
         }
 
         /* --- Button Styling --- */
         button#generate-list-button {
             display: block;
-            width: 100%;
-            max-width: 300px;
-            margin: 0 auto;
+            width: 100vw;
+            max-width: none;
+            left: 0;
+            right: 0;
+            margin: 0;
             padding: 15px 20px;
             background-color: var(--primary-color);
             color: var(--white);
             border: none;
-            border-radius: var(--border-radius);
+            border-radius: 0;
             cursor: pointer;
             font-size: 1.1em;
             font-weight: 600;
             transition: all 0.2s ease;
             box-shadow: var(--shadow-sm);
-            position: sticky;
-            bottom: 20px;
-            font-family: 'Source Serif Pro', serif;
+            position: fixed;
+            bottom: 0;
+            z-index: 100;
         }
 
         button#generate-list-button:hover:not(:disabled) {
@@ -235,6 +238,7 @@
                 padding: 25px;
                 margin: 10px auto;
                 height: calc(100vh - 20px);
+                padding-bottom: 80px;
             }
             #recipe-list-container {
                 height: calc(100vh - 180px);
@@ -248,7 +252,7 @@
                 margin-bottom: 0.5em;
             }
             button#generate-list-button {
-                padding: 12px 15px;
+                padding: 15px 10px;
                 font-size: 1em;
                 bottom: 10px;
             }
@@ -261,6 +265,7 @@
             .container {
                 padding: 20px;
                 margin: 5px auto;
+                padding-bottom: 70px;
             }
             #recipe-list-container {
                 height: calc(100vh - 160px);
@@ -278,6 +283,10 @@
             }
             .recipe-item label {
                 font-size: 1em;
+            }
+            button#generate-list-button {
+                font-size: 1em;
+                padding: 12px 5px;
             }
         }
     </style>
@@ -537,6 +546,20 @@
             "Skillet pasta with 5 cheeses by Smitten Kitchen": "https://i0.wp.com/smittenkitchen.com/wp-content/uploads//2016/10/skillet-baked-pasta-with-five-cheeses.jpg?fit=750%2C500&ssl=1",
         };
 
+        // Add error message element above the button
+        const errorMessageDiv = document.createElement('div');
+        errorMessageDiv.className = 'error-message';
+        errorMessageDiv.style.display = 'none';
+        generateButton.parentNode.insertBefore(errorMessageDiv, generateButton);
+
+        function updateButtonState() {
+            const checked = recipeListDiv.querySelectorAll('input[name="recipe"]:checked').length;
+            generateButton.disabled = checked === 0;
+            if (checked > 0) {
+                errorMessageDiv.style.display = 'none';
+            }
+        }
+
         function populateRecipeCards() {
             recipeListDiv.innerHTML = '';
 
@@ -590,7 +613,6 @@
 
                 // Make the entire card clickable
                 card.addEventListener('click', function(e) {
-                    // Prevent double toggling if the plus button is clicked
                     if (e.target === checkbox || e.target === plus) return;
                     checkbox.checked = !checkbox.checked;
                     checkbox.dispatchEvent(new Event('change'));
@@ -605,12 +627,12 @@
                         checkboxWrapper.classList.remove('selected');
                         card.classList.remove('selected');
                     }
+                    updateButtonState();
                 });
 
                 recipeListDiv.appendChild(card);
             });
-
-            generateButton.disabled = false;
+            updateButtonState();
             generateButton.textContent = 'Generate Shopping List';
         }
 
@@ -619,11 +641,14 @@
             const selectedRecipeNames = [];
             const recipeCheckboxes = recipeListDiv.querySelectorAll('input[name="recipe"]:checked');
             recipeCheckboxes.forEach(checkbox => selectedRecipeNames.push(checkbox.value));
-
+            if (selectedRecipeNames.length === 0) {
+                errorMessageDiv.textContent = 'Please select at least one recipe to generate a shopping list.';
+                errorMessageDiv.style.display = 'block';
+                return;
+            }
             // Store selected recipes and recipe data in localStorage
             localStorage.setItem('selectedRecipes', JSON.stringify(selectedRecipeNames));
             localStorage.setItem('recipeData', JSON.stringify(recipeData));
-
             // Navigate to shopping list page
             window.location.href = 'shopping-list.html';
         });
