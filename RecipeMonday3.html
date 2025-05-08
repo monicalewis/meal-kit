@@ -302,7 +302,7 @@
             </div>
         </div>
 
-        <button id="generate-list-button">Generate Shopping List</button>
+        <button id="generate-list-button">Get Shopping List</button>
     </div>
 
     <script>
@@ -503,22 +503,20 @@
             { recipeName: "Haricots verts with minty tahini by Ottolenghi", ingredient: "Maple syrup", quantity: 0.5, units: "tsp", section: "Cooking" },
         ];
 
-        // --- DOM References ---
-        const recipeListDiv = document.getElementById('recipe-list');
-        const generateButton = document.getElementById('generate-list-button');
-
-        // --- Get Unique Recipe Names from Data ---
-        const availableRecipes = [...new Set(recipeData.map(item => item.recipeName))];
-        const selectableRecipes = availableRecipes.filter(name =>
-            name &&
-            name.toLowerCase() !== 'everday staples' &&
-            name.toLowerCase() !== 'infrequent staples'
-        ).sort();
+        // Update recipeData for new labels
+        recipeData.forEach(item => {
+            if (item.recipeName === 'Enchilada bake') {
+                item.recipeName = 'Enchilada bake by Hello Fresh';
+            }
+            if (item.recipeName === 'Mediteranean baked veggies') {
+                item.recipeName = 'Baked mediterranean veggies by Hello Fresh';
+            }
+        });
 
         // Placeholder images for recipes
         const recipeImages = {
             "Veggie jumble": "https://img.hellofresh.com/c_fit,f_auto,fl_lossy,h_1100,q_50,w_2600/hellofresh_s3/image/grilled-cheese-and-veggie-jumble-46f11c36.jpg",
-            "Mediteranean baked veggies": "https://img.hellofresh.com/c_fit,f_auto,fl_lossy,h_1100,q_50,w_2600/hellofresh_s3/image/5a958ac730006c32be67bfd2-1f072c43.jpg",
+            "Baked mediterranean veggies by Hello Fresh": "https://img.hellofresh.com/c_fit,f_auto,fl_lossy,h_1100,q_50,w_2600/hellofresh_s3/image/5a958ac730006c32be67bfd2-1f072c43.jpg",
             "Mushroom buratta pizza by Good Eggs": "https://goodeggs4.imgix.net/da949f17-33ce-4864-bc35-76ae05d5c10a.jpg?w=840&h=525&fm=jpg&q=80&fit=crop",
             "Burrito bowls": "https://img.hellofresh.com/c_fit,f_auto,fl_lossy,h_1100,q_50,w_2600/hellofresh_s3/image/5e5ea67325ed1a2b107a3598-296940aa.jpg",
             "Margherita pizza": "https://ooni.com/cdn/shop/articles/20220211142347-margherita-9920_ba86be55-674e-4f35-8094-2067ab41a671.jpg?v=1737104576&width=2048",
@@ -533,7 +531,7 @@
             "Creamy mushroom pasta by Bon Appetit": "https://assets.bonappetit.com/photos/5d4ddd602c815a00080f9771/1:1/w_2240,c_limit/BA-0919-Creamy-Pasta-Crispy-Mushroom-Playbook.jpg",
             "Chickpea and carrot curry": "https://assets.wsimgs.com/wsimgs/rk/images/dp/recipe/202508/0012/img74l.jpg",
             "Caprese sandwiches": "https://cdn.loveandlemons.com/wp-content/uploads/2020/06/caprese-sandwich-1.jpg",
-            "Enchilada bake": "https://img.hellofresh.com/c_fit,f_auto,fl_lossy,h_1100,q_50,w_2600/hellofresh_s3/image/one-pan-rice-bean-enchilada-bake-a73f6f46.jpg",
+            "Enchilada bake by Hello Fresh": "https://img.hellofresh.com/c_fit,f_auto,fl_lossy,h_1100,q_50,w_2600/hellofresh_s3/image/one-pan-rice-bean-enchilada-bake-a73f6f46.jpg",
             "Haricots verts with minty tahini by Ottolenghi": "https://assets.bonappetit.com/photos/57ad3b1653e63daf11a4dd26/1:1/w_2240,c_limit/haricots-verts-and-freekeh-with-minty-tahini-dressing.jpg",
             "Kale salad": "https://i0.wp.com/smittenkitchen.com/wp-content/uploads//2013/08/kale-salad-with-pecorino-and-walnuts.jpg?fit=750%2C500&ssl=1",
             "Minestrone soup": "https://i0.wp.com/fortheloveofgourmet.com/wp-content/uploads/2025/01/IMG_2256-scaled.jpg?resize=1365%2C2048&ssl=1",
@@ -545,6 +543,24 @@
             "Simple cauliflower tacos by Smitten Kitchen": "https://i0.wp.com/smittenkitchen.com/wp-content/uploads/2020/10/simple-cauliflower-tacos-scaled.jpg?resize=1536%2C1024&ssl=1",
             "Skillet pasta with 5 cheeses by Smitten Kitchen": "https://i0.wp.com/smittenkitchen.com/wp-content/uploads//2016/10/skillet-baked-pasta-with-five-cheeses.jpg?fit=750%2C500&ssl=1",
         };
+
+        // Update recipeImages keys
+        recipeImages['Enchilada bake by Hello Fresh'] = recipeImages['Enchilada bake'];
+        delete recipeImages['Enchilada bake'];
+        recipeImages['Baked mediterranean veggies by Hello Fresh'] = recipeImages['Mediteranean baked veggies'];
+        delete recipeImages['Mediteranean baked veggies'];
+
+        // --- DOM References ---
+        const recipeListDiv = document.getElementById('recipe-list');
+        const generateButton = document.getElementById('generate-list-button');
+
+        // --- Get Unique Recipe Names from Data ---
+        const availableRecipes = [...new Set(recipeData.map(item => item.recipeName))];
+        const selectableRecipes = availableRecipes.filter(name =>
+            name &&
+            name.toLowerCase() !== 'everday staples' &&
+            name.toLowerCase() !== 'infrequent staples'
+        ).sort();
 
         // Add error message element above the button
         const errorMessageDiv = document.createElement('div');
@@ -633,7 +649,7 @@
                 recipeListDiv.appendChild(card);
             });
             updateButtonState();
-            generateButton.textContent = 'Generate Shopping List';
+            generateButton.textContent = 'Get Shopping List';
         }
 
         // --- Event Listener for Button ---
