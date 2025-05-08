@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Shopping List</title>
     <style>
-        /* Import a modern font */
-        @import url('https://fonts.googleapis.com/css2?family=Source+Serif+Pro:wght@400;600;700&display=swap');
+        /* Import modern, organic fonts */
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Source+Serif+Pro:wght@400;600;700&display=swap');
 
         /* --- Global Styles & Variables --- */
         :root {
@@ -49,11 +49,12 @@
         h1, h2, h3 {
             color: var(--dark-grey);
             margin-bottom: 1em;
-            font-weight: 600;
+            font-weight: 700;
+            font-family: 'Playfair Display', serif;
         }
 
         h1 {
-            text-align: center;
+            text-align: left;
             margin-bottom: 1.5em;
             font-size: 2.2em;
             letter-spacing: -0.02em;
@@ -461,8 +462,6 @@
                 </a>
             </div>
         </div>
-        <h1>Shopping List</h1>
-
         <div id="shopping-list-output">
             <div id="selected-recipe-links">
                 <h4>Recipe Links:</h4>
@@ -664,17 +663,7 @@
         function formatShoppingList() {
             const selectedRecipes = JSON.parse(localStorage.getItem('selectedRecipes') || '[]');
             const recipeData = JSON.parse(localStorage.getItem('recipeData') || '[]');
-            
             let text = 'Shopping List:\n\n';
-            
-            // Add recipe names
-            if (selectedRecipes.length > 0) {
-                text += 'Recipes:\n';
-                selectedRecipes.sort().forEach(recipe => {
-                    text += `- ${recipe}\n`;
-                });
-                text += '\n';
-            }
 
             // Generate shopping list
             const shoppingList = {};
@@ -750,7 +739,7 @@
                     : parseFloat(item.quantity.toFixed(2));
                 text += `- ${item.originalName}: ${displayQuantity} ${item.units}\n`;
             });
-
+            text += '\nPlan your meals here: https://monicalewis.github.io/meal-kit/MealKit2/RecipeMonday3.html';
             return text;
         }
 
@@ -769,7 +758,7 @@
             if (navigator.share) {
                 try {
                     await navigator.share({
-                        title: 'Shopping List',
+                        title: '',
                         text: text
                     });
                 } catch (err) {
