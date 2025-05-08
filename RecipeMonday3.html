@@ -1,25 +1,27 @@
 <!DOCTYPE html>
-<!-- saved from url=(0047)file:///Users/mlewis/Desktop/RecipeMonday2.html -->
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-    
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Recipe Selector &amp; Shopping List</title>
+    <title>Recipe Selector</title>
     <style>
-        /* Import a modern font */
-        @import url('https://fonts.googleapis.com/css2?family=Lato:wght@400;700&display=swap');
+        /* Import modern, organic fonts */
+        @import url('https://fonts.googleapis.com/css2?family=Work+Sans:wght@600;700&family=Source+Serif+Pro:wght@400;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&family=Montserrat:wght@400;500&display=swap');
 
         /* --- Global Styles & Variables --- */
         :root {
-            --primary-color: #0d6efd; /* A nice blue */
-            --secondary-color: #6c757d; /* Muted grey */
-            --light-grey: #f8f9fa;
-            --dark-grey: #343a40;
+            --primary-color: #2E7D32;  /* Organic green */
+            --secondary-color: #666666;
+            --light-grey: #F9F9F7;     /* Warm off-white */
+            --dark-grey: #2C2C2C;
             --white: #ffffff;
-            --border-color: #dee2e6;
-            --success-color: #198754;
-            --shadow-sm: 0 1px 3px rgba(0,0,0,0.1);
-            --shadow-md: 0 4px 8px rgba(0,0,0,0.1);
-            --border-radius: 8px;
+            --border-color: #E8E8E8;
+            --success-color: #2E7D32;
+            --shadow-sm: 0 2px 4px rgba(0,0,0,0.05);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+            --border-radius: 12px;
+            --section-bg: #F5F5F3;
         }
 
         * {
@@ -29,7 +31,7 @@
         }
 
         body {
-            font-family: 'Lato', sans-serif;
+            font-family: 'Montserrat', Arial, sans-serif;
             line-height: 1.6;
             background-color: var(--light-grey);
             color: var(--dark-grey);
@@ -40,126 +42,152 @@
             max-width: 900px;
             margin: 20px auto;
             background-color: var(--white);
-            padding: 30px;
+            padding: 40px;
             border-radius: var(--border-radius);
             box-shadow: var(--shadow-md);
         }
 
         h1, h2, h3 {
-            color: var(--primary-color);
-            margin-bottom: 1em;
+            font-family: 'Montserrat', Arial, sans-serif;
+            font-weight: 900;
+            color: var(--dark-grey);
         }
 
         h1 {
-            text-align: center;
-            margin-bottom: 1.5em;
-            color: var(--dark-grey);
+            font-size: 3em;
+            font-weight: 900;
+            letter-spacing: -0.01em;
+            margin-bottom: 0.7em;
+            line-height: 1.05;
         }
 
         h2 {
-           border-bottom: 2px solid var(--primary-color);
-           padding-bottom: 0.3em;
-           font-weight: 700;
+            font-size: 1.1em;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.18em;
+            border-bottom: none;
+            margin-bottom: 2em;
+            color: var(--secondary-color);
         }
 
         h3 {
+            margin-bottom: 1em;
+        }
+
+        .recipe-card-title {
+            font-family: 'Montserrat', Arial, sans-serif;
             font-weight: 700;
-            color: var(--dark-grey);
-            margin-top: 0; /* Reset margin for shopping list heading */
+            font-size: 1.15em;
+            letter-spacing: -0.01em;
         }
 
-        /* --- Recipe Selection Area --- */
-        #recipe-list-container {
-            margin-bottom: 30px;
+        .recipe-card-content {
+            font-family: 'Montserrat', Arial, sans-serif;
         }
 
-        #recipe-list {
-            max-height: 400px;
-            overflow-y: auto;
-            padding: 15px;
-            border: 1px solid var(--border-color);
+        .recipe-card-title .recipe-by {
+            font-weight: 400;
+            color: #888;
+            letter-spacing: 0.01em;
+            font-size: 0.95em;
+        }
+
+        /* --- Recipe Card Grid --- */
+        .recipe-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 32px 24px;
+            margin-top: 24px;
+        }
+        .recipe-card {
+            background: var(--white);
             border-radius: var(--border-radius);
-            background-color: #fdfdfd;
-        }
-
-        .recipe-item {
-            margin-bottom: 12px;
-            display: block;
-            padding: 8px 0;
-            border-bottom: 1px solid #eee;
-        }
-         .recipe-item:last-child {
-             border-bottom: none;
-         }
-
-        /* Custom Checkbox Styling (for recipe list) */
-        .recipe-item label {
+            box-shadow: var(--shadow-sm);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            transition: box-shadow 0.2s, border 0.2s;
+            position: relative;
             cursor: pointer;
-            margin-left: 10px;
-            vertical-align: middle;
-            position: relative;
-            user-select: none;
         }
-
-        .recipe-item input[type="checkbox"] {
-            opacity: 0;
-            position: absolute;
-            outline: none;
-            width: 0;
-            height: 0;
-            margin: 0;
-            padding: 0;
-            border: none;
-            left: 0;
-            top: 0;
+        .recipe-card:hover {
+            box-shadow: var(--shadow-md);
+            border: 2px solid var(--primary-color);
         }
-
-        .recipe-item label::before {
+        .recipe-card.selected {
+            border: 3px solid var(--primary-color);
+            box-shadow: 0 0 0 4px #e0f2e9, var(--shadow-md);
+        }
+        .recipe-card.selected::after {
             content: '';
-            display: inline-block;
-            width: 18px;
-            height: 18px;
-            border: 2px solid var(--secondary-color);
-            border-radius: 4px;
-            margin-right: 10px;
-            vertical-align: middle;
-            transition: background-color 0.2s ease, border-color 0.2s ease;
-            position: relative;
-            top: -1px;
-        }
-
-        .recipe-item input[type="checkbox"]:checked + label::before {
-            background-color: var(--primary-color);
-            border-color: var(--primary-color);
-        }
-
-        .recipe-item label::after {
-            content: '\2714';
-            font-size: 14px;
-            font-weight: bold;
-            color: var(--white);
             position: absolute;
-            left: 4px;
-            top: 1px;
-            opacity: 0;
-            transition: opacity 0.2s ease;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(46, 125, 50, 0.18);
+            pointer-events: none;
+            z-index: 2;
         }
-
-        .recipe-item input[type="checkbox"]:checked + label::after {
-            opacity: 1;
+        .recipe-card-img {
+            width: 100%;
+            height: 160px;
+            object-fit: cover;
+            background: #eee;
         }
-
-         .recipe-item input[type="checkbox"]:focus + label::before {
-             box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.25);
-         }
-
+        .recipe-card-content {
+            flex: 1;
+            padding: 18px 18px 12px 18px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        .recipe-card-checkbox {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: var(--primary-color);
+            color: var(--white);
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.6em;
+            cursor: pointer;
+            box-shadow: var(--shadow-sm);
+            transition: background 0.2s, box-shadow 0.2s;
+            z-index: 3;
+        }
+        .recipe-card-checkbox.selected, .recipe-card-checkbox:active {
+            background: #1B5E20;
+            box-shadow: var(--shadow-md);
+        }
+        .recipe-card-checkbox input[type="checkbox"] {
+            display: none;
+        }
+        .recipe-card-checkbox .plus {
+            font-size: 1.5em;
+            font-weight: bold;
+            pointer-events: none;
+        }
+        @media (max-width: 1000px) {
+            .recipe-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        @media (max-width: 600px) {
+            .recipe-grid {
+                grid-template-columns: 1fr;
+            }
+        }
 
         /* --- Button Styling --- */
         button#generate-list-button {
             display: block;
             width: 100%;
             max-width: 300px;
-            margin: 30px auto;
+            margin: 0 auto;
             padding: 15px 20px;
             background-color: var(--primary-color);
             color: var(--white);
@@ -167,14 +195,18 @@
             border-radius: var(--border-radius);
             cursor: pointer;
             font-size: 1.1em;
-            font-weight: 700;
-            transition: background-color 0.2s ease, box-shadow 0.2s ease;
+            font-weight: 600;
+            transition: all 0.2s ease;
             box-shadow: var(--shadow-sm);
+            position: sticky;
+            bottom: 20px;
+            font-family: 'Source Serif Pro', serif;
         }
 
         button#generate-list-button:hover:not(:disabled) {
-            background-color: #0b5ed7;
+            background-color: #1B5E20;
             box-shadow: var(--shadow-md);
+            transform: translateY(-1px);
         }
 
         button#generate-list-button:disabled {
@@ -184,225 +216,85 @@
             box-shadow: none;
         }
 
-        /* --- Shopping List & Links Area --- */
-        #shopping-list-output {
-             background-color: var(--white); /* Match container background */
-             padding-top: 10px; /* Add some space above */
-        }
-
-        /* Styling for Recipe Links Area */
-        #selected-recipe-links {
-            margin-bottom: 25px;
-            padding: 15px;
-            background-color: #eef3f9;
-            border: 1px solid #cfe2ff;
-            border-radius: var(--border-radius);
-            /* Hide initially if empty */
-            display: none;
-        }
-
-        #selected-recipe-links h4 {
-             margin: 0 0 12px 0;
-             padding-bottom: 5px;
-             border-bottom: 1px solid #cfe2ff;
-             color: var(--dark-grey);
-             font-size: 1.1em;
-             font-weight: 700;
-        }
-
-        #selected-recipe-links div {
-            margin-bottom: 8px;
-        }
-        #selected-recipe-links div:last-child {
-            margin-bottom: 0;
-        }
-
-        #selected-recipe-links a {
-            color: var(--primary-color);
-            text-decoration: none;
-            font-weight: normal;
-            display: inline-block;
-            padding: 2px 0;
-            transition: color 0.2s ease;
-        }
-
-        #selected-recipe-links a:hover {
-            text-decoration: underline;
-            color: #0a58ca;
-        }
-
-
-        #shopping-list-ul {
-            list-style: none;
-            padding-left: 0;
-            margin-top: 20px; /* Space below links (if present) or heading */
-        }
-
-        /* Section Headers */
-        #shopping-list-ul .section-header {
-            margin-top: 25px;
-            margin-bottom: 10px;
-            padding-bottom: 5px;
-            font-weight: 700;
-            font-size: 1.2em;
-            color: var(--dark-grey);
-            border-bottom: 2px solid var(--primary-color);
-            /* Ensure header takes full width if UL was grid */
-            grid-column: 1 / -1;
-        }
-         #shopping-list-ul .section-header:first-of-type {
-             margin-top: 10px;
-         }
-
-        /* Ingredient Items - Using CSS Grid for Alignment */
-        #shopping-list-ul .ingredient-item {
-            display: grid;
-            /* ADDED checkbox column (auto width), Name (flex), Qty (auto), Unit (auto) */
-            grid-template-columns: auto 1fr auto auto;
-            /* Adjusted column gap */
-            gap: 10px 15px; /* Row gap, Column gap */
-            align-items: center; /* Vertically align checkbox and text nicely */
-            padding: 10px 5px;
-            border-bottom: 1px solid #eee;
-            transition: opacity 0.3s ease; /* Smooth fade on check */
-        }
-         #shopping-list-ul .ingredient-item:last-child {
-            border-bottom: none;
-        }
-
-         /* Style Shopping List Checkbox */
-         .shopping-list-checkbox {
-             grid-column: 1 / 2;
-             margin: 0; /* Reset default margin */
-             /* Use accent-color for modern browsers, fallbacks needed for older */
-             accent-color: var(--primary-color);
-             width: 18px; /* Match recipe checkbox size */
-             height: 18px;
-             cursor: pointer;
-         }
-
-        /* Style Label containing ingredient name */
-        .ingredient-item label.ingredient-name {
-            grid-column: 2 / 3;
-            font-weight: normal;
-            margin: 0; /* Reset default label margin */
-            cursor: pointer; /* Clicking label toggles checkbox */
-            transition: color 0.3s ease, text-decoration 0.3s ease;
-        }
-
-        .ingredient-qty {
-            grid-column: 3 / 4;
-            font-weight: 700;
-            text-align: right; /* Correct alignment for quantities */
-            transition: color 0.3s ease, text-decoration 0.3s ease;
-        }
-
-        .ingredient-unit {
-            grid-column: 4 / 5;
-            color: var(--secondary-color);
-            text-align: left; /* Correct alignment for units */
-            transition: color 0.3s ease, text-decoration 0.3s ease;
-        }
-
-        /* Apply styles when checked using sibling combinator */
-        .ingredient-item input[type="checkbox"]:checked + label.ingredient-name,
-        .ingredient-item input[type="checkbox"]:checked ~ .ingredient-qty,
-        .ingredient-item input[type="checkbox"]:checked ~ .ingredient-unit {
-            text-decoration: line-through;
-            color: var(--secondary-color);
-        }
-        /* Optional: fade the entire item slightly */
-         .ingredient-item input[type="checkbox"]:checked ~ * {
-            opacity: 0.7;
-        }
-         .ingredient-item input[type="checkbox"]:checked {
-             opacity: 0.7; /* Fade checkbox too */
-         }
-
-
         .error-message {
             color: #dc3545;
-            font-weight: bold;
-            padding: 10px;
+            font-weight: 600;
+            padding: 15px;
             background-color: #f8d7da;
             border: 1px solid #f5c2c7;
             border-radius: var(--border-radius);
+            margin: 10px 0;
         }
 
-         /* --- Mobile Responsiveness --- */
-         @media (max-width: 768px) {
+        /* --- Mobile Responsiveness --- */
+        @media (max-width: 768px) {
             body {
                 padding: 10px;
             }
             .container {
-                padding: 20px;
+                padding: 25px;
                 margin: 10px auto;
+                height: calc(100vh - 20px);
+            }
+            #recipe-list-container {
+                height: calc(100vh - 180px);
             }
             h1 {
                 font-size: 1.8em;
+                margin-bottom: 1em;
             }
-             h2 {
-                 font-size: 1.4em;
-             }
-             button#generate-list-button {
-                 padding: 12px 15px;
-                 font-size: 1em;
-             }
-             #shopping-list-ul .ingredient-item {
-                 /* Reduce column gap on smaller screens */
-                 gap: 8px 10px;
-                 align-items: baseline; /* Switch back for smaller text? Test needed */
-             }
-         }
+            h2 {
+                font-size: 1.3em;
+                margin-bottom: 0.5em;
+            }
+            button#generate-list-button {
+                padding: 12px 15px;
+                font-size: 1em;
+                bottom: 10px;
+            }
+            #recipe-list {
+                padding: 15px;
+            }
+        }
 
-         @media (max-width: 480px) {
-             .container {
-                 padding: 15px;
-             }
-             h1 {
-                 font-size: 1.5em;
-             }
-             h2 {
-                 font-size: 1.2em;
-             }
-              #shopping-list-ul .ingredient-item {
-                  /* Further reduce column gap */
-                  gap: 5px 8px;
-                   align-items: center; /* Keep center align */
-             }
-             /* Make text slightly smaller if needed */
-             /*
-             .ingredient-item label.ingredient-name,
-             .ingredient-item .ingredient-qty,
-             .ingredient-item .ingredient-unit {
-                 font-size: 0.95em;
-             }
-            */
-         }
-
+        @media (max-width: 480px) {
+            .container {
+                padding: 20px;
+                margin: 5px auto;
+            }
+            #recipe-list-container {
+                height: calc(100vh - 160px);
+            }
+            h1 {
+                font-size: 1.6em;
+                margin-bottom: 0.8em;
+            }
+            h2 {
+                font-size: 1.2em;
+                margin-bottom: 0.4em;
+            }
+            #recipe-list {
+                padding: 12px;
+            }
+            .recipe-item label {
+                font-size: 1em;
+            }
+        }
     </style>
 </head>
 <body>
-
     <div class="container">
         <h1>Meal Planner</h1>
 
         <div id="recipe-list-container">
             <h2>Choose recipes to make:</h2>
-            <div id="recipe-list"><div class="recipe-item"><input type="checkbox" id="recipe-BroccoliFarroSaladSmittenKitchen" name="recipe" value="Broccoli Farro Salad (Smitten Kitchen)"><label for="recipe-BroccoliFarroSaladSmittenKitchen">Broccoli Farro Salad (Smitten Kitchen)</label></div><div class="recipe-item"><input type="checkbox" id="recipe-Burritobowls" name="recipe" value="Burrito bowls"><label for="recipe-Burritobowls">Burrito bowls</label></div><div class="recipe-item"><input type="checkbox" id="recipe-Capresesandwiches" name="recipe" value="Caprese sandwiches"><label for="recipe-Capresesandwiches">Caprese sandwiches</label></div><div class="recipe-item"><input type="checkbox" id="recipe-Chickpeaandcarrotcurry" name="recipe" value="Chickpea and carrot curry"><label for="recipe-Chickpeaandcarrotcurry">Chickpea and carrot curry</label></div><div class="recipe-item"><input type="checkbox" id="recipe-CreamymushroompastaBonAppetit" name="recipe" value="Creamy mushroom pasta (Bon Appetit)"><label for="recipe-CreamymushroompastaBonAppetit">Creamy mushroom pasta (Bon Appetit)</label></div><div class="recipe-item"><input type="checkbox" id="recipe-Enchiladabake" name="recipe" value="Enchilada bake"><label for="recipe-Enchiladabake">Enchilada bake</label></div><div class="recipe-item"><input type="checkbox" id="recipe-Grazingplatter" name="recipe" value="Grazing platter"><label for="recipe-Grazingplatter">Grazing platter</label></div><div class="recipe-item"><input type="checkbox" id="recipe-Haricotsvertswithmintytahini" name="recipe" value="Haricots verts with minty tahini"><label for="recipe-Haricotsvertswithmintytahini">Haricots verts with minty tahini</label></div><div class="recipe-item"><input type="checkbox" id="recipe-Kalesalad" name="recipe" value="Kale salad"><label for="recipe-Kalesalad">Kale salad</label></div><div class="recipe-item"><input type="checkbox" id="recipe-Margaritapizza" name="recipe" value="Margarita pizza"><label for="recipe-Margaritapizza">Margarita pizza</label></div><div class="recipe-item"><input type="checkbox" id="recipe-Mediteraneanbakedveggies" name="recipe" value="Mediteranean baked veggies"><label for="recipe-Mediteraneanbakedveggies">Mediteranean baked veggies</label></div><div class="recipe-item"><input type="checkbox" id="recipe-Minestronesoup" name="recipe" value="Minestrone soup"><label for="recipe-Minestronesoup">Minestrone soup</label></div><div class="recipe-item"><input type="checkbox" id="recipe-MushroomburattapizzaGoodEggs" name="recipe" value="Mushroom buratta pizza (Good Eggs)"><label for="recipe-MushroomburattapizzaGoodEggs">Mushroom buratta pizza (Good Eggs)</label></div><div class="recipe-item"><input type="checkbox" id="recipe-Mushroomravioli" name="recipe" value="Mushroom ravioli"><label for="recipe-Mushroomravioli">Mushroom ravioli</label></div><div class="recipe-item"><input type="checkbox" id="recipe-OnepotfarrowithtomatoSmittenKitchen" name="recipe" value="One pot farro with tomato (Smitten Kitchen)"><label for="recipe-OnepotfarrowithtomatoSmittenKitchen">One pot farro with tomato (Smitten Kitchen)</label></div><div class="recipe-item"><input type="checkbox" id="recipe-Peachpanzanellawithburratamint" name="recipe" value="Peach panzanella with burrata &amp; mint"><label for="recipe-Peachpanzanellawithburratamint">Peach panzanella with burrata &amp; mint</label></div><div class="recipe-item"><input type="checkbox" id="recipe-Quinoaspaghettiwithbroccoli" name="recipe" value="Quinoa spaghetti with broccoli"><label for="recipe-Quinoaspaghettiwithbroccoli">Quinoa spaghetti with broccoli</label></div><div class="recipe-item"><input type="checkbox" id="recipe-Roastbutternutsquashandredonionwithzaatartahini" name="recipe" value="Roast butternut squash and red onion with za&#39;atar tahini"><label for="recipe-Roastbutternutsquashandredonionwithzaatartahini">Roast butternut squash and red onion with za'atar tahini</label></div><div class="recipe-item"><input type="checkbox" id="recipe-Roastedtomatoeswithgarlic" name="recipe" value="Roasted tomatoes with garlic"><label for="recipe-Roastedtomatoeswithgarlic">Roasted tomatoes with garlic</label></div><div class="recipe-item"><input type="checkbox" id="recipe-Roastedyamsandchickpeaswithyogurt" name="recipe" value="Roasted yams and chickpeas with yogurt"><label for="recipe-Roastedyamsandchickpeaswithyogurt">Roasted yams and chickpeas with yogurt</label></div><div class="recipe-item"><input type="checkbox" id="recipe-Sausagedogs" name="recipe" value="Sausage dogs"><label for="recipe-Sausagedogs">Sausage dogs</label></div><div class="recipe-item"><input type="checkbox" id="recipe-ShakshukaSmittenKitchen" name="recipe" value="Shakshuka (Smitten Kitchen)"><label for="recipe-ShakshukaSmittenKitchen">Shakshuka (Smitten Kitchen)</label></div><div class="recipe-item"><input type="checkbox" id="recipe-Simplecauliflowertacos" name="recipe" value="Simple cauliflower tacos"><label for="recipe-Simplecauliflowertacos">Simple cauliflower tacos</label></div><div class="recipe-item"><input type="checkbox" id="recipe-Skilletpastawith5cheeses" name="recipe" value="Skillet pasta with 5 cheeses"><label for="recipe-Skilletpastawith5cheeses">Skillet pasta with 5 cheeses</label></div><div class="recipe-item"><input type="checkbox" id="recipe-SpaghettiaglioeolioBonAppetit" name="recipe" value="Spaghetti aglio e olio (Bon Appetit)"><label for="recipe-SpaghettiaglioeolioBonAppetit">Spaghetti aglio e olio (Bon Appetit)</label></div><div class="recipe-item"><input type="checkbox" id="recipe-Sweetpotatopitapocket" name="recipe" value="Sweet potato pita pocket"><label for="recipe-Sweetpotatopitapocket">Sweet potato pita pocket</label></div><div class="recipe-item"><input type="checkbox" id="recipe-Veggiejumble" name="recipe" value="Veggie jumble"><label for="recipe-Veggiejumble">Veggie jumble</label></div></div>
+            <div id="recipe-list" class="recipe-grid">
+                <!-- Recipe cards will be populated here -->
+            </div>
         </div>
 
         <button id="generate-list-button">Generate Shopping List</button>
-
-        <div id="shopping-list-output">
-            <h3>Shopping List:</h3>
-
-            <!-- Placeholder for recipe links -->
-            <div id="selected-recipe-links" style="display: block;"><h4>Recipe Links:</h4><div><a href="https://www.williams-sonoma.com/recipe/chickpea--spinach-and-carrot-curry.html" target="_blank" rel="noopener noreferrer">Chickpea and carrot curry</a></div><div><a href="https://www.bonappetit.com/test-kitchen/inside-our-kitchen/article/brown-butter-mushroom-orecchiette" target="_blank" rel="noopener noreferrer">Creamy mushroom pasta (Bon Appetit)</a></div><div><a href="https://www.hellofresh.com/recipes/one-pan-rice-bean-enchilada-bake-614b499eebe91d735a1d62a9" target="_blank" rel="noopener noreferrer">Enchilada bake</a></div><div><a href="https://www.bonappetit.com/recipe/haricots-verts-and-freekeh-with-minty-tahini-dressing" target="_blank" rel="noopener noreferrer">Haricots verts with minty tahini</a></div></div>
-
-            <ul id="shopping-list-ul"><li class="section-header">Bread</li><li class="ingredient-item"><input type="checkbox" id="item-pitaspacket-0" class="shopping-list-checkbox"><label for="item-pitaspacket-0" class="ingredient-name">Pitas</label><span class="ingredient-qty">1</span><span class="ingredient-unit">packet</span></li><li class="section-header">Cheese area</li><li class="ingredient-item"><input type="checkbox" id="item-cheddarcheesecount-1" class="shopping-list-checkbox"><label for="item-cheddarcheesecount-1" class="ingredient-name">Cheddar cheese</label><span class="ingredient-qty">1</span><span class="ingredient-unit">count</span></li><li class="ingredient-item"><input type="checkbox" id="item-mexicancheesecups-2" class="shopping-list-checkbox"><label for="item-mexicancheesecups-2" class="ingredient-name">Mexican cheese</label><span class="ingredient-qty">0.5</span><span class="ingredient-unit">cups</span></li><li class="ingredient-item"><input type="checkbox" id="item-parmesancheeseoz-3" class="shopping-list-checkbox"><label for="item-parmesancheeseoz-3" class="ingredient-name">Parmesan cheese</label><span class="ingredient-qty">3</span><span class="ingredient-unit">oz</span></li><li class="section-header">Cooking</li><li class="ingredient-item"><input type="checkbox" id="item-chickpeasozcan-4" class="shopping-list-checkbox"><label for="item-chickpeasozcan-4" class="ingredient-name">Chickpeas</label><span class="ingredient-qty">15</span><span class="ingredient-unit">oz can</span></li><li class="ingredient-item"><input type="checkbox" id="item-choppedtomatoesozcan-5" class="shopping-list-checkbox"><label for="item-choppedtomatoesozcan-5" class="ingredient-name">Chopped tomatoes</label><span class="ingredient-qty">28</span><span class="ingredient-unit">oz can</span></li><li class="ingredient-item"><input type="checkbox" id="item-cumintsp-6" class="shopping-list-checkbox"><label for="item-cumintsp-6" class="ingredient-name">Cumin</label><span class="ingredient-qty">2</span><span class="ingredient-unit">tsp</span></li><li class="ingredient-item"><input type="checkbox" id="item-enchiladasaucecount-7" class="shopping-list-checkbox"><label for="item-enchiladasaucecount-7" class="ingredient-name">Enchilada sauce</label><span class="ingredient-qty">1</span><span class="ingredient-unit">count</span></li><li class="ingredient-item"><input type="checkbox" id="item-jasminericecup-8" class="shopping-list-checkbox"><label for="item-jasminericecup-8" class="ingredient-name">Jasmine rice</label><span class="ingredient-qty">0.5</span><span class="ingredient-unit">cup</span></li><li class="ingredient-item"><input type="checkbox" id="item-kidneybeanscount-9" class="shopping-list-checkbox"><label for="item-kidneybeanscount-9" class="ingredient-name">Kidney beans</label><span class="ingredient-qty">1</span><span class="ingredient-unit">count</span></li><li class="ingredient-item"><input type="checkbox" id="item-maplesyruptsp-10" class="shopping-list-checkbox"><label for="item-maplesyruptsp-10" class="ingredient-name">Maple syrup</label><span class="ingredient-qty">0.5</span><span class="ingredient-unit">tsp</span></li><li class="ingredient-item"><input type="checkbox" id="item-oliveoiltsp-11" class="shopping-list-checkbox"><label for="item-oliveoiltsp-11" class="ingredient-name">Olive oil</label><span class="ingredient-qty">1</span><span class="ingredient-unit">tsp</span></li><li class="ingredient-item"><input type="checkbox" id="item-pastalb-12" class="shopping-list-checkbox"><label for="item-pastalb-12" class="ingredient-name">Pasta</label><span class="ingredient-qty">1</span><span class="ingredient-unit">lb</span></li><li class="ingredient-item"><input type="checkbox" id="item-semipearledfarrocups-13" class="shopping-list-checkbox"><label for="item-semipearledfarrocups-13" class="ingredient-name">Semi pearled farro</label><span class="ingredient-qty">0.25</span><span class="ingredient-unit">cups</span></li><li class="ingredient-item"><input type="checkbox" id="item-tahinitbsp-14" class="shopping-list-checkbox"><label for="item-tahinitbsp-14" class="ingredient-name">Tahini</label><span class="ingredient-qty">2</span><span class="ingredient-unit">tbsp</span></li><li class="section-header">Dairy</li><li class="ingredient-item"><input type="checkbox" id="item-heavycreamtbsp-15" class="shopping-list-checkbox"><label for="item-heavycreamtbsp-15" class="ingredient-name">Heavy cream</label><span class="ingredient-qty">4</span><span class="ingredient-unit">tbsp</span></li><li class="ingredient-item"><input type="checkbox" id="item-hummuscount-16" class="shopping-list-checkbox"><label for="item-hummuscount-16" class="ingredient-name">Hummus</label><span class="ingredient-qty">1</span><span class="ingredient-unit">count</span></li><li class="ingredient-item"><input type="checkbox" id="item-sourcreamtbsp-17" class="shopping-list-checkbox"><label for="item-sourcreamtbsp-17" class="ingredient-name">Sour cream</label><span class="ingredient-qty">2</span><span class="ingredient-unit">tbsp</span></li><li class="section-header">Nuts</li><li class="ingredient-item"><input type="checkbox" id="item-hazelnutscup-18" class="shopping-list-checkbox"><label for="item-hazelnutscup-18" class="ingredient-name">Hazelnuts</label><span class="ingredient-qty">0.25</span><span class="ingredient-unit">cup</span></li><li class="section-header">Produce</li><li class="ingredient-item"><input type="checkbox" id="item-applescount-19" class="shopping-list-checkbox"><label for="item-applescount-19" class="ingredient-name">Apples</label><span class="ingredient-qty">1</span><span class="ingredient-unit">count</span></li><li class="ingredient-item"><input type="checkbox" id="item-avocadocount-20" class="shopping-list-checkbox"><label for="item-avocadocount-20" class="ingredient-name">Avocado</label><span class="ingredient-qty">1</span><span class="ingredient-unit">count</span></li><li class="ingredient-item"><input type="checkbox" id="item-babyspinachcups-21" class="shopping-list-checkbox"><label for="item-babyspinachcups-21" class="ingredient-name">Baby spinach</label><span class="ingredient-qty">2</span><span class="ingredient-unit">cups</span></li><li class="ingredient-item"><input type="checkbox" id="item-carrotscount-22" class="shopping-list-checkbox"><label for="item-carrotscount-22" class="ingredient-name">Carrots</label><span class="ingredient-qty">2</span><span class="ingredient-unit">count</span></li><li class="ingredient-item"><input type="checkbox" id="item-chivesbunch-23" class="shopping-list-checkbox"><label for="item-chivesbunch-23" class="ingredient-name">Chives</label><span class="ingredient-qty">1</span><span class="ingredient-unit">bunch</span></li><li class="ingredient-item"><input type="checkbox" id="item-cilantrocount-24" class="shopping-list-checkbox"><label for="item-cilantrocount-24" class="ingredient-name">Cilantro</label><span class="ingredient-qty">1</span><span class="ingredient-unit">count</span></li><li class="ingredient-item"><input type="checkbox" id="item-freshgingertbsp-25" class="shopping-list-checkbox"><label for="item-freshgingertbsp-25" class="ingredient-name">Fresh ginger</label><span class="ingredient-qty">2</span><span class="ingredient-unit">tbsp</span></li><li class="ingredient-item"><input type="checkbox" id="item-garlictbsp-26" class="shopping-list-checkbox"><label for="item-garlictbsp-26" class="ingredient-name">Garlic</label><span class="ingredient-qty">1</span><span class="ingredient-unit">tbsp</span></li><li class="ingredient-item"><input type="checkbox" id="item-garlicclove-27" class="shopping-list-checkbox"><label for="item-garlicclove-27" class="ingredient-name">Garlic</label><span class="ingredient-qty">1</span><span class="ingredient-unit">clove</span></li><li class="ingredient-item"><input type="checkbox" id="item-grapetomatoesoz-28" class="shopping-list-checkbox"><label for="item-grapetomatoesoz-28" class="ingredient-name">Grape tomatoes</label><span class="ingredient-qty">1</span><span class="ingredient-unit">oz</span></li><li class="ingredient-item"><input type="checkbox" id="item-grapescount-29" class="shopping-list-checkbox"><label for="item-grapescount-29" class="ingredient-name">Grapes</label><span class="ingredient-qty">1</span><span class="ingredient-unit">count</span></li><li class="ingredient-item"><input type="checkbox" id="item-greenbeanslb-30" class="shopping-list-checkbox"><label for="item-greenbeanslb-30" class="ingredient-name">Green beans</label><span class="ingredient-qty">1</span><span class="ingredient-unit">lb</span></li><li class="ingredient-item"><input type="checkbox" id="item-lemoncount-31" class="shopping-list-checkbox"><label for="item-lemoncount-31" class="ingredient-name">Lemon</label><span class="ingredient-qty">1</span><span class="ingredient-unit">count</span></li><li class="ingredient-item"><input type="checkbox" id="item-limecount-32" class="shopping-list-checkbox"><label for="item-limecount-32" class="ingredient-name">Lime</label><span class="ingredient-qty">2</span><span class="ingredient-unit">count</span></li><li class="ingredient-item"><input type="checkbox" id="item-minttsp-33" class="shopping-list-checkbox"><label for="item-minttsp-33" class="ingredient-name">Mint</label><span class="ingredient-qty">0.5</span><span class="ingredient-unit">tsp</span></li><li class="ingredient-item"><input type="checkbox" id="item-mushroomsoz-34" class="shopping-list-checkbox"><label for="item-mushroomsoz-34" class="ingredient-name">Mushrooms</label><span class="ingredient-qty">4</span><span class="ingredient-unit">oz</span></li><li class="ingredient-item"><input type="checkbox" id="item-scallionscount-35" class="shopping-list-checkbox"><label for="item-scallionscount-35" class="ingredient-name">Scallions</label><span class="ingredient-qty">2</span><span class="ingredient-unit">count</span></li><li class="ingredient-item"><input type="checkbox" id="item-yellowonioncount-36" class="shopping-list-checkbox"><label for="item-yellowonioncount-36" class="ingredient-name">Yellow onion</label><span class="ingredient-qty">1</span><span class="ingredient-unit">count</span></li><li class="section-header">Snacks</li><li class="ingredient-item"><input type="checkbox" id="item-crackerscount-37" class="shopping-list-checkbox"><label for="item-crackerscount-37" class="ingredient-name">Crackers</label><span class="ingredient-qty">1</span><span class="ingredient-unit">count</span></li><li class="ingredient-item"><input type="checkbox" id="item-tortillachipscount-38" class="shopping-list-checkbox"><label for="item-tortillachipscount-38" class="ingredient-name">Tortilla chips</label><span class="ingredient-qty">1</span><span class="ingredient-unit">count</span></li></ul>
-        </div>
-    </div> <!-- End of container -->
+    </div>
 
     <script>
         // --- Embedded Recipe Data ---
@@ -534,7 +426,7 @@
             { recipeName: "Skillet pasta with 5 cheeses by Smitten Kitchen", ingredient: "Parmesan", quantity: 3, units: "oz", section: "Cheese area" },
             { recipeName: "Skillet pasta with 5 cheeses by Smitten Kitchen", ingredient: "Crushed tomatoes", quantity: 28, units: "oz can", section: "Cooking" },
             { recipeName: "Skillet pasta with 5 cheeses by Smitten Kitchen", ingredient: "Gruyere or gouda", quantity: 3, units: "oz", section: "Cheese area" },
-            { recipeName: "Skillet pasta with 5 cheeses by Smitten Kitchen", ingredient: "Past shells", quantity: 1, units: "lb", section: "Cooking" },
+            { recipeName: "Skillet pasta with 5 cheeses by Smitten Kitchen", ingredient: "Pasta shells", quantity: 1, units: "lb", section: "Cooking" },
             { recipeName: "Caprese sandwiches", ingredient: "Olive oil", quantity: 3, units: "tsp", section: "Cooking" },
             { recipeName: "Caprese sandwiches", ingredient: "Basil", quantity: 1, units: "tbsp", section: "Produce" },
             { recipeName: "Caprese sandwiches", ingredient: "Plum tomatoes", quantity: 1, units: "count", section: "Produce" },
@@ -602,48 +494,51 @@
             { recipeName: "Haricots verts with minty tahini by Ottolenghi", ingredient: "Maple syrup", quantity: 0.5, units: "tsp", section: "Cooking" },
         ];
 
-        // --- Recipe URL Mappings ---
-        const recipeUrls = {
-            "Burrito bowls": "https://www.hellofresh.com/recipes/veggie-burrito-bowls-5bc0bfaaae08b5032c3a6bf2",
-            "Enchilada bake": "https://www.hellofresh.com/recipes/one-pan-rice-bean-enchilada-bake-614b499eebe91d735a1d62a9",
-            "Simple cauliflower tacos by Smitten Kitchen": "https://smittenkitchen.com/2020/10/simple-cauliflower-tacos/",
-            "Peach panzanella with burrata & mint by Good Eggs": "https://www.goodeggs.com/bundlessfbay/peach-panzanella-with-burrata-mint/5cd5c7e536ac96000eceb455",
-            "Roasted yams and chickpeas with yogurt by Smitten Kitchen": "https://smittenkitchen.com/2016/02/roasted-yams-and-chickpeas-with-yogurt/",
-            "Roast butternut squash and red onion with za'atar tahini by Ottolenghi": "https://ottolenghi.co.uk/recipes/roast-butternut-squash-and-red-onion-with-tahini-and-za-atar",
-            "Shakshuka by Smitten Kitchen": "https://smittenkitchen.com/2010/04/shakshuka/",
-            "Veggie jumble": "https://www.hellofresh.com/recipes/w19-r8-58d3c741d56afa563047ade3",
-            "Mediteranean baked veggies": "https://www.hellofresh.com/recipes/mediterranean-baked-veggies-5a958ac730006c32be67bfd2",
-            "Mushroom buratta pizza by Good Eggs": "https://www.goodeggs.com/sfbay/bundlessfbay/mushroom-pizza-with-burrata-arugula/5b58e54d9c68f5000ff4e2ad",
-            "Sweet potato pita pocket": "https://www.hellofresh.com/recipes/harissa-sweet-potato-pitas-58b99736d56afa17de02ce53",
-            "Mushroom ravioli": "https://www.hellofresh.com/recipes/creamiest-mushroom-ravioli-5aaac3ac30006c55e74b0644",
-            "Broccoli farro salad by Smitten Kitchen": "https://smittenkitchen.com/2017/05/broccoli-rubble-farro-salad/",
-            "One pot farro with tomato by Smitten Kitchen": "https://smittenkitchen.com/2013/07/one-pan-farro-with-tomatoes/",
-            "Spaghetti aglio e olio by Bon Appetit": "https://www.bonappetit.com/recipe/spaghetti-aglio-e-olio-with-lots-of-kale",
-            "Creamy mushroom pasta by Bon Appetit": "https://www.bonappetit.com/test-kitchen/inside-our-kitchen/article/brown-butter-mushroom-orecchiette",
-            "Chickpea and carrot curry": "https://www.williams-sonoma.com/recipe/chickpea--spinach-and-carrot-curry.html", // Assuming name matches data
-            "Quinoa spaghetti with broccoli": "https://www.williams-sonoma.com/recipe/quinoa-spaghetti-with-broccoli-rabe--feta-and-mint.html", // Assuming name matches data
-            "Skillet pasta with 5 cheeses by Smitten Kitchen": "https://smittenkitchen.com/2016/10/skillet-baked-pasta-with-five-cheeses/",
-            "Roasted tomatoes with garlic by Smitten Kitchen": "https://smittenkitchen.com/2008/08/slow-roasted-tomatoes/",
-            "Haricots verts with minty tahini by Ottolenghi": "https://www.bonappetit.com/recipe/haricots-verts-and-freekeh-with-minty-tahini-dressing"
-        };
-
         // --- DOM References ---
         const recipeListDiv = document.getElementById('recipe-list');
         const generateButton = document.getElementById('generate-list-button');
-        const shoppingListUl = document.getElementById('shopping-list-ul');
-        const recipeLinksDiv = document.getElementById('selected-recipe-links');
 
         // --- Get Unique Recipe Names from Data ---
         const availableRecipes = [...new Set(recipeData.map(item => item.recipeName))];
         const selectableRecipes = availableRecipes.filter(name =>
             name &&
-            name.toLowerCase() !== 'everday staples' && // Exclude specific names
-            name.toLowerCase() !== 'infrequent staples' // Exclude specific names
+            name.toLowerCase() !== 'everday staples' &&
+            name.toLowerCase() !== 'infrequent staples'
         ).sort();
 
-        // --- Dynamically Create Recipe Checkboxes ---
-        function populateRecipeCheckboxes() {
-            recipeListDiv.innerHTML = ''; // Clear loading message
+        // Placeholder images for recipes
+        const recipeImages = {
+            "Veggie jumble": "https://img.hellofresh.com/c_fit,f_auto,fl_lossy,h_1100,q_50,w_2600/hellofresh_s3/image/grilled-cheese-and-veggie-jumble-46f11c36.jpg",
+            "Mediteranean baked veggies": "https://img.hellofresh.com/c_fit,f_auto,fl_lossy,h_1100,q_50,w_2600/hellofresh_s3/image/5a958ac730006c32be67bfd2-1f072c43.jpg",
+            "Mushroom buratta pizza by Good Eggs": "https://goodeggs4.imgix.net/da949f17-33ce-4864-bc35-76ae05d5c10a.jpg?w=840&h=525&fm=jpg&q=80&fit=crop",
+            "Burrito bowls": "https://img.hellofresh.com/c_fit,f_auto,fl_lossy,h_1100,q_50,w_2600/hellofresh_s3/image/5e5ea67325ed1a2b107a3598-296940aa.jpg",
+            "Margherita pizza": "https://ooni.com/cdn/shop/articles/20220211142347-margherita-9920_ba86be55-674e-4f35-8094-2067ab41a671.jpg?v=1737104576&width=2048",
+            "Sweet potato pita pocket": "https://img.hellofresh.com/c_fit,f_auto,fl_lossy,h_1100,q_50,w_2600/hellofresh_s3/image/5c3cb170c445fa2277482006-cabc7683.jpg",
+            "Mushroom ravioli": "https://img.hellofresh.com/c_fit,f_auto,fl_lossy,h_1100,q_50,w_2600/hellofresh_s3/image/5aaac3ac30006c55e74b0644-3b4a0509.jpg",
+            "Broccoli farro salad by Smitten Kitchen": "https://i0.wp.com/smittenkitchen.com/wp-content/uploads//2017/05/broccoli-rubble-farro-salad.jpg?fit=750%2C500&ssl=1",
+            "One pot farro with tomato by Smitten Kitchen": "https://i0.wp.com/smittenkitchen.com/wp-content/uploads//2013/07/one-pan-farro-with-tomatoes.jpg?fit=750%2C500&ssl=1",
+            "Shakshuka by Smitten Kitchen": "https://i0.wp.com/smittenkitchen.com/wp-content/uploads/2010/04/shakshuka-1-scaled.jpg?resize=1536%2C1021&ssl=1",
+            "Grazing platter": "https://www.chefnotrequired.com/wp-content/uploads/2019/12/grazing-board-blog-hero.jpg",
+            "Sausage dogs": "https://www.connoisseurusveg.com/wp-content/uploads/2023/08/portobello-mushroom-hot-dogs-fb-sq.jpg",
+            "Spaghetti aglio e olio by Bon Appetit": "https://assets.bonappetit.com/photos/58700a2f725909250df59f9c/master/w_1280,c_limit/spaghetti-aglio-e-olio-with-lots-of-kale.jpg",
+            "Creamy mushroom pasta by Bon Appetit": "https://assets.bonappetit.com/photos/5d4ddd602c815a00080f9771/1:1/w_2240,c_limit/BA-0919-Creamy-Pasta-Crispy-Mushroom-Playbook.jpg",
+            "Chickpea and carrot curry": "https://assets.wsimgs.com/wsimgs/rk/images/dp/recipe/202508/0012/img74l.jpg",
+            "Caprese sandwiches": "https://cdn.loveandlemons.com/wp-content/uploads/2020/06/caprese-sandwich-1.jpg",
+            "Enchilada bake": "https://img.hellofresh.com/c_fit,f_auto,fl_lossy,h_1100,q_50,w_2600/hellofresh_s3/image/one-pan-rice-bean-enchilada-bake-a73f6f46.jpg",
+            "Haricots verts with minty tahini by Ottolenghi": "https://assets.bonappetit.com/photos/57ad3b1653e63daf11a4dd26/1:1/w_2240,c_limit/haricots-verts-and-freekeh-with-minty-tahini-dressing.jpg",
+            "Kale salad": "https://i0.wp.com/smittenkitchen.com/wp-content/uploads//2013/08/kale-salad-with-pecorino-and-walnuts.jpg?fit=750%2C500&ssl=1",
+            "Minestrone soup": "https://i0.wp.com/fortheloveofgourmet.com/wp-content/uploads/2025/01/IMG_2256-scaled.jpg?resize=1365%2C2048&ssl=1",
+            "Peach panzanella with burrata & mint by Good Eggs": "https://goodeggs4.imgix.net/c2470fe2-bb40-4f1e-93f6-8681eaaea4c4.jpg?w=840&h=525&fm=jpg&q=80&fit=crop",
+            "Quinoa spaghetti with broccoli": "https://assets.wsimgs.com/wsimgs/rk/images/dp/recipe/202512/0003/img460l.jpg",
+            "Roast butternut squash and red onion with za'atar tahini by Ottolenghi": "https://i.guim.co.uk/img/static/sys-images/Guardian/Pix/pictures/2011/12/8/1323360137075/Roasted-butternut-squash--007.jpg?width=620&dpr=2&s=none&crop=none",
+            "Roasted tomatoes with garlic by Smitten Kitchen": "https://i0.wp.com/smittenkitchen.com/wp-content/uploads//2008/08/slow-roasted-tomatoes1.jpg?resize=1536%2C1025&ssl=1",
+            "Roasted yams and chickpeas with yogurt by Smitten Kitchen": "https://i0.wp.com/smittenkitchen.com/wp-content/uploads//2016/02/roasted-yams-and-chickpeas-with-yogurt1.jpg?fit=640%2C427&ssl=1",
+            "Simple cauliflower tacos by Smitten Kitchen": "https://i0.wp.com/smittenkitchen.com/wp-content/uploads/2020/10/simple-cauliflower-tacos-scaled.jpg?resize=1536%2C1024&ssl=1",
+            "Skillet pasta with 5 cheeses by Smitten Kitchen": "https://i0.wp.com/smittenkitchen.com/wp-content/uploads//2016/10/skillet-baked-pasta-with-five-cheeses.jpg?fit=750%2C500&ssl=1",
+        };
+
+        function populateRecipeCards() {
+            recipeListDiv.innerHTML = '';
 
             if (selectableRecipes.length === 0) {
                 recipeListDiv.innerHTML = '<p class="error-message">No recipes found in the data.</p>';
@@ -652,190 +547,96 @@
             }
 
             selectableRecipes.forEach(recipeName => {
-                const div = document.createElement('div');
-                div.classList.add('recipe-item');
+                const card = document.createElement('div');
+                card.classList.add('recipe-card');
 
+                // Image
+                const img = document.createElement('img');
+                img.className = 'recipe-card-img';
+                img.src = recipeImages[recipeName] || 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=400&q=80';
+                img.alt = recipeName;
+                card.appendChild(img);
+
+                // Checkbox as plus button
+                const checkboxWrapper = document.createElement('label');
+                checkboxWrapper.className = 'recipe-card-checkbox';
                 const checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
-                // Create a safe ID from the recipe name
-                const safeId = `recipe-${recipeName.replace(/[^a-zA-Z0-9_-]/g, '') || Math.random().toString(36).substring(2, 8)}`;
-                checkbox.id = safeId;
                 checkbox.name = 'recipe';
                 checkbox.value = recipeName;
+                checkboxWrapper.appendChild(checkbox);
+                const plus = document.createElement('span');
+                plus.className = 'plus';
+                plus.textContent = '+';
+                checkboxWrapper.appendChild(plus);
+                card.appendChild(checkboxWrapper);
 
-                const label = document.createElement('label');
-                label.htmlFor = safeId;
-                label.textContent = recipeName;
+                // Card content
+                const content = document.createElement('div');
+                content.className = 'recipe-card-content';
+                const title = document.createElement('div');
+                title.className = 'recipe-card-title';
+                // Split and style 'by xyz' part
+                const byIndex = recipeName.toLowerCase().indexOf(' by ');
+                if (byIndex !== -1) {
+                    const main = recipeName.slice(0, byIndex);
+                    const by = recipeName.slice(byIndex);
+                    title.innerHTML = `${main}<span class="recipe-by">${by}</span>`;
+                } else {
+                    title.textContent = recipeName;
+                }
+                content.appendChild(title);
+                card.appendChild(content);
 
-                div.appendChild(checkbox);
-                div.appendChild(label);
-                recipeListDiv.appendChild(div);
+                // Make the entire card clickable
+                card.addEventListener('click', function(e) {
+                    // Prevent double toggling if the plus button is clicked
+                    if (e.target === checkbox || e.target === plus) return;
+                    checkbox.checked = !checkbox.checked;
+                    checkbox.dispatchEvent(new Event('change'));
+                });
+
+                // Checkbox selection styling and card selection
+                checkbox.addEventListener('change', function() {
+                    if (checkbox.checked) {
+                        checkboxWrapper.classList.add('selected');
+                        card.classList.add('selected');
+                    } else {
+                        checkboxWrapper.classList.remove('selected');
+                        card.classList.remove('selected');
+                    }
+                });
+
+                recipeListDiv.appendChild(card);
             });
 
-            // Enable the button now that recipes are loaded
             generateButton.disabled = false;
             generateButton.textContent = 'Generate Shopping List';
         }
 
         // --- Event Listener for Button ---
         generateButton.addEventListener('click', () => {
-            // --- Get Selected Recipe Names ---
             const selectedRecipeNames = [];
             const recipeCheckboxes = recipeListDiv.querySelectorAll('input[name="recipe"]:checked');
             recipeCheckboxes.forEach(checkbox => selectedRecipeNames.push(checkbox.value));
 
-            // --- Populate Recipe Links ---
-            recipeLinksDiv.innerHTML = ''; // Clear previous links
-            let linksAdded = false;
+            // Store selected recipes and recipe data in localStorage
+            localStorage.setItem('selectedRecipes', JSON.stringify(selectedRecipeNames));
+            localStorage.setItem('recipeData', JSON.stringify(recipeData));
 
-            if (selectedRecipeNames.length > 0) {
-                selectedRecipeNames.sort().forEach(recipeName => {
-                    const url = recipeUrls[recipeName]; // Look up URL
-                    if (url) {
-                        if (!linksAdded) {
-                           const linksTitle = document.createElement('h4');
-                           linksTitle.textContent = 'Recipe Links:';
-                           recipeLinksDiv.appendChild(linksTitle);
-                           linksAdded = true;
-                        }
-
-                        const linkContainer = document.createElement('div');
-                        const link = document.createElement('a');
-                        link.href = url;
-                        link.textContent = recipeName;
-                        link.target = "_blank";
-                        link.rel = "noopener noreferrer";
-                        linkContainer.appendChild(link);
-                        recipeLinksDiv.appendChild(linkContainer);
-                    }
-                    // Optional: Log if a URL wasn't found for a selected recipe
-                    // else { console.warn(`No URL found for recipe: ${recipeName}`); }
-                });
-            }
-             recipeLinksDiv.style.display = linksAdded ? 'block' : 'none'; // Show/hide container
-
-
-            // --- Aggregate Ingredients ---
-            const shoppingList = {};
-            recipeData.forEach(item => {
-                if (selectedRecipeNames.includes(item.recipeName)) {
-                    const { ingredient, quantity, units, section } = item;
-                    // Ensure quantity is treated as a number
-                    const numQuantity = Number(quantity);
-                    if (isNaN(numQuantity)) {
-                        console.warn(`Invalid quantity for ${ingredient} in ${item.recipeName}: ${quantity}`);
-                        return; // Skip items with non-numeric quantity
-                    }
-
-                    const ingredientKey = ingredient.toLowerCase().trim(); // Normalize key
-                    const unitKey = units ? units.toLowerCase().trim() : ''; // Normalize unit key
-
-                    // Try to combine based on ingredient and unit
-                    const combinedKey = `${ingredientKey}|${unitKey}`; // Use a separator
-
-                    if (shoppingList[combinedKey]) {
-                        shoppingList[combinedKey].quantity += numQuantity;
-                    } else {
-                        // If just the ingredient exists but with a different unit, create a new entry
-                        // (This simplified logic assumes direct aggregation is usually desired if units match)
-                         shoppingList[combinedKey] = {
-                            quantity: numQuantity,
-                            units: units || '', // Store original unit display
-                            section: section || 'Uncategorized', // Default section
-                            originalName: ingredient // Store original name for display
-                        };
-                    }
-                }
-            });
-
-            // --- Display Shopping List ---
-            shoppingListUl.innerHTML = ''; // Clear previous list
-            const ingredientEntries = Object.entries(shoppingList); // Get [key, value] pairs
-
-            if (ingredientEntries.length === 0) {
-                 if (selectedRecipeNames.length > 0) {
-                    shoppingListUl.innerHTML = '<li>No ingredients needed for selected recipes.</li>';
-                 } else {
-                    shoppingListUl.innerHTML = '<li>Select recipes and click generate.</li>';
-                 }
-            } else {
-                // Sort by section, then by original ingredient name
-                ingredientEntries.sort(([, itemA], [, itemB]) => {
-                    const sectionA = itemA.section || 'ZZZ'; // Put uncategorized last
-                    const sectionB = itemB.section || 'ZZZ';
-                    const sectionCompare = sectionA.localeCompare(sectionB);
-                    if (sectionCompare !== 0) return sectionCompare;
-
-                    const nameA = itemA.originalName || '';
-                    const nameB = itemB.originalName || '';
-                    return nameA.localeCompare(nameB);
-                });
-
-                let currentSection = null;
-                ingredientEntries.forEach(([combinedKey, item], index) => { // Use index for unique IDs
-                    // Add Section Header
-                    if (item.section !== currentSection) {
-                        const headerLi = document.createElement('li');
-                        headerLi.classList.add('section-header');
-                        headerLi.textContent = item.section;
-                        shoppingListUl.appendChild(headerLi);
-                        currentSection = item.section;
-                    }
-
-                    // Add Ingredient Item with Checkbox
-                    const listItem = document.createElement('li');
-                    listItem.classList.add('ingredient-item');
-
-                    // Create Checkbox
-                    const checkbox = document.createElement('input');
-                    checkbox.type = 'checkbox';
-                    // Create a more robust unique ID
-                    const safeKey = combinedKey.replace(/[^a-zA-Z0-9_-]/g, '');
-                    const checkboxId = `item-${safeKey}-${index}`;
-                    checkbox.id = checkboxId;
-                    checkbox.classList.add('shopping-list-checkbox');
-
-                    // Create Label (for Ingredient Name)
-                    const label = document.createElement('label');
-                    label.htmlFor = checkboxId;
-                    label.classList.add('ingredient-name');
-                    label.textContent = item.originalName; // Use original name
-
-                    // Create Qty Span
-                    const qtySpan = document.createElement('span');
-                    qtySpan.classList.add('ingredient-qty');
-                    // Format quantity nicely (remove trailing .00 or .0)
-                    const displayQuantity = Number.isInteger(item.quantity)
-                        ? item.quantity
-                        : parseFloat(item.quantity.toFixed(2)); // Keep up to 2 decimal places if needed
-                    qtySpan.textContent = displayQuantity;
-
-                    // Create Unit Span
-                    const unitSpan = document.createElement('span');
-                    unitSpan.classList.add('ingredient-unit');
-                    unitSpan.textContent = item.units;
-
-                    // Append elements in order
-                    listItem.appendChild(checkbox);
-                    listItem.appendChild(label);
-                    listItem.appendChild(qtySpan);
-                    listItem.appendChild(unitSpan);
-                    shoppingListUl.appendChild(listItem);
-                });
-            }
-        }); // End of Event Listener
+            // Navigate to shopping list page
+            window.location.href = 'shopping-list.html';
+        });
 
         // --- Initial Setup ---
         try {
-           populateRecipeCheckboxes();
+            populateRecipeCards();
         } catch (error) {
             console.error("Error initializing recipe list:", error);
             recipeListDiv.innerHTML = '<p class="error-message">An error occurred loading the recipe list.</p>';
             generateButton.disabled = true;
             generateButton.textContent = 'Error Loading';
         }
-
     </script>
-
-
-</body></html>
+</body>
+</html>
