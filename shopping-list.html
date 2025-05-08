@@ -693,10 +693,14 @@
                 }
             });
 
+            // Get checked off items (exclude from share)
+            const checkedKeys = new Set();
+            document.querySelectorAll('.shopping-list-checkbox:checked').forEach(checkbox => {
+                checkedKeys.add(checkbox.id.replace(/^item-/, '').replace(/-\d+$/, ''));
+            });
+
             // Sort and format ingredients
             const ingredientEntries = Object.entries(shoppingList);
-            
-            // Define category order
             const categoryOrder = [
                 'Bread',
                 'Nuts',
@@ -705,35 +709,26 @@
                 'Frozen',
                 'Cooking'
             ];
-
             ingredientEntries.sort(([, itemA], [, itemB]) => {
                 const sectionA = itemA.section || 'ZZZ';
                 const sectionB = itemB.section || 'ZZZ';
-                
-                // Get index in category order, or use a large number for uncategorized
                 const indexA = categoryOrder.indexOf(sectionA);
                 const indexB = categoryOrder.indexOf(sectionB);
-                
-                // If both categories are in our order list, sort by their position
-                if (indexA !== -1 && indexB !== -1) {
-                    return indexA - indexB;
-                }
-                
-                // If only one category is in our order list, prioritize it
+                if (indexA !== -1 && indexB !== -1) return indexA - indexB;
                 if (indexA !== -1) return -1;
                 if (indexB !== -1) return 1;
-                
-                // If neither category is in our order list, sort alphabetically
                 return sectionA.localeCompare(sectionB);
             });
 
             let currentSection = null;
-            ingredientEntries.forEach(([, item]) => {
+            ingredientEntries.forEach(([combinedKey, item], index) => {
+                // Exclude checked-off items from share
+                const safeKey = combinedKey.replace(/[^a-zA-Z0-9_-]/g, '');
+                if (checkedKeys.has(safeKey)) return;
                 if (item.section !== currentSection) {
                     text += `\n${item.section}:\n`;
                     currentSection = item.section;
                 }
-
                 const displayQuantity = Number.isInteger(item.quantity)
                     ? item.quantity
                     : parseFloat(item.quantity.toFixed(2));
