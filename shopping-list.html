@@ -169,7 +169,7 @@
         /* Ingredient Items */
         #shopping-list-ul .ingredient-item {
             display: grid;
-            grid-template-columns: auto 1fr minmax(60px, auto) minmax(60px, auto);
+            grid-template-columns: auto 1fr minmax(60px, auto) minmax(60px, auto) auto;
             gap: 12px 20px;
             align-items: center;
             padding: 12px 8px;
@@ -447,6 +447,116 @@
                 min-width: 40px;
             }
         }
+
+        /* Add Ingredient Section */
+        .add-ingredient-container {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 2px solid var(--border-color);
+        }
+
+        .add-ingredient-input-container {
+            position: relative;
+            margin-bottom: 10px;
+        }
+
+        .add-ingredient-input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
+            font-family: 'Source Serif Pro', serif;
+            font-size: 1em;
+            transition: all 0.2s ease;
+        }
+
+        .add-ingredient-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 2px rgba(46, 125, 50, 0.1);
+        }
+
+        .typeahead-suggestions {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: var(--white);
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
+            margin-top: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+            box-shadow: var(--shadow-md);
+            display: none;
+        }
+
+        .typeahead-suggestions.active {
+            display: block;
+        }
+
+        .suggestion-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        .suggestion-item:hover {
+            background-color: var(--light-grey);
+        }
+
+        .suggestion-item.selected {
+            background-color: var(--light-grey);
+        }
+
+        .add-ingredient-button {
+            background-color: var(--primary-color);
+            color: var(--white);
+            border: none;
+            padding: 12px 24px;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            font-family: 'Source Serif Pro', serif;
+            font-size: 1em;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .add-ingredient-button:hover {
+            background-color: #1B5E20;
+            transform: translateY(-1px);
+        }
+
+        .add-ingredient-button svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .user-added {
+            color: var(--secondary-color);
+            font-size: 0.9em;
+            margin-left: 8px;
+        }
+
+        .delete-button {
+            color: var(--secondary-color);
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 4px 8px;
+            font-size: 1.2em;
+            opacity: 0.6;
+            transition: opacity 0.2s ease;
+            margin-left: 8px;
+        }
+
+        .delete-button:hover {
+            opacity: 1;
+            color: #dc3545;
+        }
     </style>
 </head>
 <body>
@@ -471,6 +581,18 @@
             <ul id="shopping-list-ul">
                 <!-- Shopping list will be populated here -->
             </ul>
+            <div class="add-ingredient-container">
+                <div class="add-ingredient-input-container">
+                    <input type="text" class="add-ingredient-input" placeholder="+ Add ingredient" id="add-ingredient-input">
+                    <div class="typeahead-suggestions" id="typeahead-suggestions"></div>
+                </div>
+                <button class="add-ingredient-button" id="add-ingredient-button">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+                    </svg>
+                    Add to List
+                </button>
+            </div>
         </div>
     </div>
 
@@ -591,75 +713,71 @@
                     'Cooking'
                 ];
 
-                ingredientEntries.sort(([, itemA], [, itemB]) => {
-                    const sectionA = itemA.section || 'ZZZ';
-                    const sectionB = itemB.section || 'ZZZ';
-                    
-                    // Get index in category order, or use a large number for uncategorized
-                    const indexA = categoryOrder.indexOf(sectionA);
-                    const indexB = categoryOrder.indexOf(sectionB);
-                    
-                    // If both categories are in our order list, sort by their position
-                    if (indexA !== -1 && indexB !== -1) {
-                        if (indexA === indexB) {
-                            // If same section, sort alphabetically by ingredient name
-                            return itemA.originalName.localeCompare(itemB.originalName);
-                        }
-                        return indexA - indexB;
+                // Group items by section
+                const sectionGroups = {};
+                ingredientEntries.forEach(([combinedKey, item]) => {
+                    const section = item.section || 'Other';
+                    if (!sectionGroups[section]) {
+                        sectionGroups[section] = [];
                     }
-                    
-                    // If only one category is in our order list, prioritize it
-                    if (indexA !== -1) return -1;
-                    if (indexB !== -1) return 1;
-                    
-                    // If neither category is in our order list, sort alphabetically by section then ingredient
-                    if (sectionA === sectionB) {
-                        return itemA.originalName.localeCompare(itemB.originalName);
-                    }
-                    return sectionA.localeCompare(sectionB);
+                    sectionGroups[section].push([combinedKey, item]);
                 });
 
-                let currentSection = null;
-                ingredientEntries.forEach(([combinedKey, item], index) => {
-                    if (item.section !== currentSection) {
-                        const headerLi = document.createElement('li');
-                        headerLi.classList.add('section-header');
-                        headerLi.textContent = item.section;
-                        shoppingListUl.appendChild(headerLi);
-                        currentSection = item.section;
-                    }
+                // Sort sections according to category order
+                const sortedSections = Object.keys(sectionGroups).sort((a, b) => {
+                    const indexA = categoryOrder.indexOf(a);
+                    const indexB = categoryOrder.indexOf(b);
+                    if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+                    if (indexA !== -1) return -1;
+                    if (indexB !== -1) return 1;
+                    return a.localeCompare(b);
+                });
 
-                    const listItem = document.createElement('li');
-                    listItem.classList.add('ingredient-item');
+                // Display sections and their items
+                sortedSections.forEach(section => {
+                    const items = sectionGroups[section];
+                    if (items.length === 0) return; // Skip empty sections
 
-                    const checkbox = document.createElement('input');
-                    checkbox.type = 'checkbox';
-                    const safeKey = combinedKey.replace(/[^a-zA-Z0-9_-]/g, '');
-                    const checkboxId = `item-${safeKey}-${index}`;
-                    checkbox.id = checkboxId;
-                    checkbox.classList.add('shopping-list-checkbox');
+                    const headerLi = document.createElement('li');
+                    headerLi.classList.add('section-header');
+                    headerLi.textContent = section;
+                    shoppingListUl.appendChild(headerLi);
 
-                    const label = document.createElement('label');
-                    label.htmlFor = checkboxId;
-                    label.classList.add('ingredient-name');
-                    label.textContent = item.originalName;
+                    items.sort(([, itemA], [, itemB]) => 
+                        itemA.originalName.localeCompare(itemB.originalName)
+                    ).forEach(([combinedKey, item], index) => {
+                        const listItem = document.createElement('li');
+                        listItem.classList.add('ingredient-item');
 
-                    const qtySpan = document.createElement('span');
-                    qtySpan.classList.add('ingredient-qty');
-                    const displayQuantity = Number.isInteger(item.quantity)
-                        ? item.quantity
-                        : parseFloat(item.quantity.toFixed(2));
-                    qtySpan.textContent = displayQuantity;
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        const safeKey = combinedKey.replace(/[^a-zA-Z0-9_-]/g, '');
+                        const checkboxId = `item-${safeKey}-${index}`;
+                        checkbox.id = checkboxId;
+                        checkbox.classList.add('shopping-list-checkbox');
 
-                    const unitSpan = document.createElement('span');
-                    unitSpan.classList.add('ingredient-unit');
-                    unitSpan.textContent = item.units;
+                        const label = document.createElement('label');
+                        label.htmlFor = checkboxId;
+                        label.classList.add('ingredient-name');
+                        label.textContent = item.originalName;
 
-                    listItem.appendChild(checkbox);
-                    listItem.appendChild(label);
-                    listItem.appendChild(qtySpan);
-                    listItem.appendChild(unitSpan);
-                    shoppingListUl.appendChild(listItem);
+                        const qtySpan = document.createElement('span');
+                        qtySpan.classList.add('ingredient-qty');
+                        const displayQuantity = Number.isInteger(item.quantity)
+                            ? item.quantity
+                            : parseFloat(item.quantity.toFixed(2));
+                        qtySpan.textContent = displayQuantity;
+
+                        const unitSpan = document.createElement('span');
+                        unitSpan.classList.add('ingredient-unit');
+                        unitSpan.textContent = item.units;
+
+                        listItem.appendChild(checkbox);
+                        listItem.appendChild(label);
+                        listItem.appendChild(qtySpan);
+                        listItem.appendChild(unitSpan);
+                        shoppingListUl.appendChild(listItem);
+                    });
                 });
             }
         }
@@ -803,6 +921,227 @@
                 toast.classList.remove('active');
             }, 2500);
         }
+
+        // Common grocery items for typeahead
+        const commonGroceries = [
+            { name: "Bagels", section: "Bread" },
+            { name: "Apples", section: "Produce" },
+            { name: "Avocado", section: "Produce" },
+            { name: "Bananas", section: "Produce" },
+            { name: "Basil", section: "Produce" },
+            { name: "Black pepper", section: "Cooking" },
+            { name: "Bread", section: "Bread" },
+            { name: "Broccoli", section: "Produce" },
+            { name: "Butter", section: "Dairy" },
+            { name: "Carrots", section: "Produce" },
+            { name: "Cheese", section: "Dairy" },
+            { name: "Cilantro", section: "Produce" },
+            { name: "Cinnamon", section: "Cooking" },
+            { name: "Coffee", section: "Cooking" },
+            { name: "Cucumber", section: "Produce" },
+            { name: "Eggs", section: "Dairy" },
+            { name: "Flour", section: "Cooking" },
+            { name: "Garlic", section: "Produce" },
+            { name: "Ginger", section: "Produce" },
+            { name: "Honey", section: "Cooking" },
+            { name: "Lemons", section: "Produce" },
+            { name: "Limes", section: "Produce" },
+            { name: "Maple syrup", section: "Cooking" },
+            { name: "Milk", section: "Dairy" },
+            { name: "Mushrooms", section: "Produce" },
+            { name: "Olive oil", section: "Cooking" },
+            { name: "Onions", section: "Produce" },
+            { name: "Oranges", section: "Produce" },
+            { name: "Oregano", section: "Produce" },
+            { name: "Pasta", section: "Cooking" },
+            { name: "Peanut butter", section: "Cooking" },
+            { name: "Potatoes", section: "Produce" },
+            { name: "Rice", section: "Cooking" },
+            { name: "Salt", section: "Cooking" },
+            { name: "Spinach", section: "Produce" },
+            { name: "Sugar", section: "Cooking" },
+            { name: "Sweet potatoes", section: "Produce" },
+            { name: "Tomatoes", section: "Produce" },
+            { name: "Yogurt", section: "Dairy" },
+            { name: "Half and half", section: "Dairy" },
+            { name: "Tofu", section: "Dairy" },
+            { name: "Crackers", section: "Snacks" },
+            { name: "Chips", section: "Snacks" },
+            { name: "Sparkling water", section: "Snacks" },
+            { name: "String cheese", section: "Dairy" },
+            { name: "Frozen pizza", section: "Frozen" },
+            { name: "Chicken nuggets", section: "Frozen" },
+            { name: "Ice cream", section: "Frozen" },
+            { name: "Fried rice", section: "Snacks" },
+            { name: "French fries", section: "Snacks" },
+        ];
+
+        // Add ingredient functionality
+        const addIngredientInput = document.getElementById('add-ingredient-input');
+        const typeaheadSuggestions = document.getElementById('typeahead-suggestions');
+        const addIngredientButton = document.getElementById('add-ingredient-button');
+        let selectedSuggestionIndex = -1;
+
+        function showTypeaheadSuggestions(input) {
+            const value = input.toLowerCase();
+            const matches = commonGroceries.filter(item => 
+                item.name.toLowerCase().includes(value)
+            );
+
+            typeaheadSuggestions.innerHTML = '';
+            selectedSuggestionIndex = -1;
+
+            if (matches.length > 0 && value.length > 0) {
+                matches.forEach((item, index) => {
+                    const div = document.createElement('div');
+                    div.className = 'suggestion-item';
+                    div.textContent = item.name;
+                    div.dataset.section = item.section;
+                    div.addEventListener('click', () => selectSuggestion(item));
+                    typeaheadSuggestions.appendChild(div);
+                });
+                typeaheadSuggestions.classList.add('active');
+            } else {
+                typeaheadSuggestions.classList.remove('active');
+            }
+        }
+
+        function selectSuggestion(item) {
+            addIngredientInput.value = item.name;
+            typeaheadSuggestions.classList.remove('active');
+            addIngredientToList(item.name, item.section);
+        }
+
+        function addIngredientToList(name, section) {
+            const listItem = document.createElement('li');
+            listItem.classList.add('ingredient-item');
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            const safeKey = name.toLowerCase().replace(/[^a-zA-Z0-9_-]/g, '');
+            const checkboxId = `item-${safeKey}-custom`;
+            checkbox.id = checkboxId;
+            checkbox.classList.add('shopping-list-checkbox');
+
+            const label = document.createElement('label');
+            label.htmlFor = checkboxId;
+            label.classList.add('ingredient-name');
+            label.innerHTML = `${name} <span class="user-added">(added by you)</span>`;
+
+            const qtySpan = document.createElement('span');
+            qtySpan.classList.add('ingredient-qty');
+            qtySpan.textContent = '1';
+
+            const unitSpan = document.createElement('span');
+            unitSpan.classList.add('ingredient-unit');
+            unitSpan.textContent = 'count';
+
+            const deleteButton = document.createElement('button');
+            deleteButton.className = 'delete-button';
+            deleteButton.innerHTML = '×';
+            deleteButton.title = 'Remove item';
+            deleteButton.addEventListener('click', () => {
+                listItem.remove();
+                // If this was the last item in its section, remove the section header too
+                const sectionHeader = listItem.previousElementSibling;
+                if (sectionHeader && sectionHeader.classList.contains('section-header')) {
+                    const nextItem = listItem.nextElementSibling;
+                    if (!nextItem || nextItem.classList.contains('section-header')) {
+                        sectionHeader.remove();
+                    }
+                }
+            });
+
+            listItem.appendChild(checkbox);
+            listItem.appendChild(label);
+            listItem.appendChild(qtySpan);
+            listItem.appendChild(unitSpan);
+            listItem.appendChild(deleteButton);
+
+            // Find the correct section to insert the item
+            const sections = shoppingListUl.querySelectorAll('.section-header');
+            let targetSection = null;
+            let insertAfter = null;
+
+            sections.forEach(sectionEl => {
+                if (sectionEl.textContent === section) {
+                    targetSection = sectionEl;
+                }
+            });
+
+            if (targetSection) {
+                // Find the last item in this section
+                let current = targetSection.nextElementSibling;
+                while (current && !current.classList.contains('section-header')) {
+                    insertAfter = current;
+                    current = current.nextElementSibling;
+                }
+                if (insertAfter) {
+                    insertAfter.after(listItem);
+                } else {
+                    targetSection.after(listItem);
+                }
+            } else {
+                // If section doesn't exist, create it
+                const newSection = document.createElement('li');
+                newSection.classList.add('section-header');
+                newSection.textContent = section;
+                shoppingListUl.appendChild(newSection);
+                shoppingListUl.appendChild(listItem);
+            }
+
+            addIngredientInput.value = '';
+        }
+
+        addIngredientInput.addEventListener('input', (e) => {
+            showTypeaheadSuggestions(e.target.value);
+        });
+
+        addIngredientInput.addEventListener('keydown', (e) => {
+            const suggestions = typeaheadSuggestions.querySelectorAll('.suggestion-item');
+            
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                selectedSuggestionIndex = Math.min(selectedSuggestionIndex + 1, suggestions.length - 1);
+                updateSelectedSuggestion(suggestions);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                selectedSuggestionIndex = Math.max(selectedSuggestionIndex - 1, -1);
+                updateSelectedSuggestion(suggestions);
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (selectedSuggestionIndex >= 0 && suggestions[selectedSuggestionIndex]) {
+                    const item = commonGroceries.find(g => 
+                        g.name.toLowerCase() === suggestions[selectedSuggestionIndex].textContent.toLowerCase()
+                    );
+                    if (item) selectSuggestion(item);
+                } else if (addIngredientInput.value.trim()) {
+                    // If no suggestion selected, add as custom item
+                    addIngredientToList(addIngredientInput.value.trim(), 'Other');
+                }
+            } else if (e.key === 'Escape') {
+                typeaheadSuggestions.classList.remove('active');
+            }
+        });
+
+        function updateSelectedSuggestion(suggestions) {
+            suggestions.forEach((suggestion, index) => {
+                suggestion.classList.toggle('selected', index === selectedSuggestionIndex);
+            });
+        }
+
+        addIngredientButton.addEventListener('click', () => {
+            if (addIngredientInput.value.trim()) {
+                addIngredientToList(addIngredientInput.value.trim(), 'Other');
+            }
+        });
+
+        // Close typeahead when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!addIngredientInput.contains(e.target) && !typeaheadSuggestions.contains(e.target)) {
+                typeaheadSuggestions.classList.remove('active');
+            }
+        });
     </script>
 </body>
 </html> 
