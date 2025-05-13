@@ -580,6 +580,9 @@
             generateButton.disabled = checked === 0;
             if (checked > 0) {
                 errorMessageDiv.style.display = 'none';
+                generateButton.textContent = `Get Shopping List (${checked})`;
+            } else {
+                generateButton.textContent = 'Get Shopping List';
             }
         }
 
