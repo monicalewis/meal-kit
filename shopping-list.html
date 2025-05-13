@@ -601,6 +601,10 @@
                     
                     // If both categories are in our order list, sort by their position
                     if (indexA !== -1 && indexB !== -1) {
+                        if (indexA === indexB) {
+                            // If same section, sort alphabetically by ingredient name
+                            return itemA.originalName.localeCompare(itemB.originalName);
+                        }
                         return indexA - indexB;
                     }
                     
@@ -608,7 +612,10 @@
                     if (indexA !== -1) return -1;
                     if (indexB !== -1) return 1;
                     
-                    // If neither category is in our order list, sort alphabetically
+                    // If neither category is in our order list, sort alphabetically by section then ingredient
+                    if (sectionA === sectionB) {
+                        return itemA.originalName.localeCompare(itemB.originalName);
+                    }
                     return sectionA.localeCompare(sectionB);
                 });
 
