@@ -4,305 +4,73 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Recipe Selector</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- ShadcnUI Dependencies -->
+    <link href="https://cdn.jsdelivr.net/npm/@radix-ui/colors/blackA.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/@radix-ui/colors/green.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/@radix-ui/colors/slate.css" rel="stylesheet">
+    <script src="https://unpkg.com/@radix-ui/react-icons"></script>
+    <script src="https://unpkg.com/@radix-ui/react-slot"></script>
+    <script src="https://unpkg.com/class-variance-authority"></script>
+    <script src="https://unpkg.com/clsx"></script>
+    <script src="https://unpkg.com/tailwind-merge"></script>
     <style>
-        /* Import modern, organic fonts */
-        @import url('https://fonts.googleapis.com/css2?family=Work+Sans:wght@600;700&family=Source+Serif+Pro:wght@400;600;700&display=swap');
-        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&family=Montserrat:wght@400;500&display=swap');
-
-        /* --- Global Styles & Variables --- */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        
         :root {
-            --primary-color: #2E7D32;  /* Organic green */
-            --secondary-color: #666666;
-            --light-grey: #F9F9F7;     /* Warm off-white */
-            --dark-grey: #2C2C2C;
-            --white: #ffffff;
-            --border-color: #E8E8E8;
-            --success-color: #2E7D32;
-            --shadow-sm: 0 2px 4px rgba(0,0,0,0.05);
-            --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
-            --border-radius: 12px;
-            --section-bg: #F5F5F3;
+            --background: 0 0% 100%;
+            --foreground: 222.2 84% 4.9%;
+            --card: 0 0% 100%;
+            --card-foreground: 222.2 84% 4.9%;
+            --popover: 0 0% 100%;
+            --popover-foreground: 222.2 84% 4.9%;
+            --primary: 142.1 76.2% 36.3%;
+            --primary-foreground: 355.7 100% 97.3%;
+            --secondary: 220 14.3% 95.9%;
+            --secondary-foreground: 220.9 39.3% 11%;
+            --muted: 220 14.3% 95.9%;
+            --muted-foreground: 220 8.9% 46.1%;
+            --accent: 220 14.3% 95.9%;
+            --accent-foreground: 220.9 39.3% 11%;
+            --destructive: 0 84.2% 60.2%;
+            --destructive-foreground: 210 20% 98%;
+            --border: 220 13% 91%;
+            --input: 220 13% 91%;
+            --ring: 142.1 76.2% 36.3%;
+            --radius: 0.75rem;
         }
 
         * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
+            @apply border-border;
         }
 
         body {
-            font-family: 'Montserrat', Arial, sans-serif;
-            line-height: 1.6;
-            background-color: var(--light-grey);
-            color: var(--dark-grey);
-            padding: 20px;
-        }
-
-        .container {
-            max-width: 900px;
-            margin: 20px auto;
-            background-color: var(--white);
-            padding: 40px;
-            border-radius: var(--border-radius);
-            box-shadow: var(--shadow-md);
-            padding-bottom: 80px; /* Ensure content is not hidden behind sticky button */
-        }
-
-        h1, h2, h3 {
-            font-family: 'Montserrat', Arial, sans-serif;
-            font-weight: 900;
-            color: var(--dark-grey);
-        }
-
-        h1 {
-            font-size: 3em;
-            font-weight: 900;
-            letter-spacing: -0.01em;
-            margin-bottom: 0.7em;
-            line-height: 1.05;
-        }
-
-        h2 {
-            font-size: 1.1em;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.18em;
-            border-bottom: none;
-            margin-bottom: 2em;
-            color: var(--secondary-color);
-        }
-
-        h3 {
-            margin-bottom: 1em;
-        }
-
-        .recipe-card-title {
-            font-family: 'Montserrat', Arial, sans-serif;
-            font-weight: 700;
-            font-size: 1.15em;
-            letter-spacing: -0.01em;
-        }
-
-        .recipe-card-content {
-            font-family: 'Montserrat', Arial, sans-serif;
-        }
-
-        .recipe-card-title .recipe-by {
-            font-weight: 400;
-            color: #888;
-            letter-spacing: 0.01em;
-            font-size: 0.95em;
-        }
-
-        /* --- Recipe Card Grid --- */
-        .recipe-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 32px 24px;
-            margin-top: 24px;
-        }
-        .recipe-card {
-            background: var(--white);
-            border-radius: var(--border-radius);
-            box-shadow: var(--shadow-sm);
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            transition: box-shadow 0.2s, border 0.2s;
-            position: relative;
-            cursor: pointer;
-        }
-        .recipe-card:hover {
-            box-shadow: var(--shadow-md);
-            border: 2px solid var(--primary-color);
-        }
-        .recipe-card.selected {
-            border: 3px solid var(--primary-color);
-            box-shadow: 0 0 0 4px #e0f2e9, var(--shadow-md);
-        }
-        .recipe-card.selected::after {
-            content: '';
-            position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(46, 125, 50, 0.18);
-            pointer-events: none;
-            z-index: 2;
-        }
-        .recipe-card-img {
-            width: 100%;
-            height: 160px;
-            object-fit: cover;
-            background: #eee;
-        }
-        .recipe-card-content {
-            flex: 1;
-            padding: 18px 18px 12px 18px;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-        }
-        .recipe-card-checkbox {
-            position: absolute;
-            top: 12px;
-            right: 12px;
-            background: var(--primary-color);
-            color: var(--white);
-            border: none;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.6em;
-            cursor: pointer;
-            box-shadow: var(--shadow-sm);
-            transition: background 0.2s, box-shadow 0.2s;
-            z-index: 3;
-        }
-        .recipe-card-checkbox.selected, .recipe-card-checkbox:active {
-            background: #1B5E20;
-            box-shadow: var(--shadow-md);
-        }
-        .recipe-card-checkbox input[type="checkbox"] {
-            display: none;
-        }
-        .recipe-card-checkbox .plus {
-            font-size: 1.5em;
-            font-weight: bold;
-            pointer-events: none;
-        }
-        @media (max-width: 1000px) {
-            .recipe-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-        }
-        @media (max-width: 600px) {
-            .recipe-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-        }
-
-        /* --- Button Styling --- */
-        button#generate-list-button {
-            display: block;
-            width: 100vw;
-            max-width: none;
-            left: 0;
-            right: 0;
-            margin: 0;
-            padding: 15px 20px;
-            background-color: var(--primary-color);
-            color: var(--white);
-            border: none;
-            border-radius: 0;
-            cursor: pointer;
-            font-size: 1.1em;
-            font-weight: 600;
-            transition: all 0.2s ease;
-            box-shadow: var(--shadow-sm);
-            position: fixed;
-            bottom: 0;
-            z-index: 100;
-        }
-
-        button#generate-list-button:hover:not(:disabled) {
-            background-color: #1B5E20;
-            box-shadow: var(--shadow-md);
-            transform: translateY(-1px);
-        }
-
-        button#generate-list-button:disabled {
-            background-color: var(--secondary-color);
-            cursor: not-allowed;
-            opacity: 0.7;
-            box-shadow: none;
-        }
-
-        .error-message {
-            color: #dc3545;
-            font-weight: 600;
-            padding: 15px;
-            background-color: #f8d7da;
-            border: 1px solid #f5c2c7;
-            border-radius: var(--border-radius);
-            margin: 10px 0;
-        }
-
-        /* --- Mobile Responsiveness --- */
-        @media (max-width: 768px) {
-            body {
-                padding: 10px;
-            }
-            .container {
-                padding: 25px;
-                margin: 10px auto;
-                height: calc(100vh - 20px);
-                padding-bottom: 80px;
-            }
-            #recipe-list-container {
-                height: calc(100vh - 180px);
-            }
-            h1 {
-                font-size: 1.8em;
-                margin-bottom: 1em;
-            }
-            h2 {
-                font-size: 1.3em;
-                margin-bottom: 0.5em;
-            }
-            button#generate-list-button {
-                padding: 15px 10px;
-                font-size: 1em;
-                bottom: 10px;
-            }
-            #recipe-list {
-                padding: 15px;
-            }
-        }
-
-        @media (max-width: 480px) {
-            .container {
-                padding: 20px;
-                margin: 5px auto;
-                padding-bottom: 70px;
-            }
-            #recipe-list-container {
-                height: calc(100vh - 160px);
-            }
-            h1 {
-                font-size: 1.6em;
-                margin-bottom: 0.8em;
-            }
-            h2 {
-                font-size: 1.2em;
-                margin-bottom: 0.4em;
-            }
-            #recipe-list {
-                padding: 12px;
-            }
-            .recipe-item label {
-                font-size: 1em;
-            }
-            button#generate-list-button {
-                font-size: 1em;
-                padding: 12px 5px;
-            }
+            @apply bg-background text-foreground font-sans antialiased;
+            font-feature-settings: "rlig" 1, "calt" 1;
         }
     </style>
 </head>
-<body>
-    <div class="container">
-        <h1>Meal Planner</h1>
+<body class="min-h-screen bg-slate-50">
+    <div class="container mx-auto px-4 py-8 max-w-6xl pb-36">
+        <h1 class="text-4xl font-bold tracking-tight text-slate-900 mb-8">Meal Planner</h1>
 
-        <div id="recipe-list-container">
-            <h2>Choose your recipes:</h2>
-            <div id="recipe-list" class="recipe-grid">
+        <div class="space-y-6">
+            <h2 class="text-lg font-semibold text-slate-700 uppercase tracking-wider">Choose your recipes:</h2>
+            
+            <div id="recipe-list" class="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                 <!-- Recipe cards will be populated here -->
             </div>
         </div>
 
-        <button id="generate-list-button">Get Shopping List</button>
+        <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-4">
+            <div class="container mx-auto max-w-6xl">
+                <button id="generate-list-button" 
+                        class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-4 px-6 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                    <span>Get Shopping List</span>
+                </button>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -317,15 +85,15 @@
             { recipeName: "Veggie jumble", ingredient: "Red onion", quantity: 1, units: "count", section: "Produce" },
             { recipeName: "Veggie jumble", ingredient: "Sweet potatoes", quantity: 2, units: "count", section: "Produce" },
             { recipeName: "Veggie jumble", ingredient: "Cumin", quantity: 1, units: "count", section: "Cooking" },
-            { recipeName: "Mediteranean baked veggies", ingredient: "Feta / goats cheese", quantity: 0.5, units: "cups", section: "Cheese area" },
-            { recipeName: "Mediteranean baked veggies", ingredient: "Garlic", quantity: 2, units: "cloves", section: "Produce" },
-            { recipeName: "Mediteranean baked veggies", ingredient: "Grape tomatoes", quantity: 4, units: "oz", section: "Produce" },
-            { recipeName: "Mediteranean baked veggies", ingredient: "Thyme", quantity: 1, units: "count", section: "Produce" },
-            { recipeName: "Mediteranean baked veggies", ingredient: "Asparagus", quantity: 8, units: "oz", section: "Produce" },
-            { recipeName: "Mediteranean baked veggies", ingredient: "Scallions", quantity: 2, units: "count", section: "Produce" },
-            { recipeName: "Mediteranean baked veggies", ingredient: "Israeli couscous", quantity: 0.75, units: "cups", section: "Cooking" },
-            { recipeName: "Mediteranean baked veggies", ingredient: "Sliced almonds", quantity: 1, units: "oz", section: "Nuts" },
-            { recipeName: "Mediteranean baked veggies", ingredient: "Veggie stock", quantity: 2, units: "cubes", section: "Cooking" },
+            { recipeName: "Baked mediterranean veggies", ingredient: "Feta / goats cheese", quantity: 0.5, units: "cups", section: "Cheese area" },
+            { recipeName: "Baked mediterranean veggies", ingredient: "Garlic", quantity: 2, units: "cloves", section: "Produce" },
+            { recipeName: "Baked mediterranean veggies", ingredient: "Grape tomatoes", quantity: 4, units: "oz", section: "Produce" },
+            { recipeName: "Baked mediterranean veggies", ingredient: "Thyme", quantity: 1, units: "count", section: "Produce" },
+            { recipeName: "Baked mediterranean veggies", ingredient: "Asparagus", quantity: 8, units: "oz", section: "Produce" },
+            { recipeName: "Baked mediterranean veggies", ingredient: "Scallions", quantity: 2, units: "count", section: "Produce" },
+            { recipeName: "Baked mediterranean veggies", ingredient: "Israeli couscous", quantity: 0.75, units: "cups", section: "Cooking" },
+            { recipeName: "Baked mediterranean veggies", ingredient: "Sliced almonds", quantity: 1, units: "oz", section: "Nuts" },
+            { recipeName: "Baked mediterranean veggies", ingredient: "Veggie stock", quantity: 2, units: "cubes", section: "Cooking" },
             { recipeName: "Mushroom buratta pizza by Good Eggs", ingredient: "Pizza dough", quantity: 1, units: "count", section: "Cheese area" },
             { recipeName: "Mushroom buratta pizza by Good Eggs", ingredient: "Buratta", quantity: 1, units: "balls", section: "Dairy" },
             { recipeName: "Mushroom buratta pizza by Good Eggs", ingredient: "Arugula", quantity: 1, units: "count", section: "Produce" },
@@ -439,8 +207,8 @@
             { recipeName: "Caprese sandwiches", ingredient: "Olive oil", quantity: 3, units: "tsp", section: "Cooking" },
             { recipeName: "Caprese sandwiches", ingredient: "Basil", quantity: 1, units: "tbsp", section: "Produce" },
             { recipeName: "Caprese sandwiches", ingredient: "Plum tomatoes", quantity: 1, units: "count", section: "Produce" },
-            { recipeName: "Caprese sandwiches", ingredient: "Mozzarella", quantity: 1, units: "oz", section: "Dairy" },
-            { recipeName: "Caprese sandwiches", ingredient: "Baguette", quantity: 1, units: "count", section: "Bread" },
+            { recipeName: "Caprese sandwiches", ingredient: "Fresh mozzarella", quantity: 1, units: "ball", section: "Dairy" },
+            { recipeName: "Caprese sandwiches", ingredient: "Baguette", quantity: 0.5, units: "count", section: "Bread" },
             { recipeName: "Roasted tomatoes with garlic by Smitten Kitchen", ingredient: "Olive oil", quantity: 4, units: "tsp", section: "Cooking" },
             { recipeName: "Roasted tomatoes with garlic by Smitten Kitchen", ingredient: "Garlic", quantity: 12, units: "cloves", section: "Produce" },
             { recipeName: "Roasted tomatoes with garlic by Smitten Kitchen", ingredient: "Basil", quantity: 1, units: "count", section: "Produce" },
@@ -485,7 +253,7 @@
             { recipeName: "Peach panzanella with burrata & mint by Good Eggs", ingredient: "Buratta", quantity: 1, units: "balls", section: "Cheese area" },
             { recipeName: "Peach panzanella with burrata & mint by Good Eggs", ingredient: "Mint", quantity: 1, units: "tsp", section: "Produce" },
             { recipeName: "Peach panzanella with burrata & mint by Good Eggs", ingredient: "Peaches", quantity: 1, units: "count", section: "Produce" },
-            { recipeName: "Peach panzanella with burrata & mint by Good Eggs", ingredient: "Baguette", quantity: 1, units: "count", section: "Bread" },
+            { recipeName: "Peach panzanella with burrata & mint by Good Eggs", ingredient: "Baguette", quantity: 0.5, units: "count", section: "Bread" },
             { recipeName: "Peach panzanella with burrata & mint by Good Eggs", ingredient: "Pine nuts", quantity: 2, units: "oz", section: "Nuts" },
             { recipeName: "Simple cauliflower tacos by Smitten Kitchen", ingredient: "Cilantro", quantity: 1, units: "count", section: "Produce" },
             { recipeName: "Simple cauliflower tacos by Smitten Kitchen", ingredient: "Lime", quantity: 1, units: "count", section: "Produce" },
@@ -513,17 +281,26 @@
             { recipeName: "Baked farro with summer vegetables by Smitten Kitchen", ingredient: "Farro", quantity: 1, units: "cup", section: "Cooking" },
             { recipeName: "Baked farro with summer vegetables by Smitten Kitchen", ingredient: "Mozzarella cheese", quantity: 6, units: "oz", section: "Dairy" },
             { recipeName: "Baked farro with summer vegetables by Smitten Kitchen", ingredient: "Parmesan cheese", quantity: 2, units: "oz", section: "Dairy" },
+            { recipeName: "Lunchbox", ingredient: "String cheese [lunchbox]", quantity: 1, units: "package", section: "Cheese area" },
+            { recipeName: "Lunchbox", ingredient: "Tofu [lunchbox]", quantity: 1, units: "package", section: "Cheese area" },
+            { recipeName: "Lunchbox", ingredient: "Cucumbers [lunchbox]", quantity: 1, units: "package", section: "Produce" },
+            { recipeName: "Lunchbox", ingredient: "Berries, kiwi, goldenberries [lunchbox]", quantity: 1, units: "package", section: "Produce" },
+            { recipeName: "Lunchbox", ingredient: "Seaweed [lunchbox]", quantity: 1, units: "package", section: "Snacks" },
+            { recipeName: "Lunchbox", ingredient: "Gogurts [lunchbox]", quantity: 1, units: "box", section: "Dairy" },
+            { recipeName: "Lunchbox", ingredient: "Sticky apricots [lunchbox]", quantity: 1, units: "box", section: "Nuts" },
+            { recipeName: "Pantry essentials", ingredient: "Pouring olive oil [essentials]", quantity: 1, units: "bottle", section: "Cooking" },
+            { recipeName: "Pantry essentials", ingredient: "Hazelnuts, pine nuts [essentials]", quantity: 1, units: "bottle", section: "Nuts" },
+            { recipeName: "Pantry essentials", ingredient: "Gummy apricots [essentials]", quantity: 1, units: "bottle", section: "Nuts" },
+            { recipeName: "Pantry essentials", ingredient: "Daddy bread, bagels, green bread... [essentials]", quantity: 1, units: "packet", section: "Bread" },
+            { recipeName: "Pantry essentials", ingredient: "Cream cheese [essentials]", quantity: 1, units: "container", section: "Cheese area" },
+            { recipeName: "Pantry essentials", ingredient: "Mangoes, Peaches, Honeycrisp apples [essentials]", quantity: 1, units: "Bag", section: "Produce" },
+            { recipeName: "Pantry essentials", ingredient: "Sparkling water [essentials]", quantity: 1, units: "case", section: "Cooking" },
+            { recipeName: "Pantry essentials", ingredient: "Turtle gummies [essentials]", quantity: 1, units: "bag", section: "Frozen" },
+            { recipeName: "Pantry essentials", ingredient: "Mini ice creams [essentials]", quantity: 1, units: "box", section: "Frozen" },
+            { recipeName: "Pantry essentials", ingredient: "Cereal [essentials]", quantity: 1, units: "box", section: "Cooking" },
+            { recipeName: "Pantry essentials", ingredient: "Milk, half & half [essentials]", quantity: 1, units: "carton", section: "Dairy" },
+            { recipeName: "Pantry essentials", ingredient: "Dumplings, impossible nuggets, other gems [essentials]", quantity: 1, units: "box", section: "Frozen" },
         ];
-
-        // Update recipeData for new labels
-        recipeData.forEach(item => {
-            if (item.recipeName === 'Enchilada bake') {
-                item.recipeName = 'Enchilada bake';
-            }
-            if (item.recipeName === 'Mediteranean baked veggies') {
-                item.recipeName = 'Baked mediterranean veggies';
-            }
-        });
 
         // Placeholder images for recipes
         const recipeImages = {
@@ -554,7 +331,9 @@
             "Roasted yams and chickpeas with yogurt by Smitten Kitchen": "https://i0.wp.com/smittenkitchen.com/wp-content/uploads//2016/02/roasted-yams-and-chickpeas-with-yogurt1.jpg?fit=640%2C427&ssl=1",
             "Simple cauliflower tacos by Smitten Kitchen": "https://i0.wp.com/smittenkitchen.com/wp-content/uploads/2020/10/simple-cauliflower-tacos-scaled.jpg?resize=1536%2C1024&ssl=1",
             "Skillet pasta with 5 cheeses by Smitten Kitchen": "https://i0.wp.com/smittenkitchen.com/wp-content/uploads//2016/10/skillet-baked-pasta-with-five-cheeses.jpg?fit=750%2C500&ssl=1",
-            "Baked farro with summer vegetables by Smitten Kitchen": "https://i0.wp.com/smittenkitchen.com/wp-content/uploads/2021/08/baked-farro-with-summer-vegetables-scaled.jpg?resize=1536%2C1024&ssl=1"
+            "Baked farro with summer vegetables by Smitten Kitchen": "https://i0.wp.com/smittenkitchen.com/wp-content/uploads/2021/08/baked-farro-with-summer-vegetables-scaled.jpg?resize=1536%2C1024&ssl=1",
+            "Lunchbox": "https://holleygrainger.com/wp-content/uploads/2019/08/blt-skewer-lunchbox.jpg",
+            "Pantry essentials": "https://simply-delicious-food.com/wp-content/uploads/2020/03/53DE1AE8-4DB2-4821-A11E-39B69931503E-2.jpg",
         };
 
         // --- DOM References ---
@@ -575,14 +354,103 @@
         errorMessageDiv.style.display = 'none';
         generateButton.parentNode.insertBefore(errorMessageDiv, generateButton);
 
-        function updateButtonState() {
-            const checked = recipeListDiv.querySelectorAll('input[name="recipe"]:checked').length;
-            generateButton.disabled = checked === 0;
-            if (checked > 0) {
-                errorMessageDiv.style.display = 'none';
-                generateButton.textContent = `Get Shopping List (${checked})`;
+        function createRecipeCard(recipeName) {
+            const card = document.createElement('div');
+            card.className = 'group relative bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-200 border-2 border-transparent hover:border-green-500 overflow-hidden';
+            
+            // Image container with aspect ratio
+            const imgContainer = document.createElement('div');
+            imgContainer.className = 'relative aspect-[4/3] overflow-hidden';
+            
+            const img = document.createElement('img');
+            img.className = 'w-full h-full object-cover transition-transform duration-300 group-hover:scale-105';
+            img.src = recipeImages[recipeName] || 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=400&q=80';
+            img.alt = recipeName;
+            imgContainer.appendChild(img);
+            
+            // Checkbox button
+            const checkboxWrapper = document.createElement('label');
+            checkboxWrapper.className = 'absolute top-3 right-3 z-10';
+            
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.name = 'recipe';
+            checkbox.value = recipeName;
+            checkbox.className = 'peer sr-only';
+            
+            const checkboxButton = document.createElement('div');
+            checkboxButton.className = 'w-10 h-10 rounded-full bg-white/90 shadow-md flex items-center justify-center text-green-600 opacity-0 group-hover:opacity-100 peer-checked:opacity-100 peer-checked:bg-green-600 peer-checked:text-white transition-all duration-200';
+            checkboxButton.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+            `;
+            
+            checkboxWrapper.appendChild(checkbox);
+            checkboxWrapper.appendChild(checkboxButton);
+            
+            // Content
+            const content = document.createElement('div');
+            content.className = 'p-4';
+            
+            const title = document.createElement('div');
+            title.className = 'font-semibold text-slate-900';
+            
+            const byIndex = recipeName.toLowerCase().indexOf(' by ');
+            if (byIndex !== -1) {
+                const main = recipeName.slice(0, byIndex);
+                const by = recipeName.slice(byIndex);
+                title.innerHTML = `${main}<span class="block text-sm font-normal text-slate-500">${by}</span>`;
             } else {
-                generateButton.textContent = 'Get Shopping List';
+                title.textContent = recipeName;
+            }
+            
+            content.appendChild(title);
+            
+            // Assemble card
+            card.appendChild(imgContainer);
+            card.appendChild(checkboxWrapper);
+            card.appendChild(content);
+            
+            // Make card clickable
+            card.addEventListener('click', (e) => {
+                if (e.target === checkbox || e.target === checkboxButton) return;
+                checkbox.checked = !checkbox.checked;
+                checkbox.dispatchEvent(new Event('change'));
+            });
+            
+            // Handle checkbox changes
+            checkbox.addEventListener('change', () => {
+                if (checkbox.checked) {
+                    card.classList.add('ring-2', 'ring-green-500');
+                } else {
+                    card.classList.remove('ring-2', 'ring-green-500');
+                }
+                updateButtonState();
+            });
+            
+            return card;
+        }
+
+        function updateButtonState() {
+            const checked = document.querySelectorAll('input[name="recipe"]:checked').length;
+            const button = document.getElementById('generate-list-button');
+            button.disabled = checked === 0;
+            
+            if (checked > 0) {
+                button.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                    <span>Get Shopping List (${checked})</span>
+                `;
+            } else {
+                button.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                    <span>Get Shopping List</span>
+                `;
             }
         }
 
@@ -590,103 +458,52 @@
             recipeListDiv.innerHTML = '';
 
             if (selectableRecipes.length === 0) {
-                recipeListDiv.innerHTML = '<p class="error-message">No recipes found in the data.</p>';
-                generateButton.textContent = 'No Recipes';
+                recipeListDiv.innerHTML = `
+                    <div class="col-span-full text-center py-12">
+                        <div class="text-slate-500">No recipes found in the data.</div>
+                    </div>
+                `;
                 return;
             }
 
             selectableRecipes.forEach(recipeName => {
-                const card = document.createElement('div');
-                card.classList.add('recipe-card');
-
-                // Image
-                const img = document.createElement('img');
-                img.className = 'recipe-card-img';
-                img.src = recipeImages[recipeName] || 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=400&q=80';
-                img.alt = recipeName;
-                card.appendChild(img);
-
-                // Checkbox as plus button
-                const checkboxWrapper = document.createElement('label');
-                checkboxWrapper.className = 'recipe-card-checkbox';
-                const checkbox = document.createElement('input');
-                checkbox.type = 'checkbox';
-                checkbox.name = 'recipe';
-                checkbox.value = recipeName;
-                checkboxWrapper.appendChild(checkbox);
-                const plus = document.createElement('span');
-                plus.className = 'plus';
-                plus.textContent = '+';
-                checkboxWrapper.appendChild(plus);
-                card.appendChild(checkboxWrapper);
-
-                // Card content
-                const content = document.createElement('div');
-                content.className = 'recipe-card-content';
-                const title = document.createElement('div');
-                title.className = 'recipe-card-title';
-                // Split and style 'by xyz' part
-                const byIndex = recipeName.toLowerCase().indexOf(' by ');
-                if (byIndex !== -1) {
-                    const main = recipeName.slice(0, byIndex);
-                    const by = recipeName.slice(byIndex);
-                    title.innerHTML = `${main}<span class="recipe-by">${by}</span>`;
-                } else {
-                    title.textContent = recipeName;
-                }
-                content.appendChild(title);
-                card.appendChild(content);
-
-                // Make the entire card clickable
-                card.addEventListener('click', function(e) {
-                    if (e.target === checkbox || e.target === plus) return;
-                    checkbox.checked = !checkbox.checked;
-                    checkbox.dispatchEvent(new Event('change'));
-                });
-
-                // Checkbox selection styling and card selection
-                checkbox.addEventListener('change', function() {
-                    if (checkbox.checked) {
-                        checkboxWrapper.classList.add('selected');
-                        card.classList.add('selected');
-                    } else {
-                        checkboxWrapper.classList.remove('selected');
-                        card.classList.remove('selected');
-                    }
-                    updateButtonState();
-                });
-
+                const card = createRecipeCard(recipeName);
                 recipeListDiv.appendChild(card);
             });
+            
             updateButtonState();
-            generateButton.textContent = 'Get Shopping List';
         }
 
-        // --- Event Listener for Button ---
-        generateButton.addEventListener('click', () => {
-            const selectedRecipeNames = [];
-            const recipeCheckboxes = recipeListDiv.querySelectorAll('input[name="recipe"]:checked');
-            recipeCheckboxes.forEach(checkbox => selectedRecipeNames.push(checkbox.value));
+        // Event listener for generate button
+        document.getElementById('generate-list-button').addEventListener('click', () => {
+            const selectedRecipeNames = Array.from(document.querySelectorAll('input[name="recipe"]:checked'))
+                .map(checkbox => checkbox.value);
+                
             if (selectedRecipeNames.length === 0) {
-                errorMessageDiv.textContent = 'Please select at least one recipe to generate a shopping list.';
-                errorMessageDiv.style.display = 'block';
+                // Show error toast
+                const toast = document.createElement('div');
+                toast.className = 'fixed bottom-20 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg';
+                toast.textContent = 'Please select at least one recipe';
+                document.body.appendChild(toast);
+                setTimeout(() => toast.remove(), 3000);
                 return;
             }
-            // Store selected recipes and recipe data in localStorage
+
             localStorage.setItem('selectedRecipes', JSON.stringify(selectedRecipeNames));
             localStorage.setItem('recipeData', JSON.stringify(recipeData));
-            // Navigate to shopping list page
             window.location.href = 'shopping-list.html';
         });
 
-        // --- Initial Setup ---
+        // Initialize
         try {
             populateRecipeCards();
         } catch (error) {
             console.error("Error initializing recipe list:", error);
-            recipeListDiv.innerHTML = '<p class="error-message">An error occurred loading the recipe list.</p>';
-            generateButton.disabled = true;
-            generateButton.textContent = 'Error Loading';
+            document.getElementById('recipe-list').innerHTML = `
+                <div class="col-span-full text-center py-12">
+                    <div class="text-red-500">An error occurred loading the recipe list.</div>
+                </div>
+            `;
         }
     </script>
 </body>
