@@ -670,7 +670,7 @@ const recipeData = {
     },
     {
       "id": "baked-mediterranean-veggies",
-      "name": "Baked mediterranean veggies",
+      "name": "Baked mediterranean veggies by Hello Fresh",
       "url": "https://www.hellofresh.com/recipes/mediterranean-baked-veggies-5a958ac730006c32be67bfd2",
       "image": "https://img.hellofresh.com/c_fit,f_auto,fl_lossy,h_1100,q_50,w_2600/hellofresh_s3/image/5a958ac730006c32be67bfd2-1f072c43.jpg",
       "ingredients": [
@@ -700,7 +700,7 @@ const recipeData = {
     },
     {
       "id": "burrito-bowls",
-      "name": "Burrito bowls",
+      "name": "Burrito bowls by Hello Fresh",
       "url": "https://www.hellofresh.com/recipes/veggie-burrito-bowls-5bc0bfaaae08b5032c3a6bf2",
       "image": "https://img.hellofresh.com/c_fit,f_auto,fl_lossy,h_1100,q_50,w_2600/hellofresh_s3/image/5e5ea67325ed1a2b107a3598-296940aa.jpg",
       "ingredients": [
@@ -719,7 +719,7 @@ const recipeData = {
     },
     {
       "id": "caprese-sandwiches",
-      "name": "Caprese sandwiches",
+      "name": "Caprese sandwiches by MoniLew",
       "image": "https://cdn.loveandlemons.com/wp-content/uploads/2020/06/caprese-sandwich-1.jpg",
       "ingredients": [
         { "id": "olive-oil", "qty": 3 },
@@ -731,7 +731,7 @@ const recipeData = {
     },
     {
       "id": "chickpea-and-carrot-curry",
-      "name": "Chickpea and carrot curry",
+      "name": "Chickpea and carrot curry by Williams Sonoma",
       "url": "https://www.williams-sonoma.com/recipe/chickpea--spinach-and-carrot-curry.html",
       "image": "https://assets.wsimgs.com/wsimgs/rk/images/dp/recipe/202508/0012/img74l.jpg",
       "ingredients": [
@@ -762,7 +762,7 @@ const recipeData = {
     },
     {
       "id": "enchilada-bake",
-      "name": "Enchilada bake",
+      "name": "Enchilada bake by HelloFresh",
       "url": "https://www.hellofresh.com/recipes/one-pan-rice-bean-enchilada-bake-614b499eebe91d735a1d62a9",
       "image": "https://img.hellofresh.com/c_fit,f_auto,fl_lossy,h_1100,q_50,w_2600/hellofresh_s3/image/one-pan-rice-bean-enchilada-bake-a73f6f46.jpg",
       "ingredients": [
@@ -779,7 +779,7 @@ const recipeData = {
     },
     {
       "id": "grazing-platter",
-      "name": "Grazing platter",
+      "name": "Grazing platter by MoniLew",
       "image": "https://www.chefnotrequired.com/wp-content/uploads/2019/12/grazing-board-blog-hero.jpg",
       "ingredients": [
         { "id": "cheddar-cheese", "qty": 1 },
@@ -810,7 +810,7 @@ const recipeData = {
     },
     {
       "id": "kale-salad",
-      "name": "Kale salad",
+      "name": "Kale salad by MoniLew",
       "image": "https://i0.wp.com/smittenkitchen.com/wp-content/uploads//2013/08/kale-salad-with-pecorino-and-walnuts.jpg?fit=750%2C500&ssl=1",
       "ingredients": [
         { "id": "feta---goat-cheese", "qty": 1 },
@@ -824,7 +824,7 @@ const recipeData = {
     },
     {
       "id": "lunchbox",
-      "name": "Lunchbox",
+      "name": "Lunchbox by MoniLew",
       "image": "https://holleygrainger.com/wp-content/uploads/2019/08/blt-skewer-lunchbox.jpg",
       "ingredients": [
         { "id": "string-cheese-[lunchbox]", "qty": 1 },
@@ -838,7 +838,7 @@ const recipeData = {
     },
     {
       "id": "margherita-pizza",
-      "name": "Margherita pizza",
+      "name": "Margherita pizza by MoniLew",
       "image": "https://ooni.com/cdn/shop/articles/20220211142347-margherita-9920_ba86be55-674e-4f35-8094-2067ab41a671.jpg?v=1737104576&width=2048",
       "ingredients": [
         { "id": "pizza-dough", "qty": 1 },
@@ -849,7 +849,7 @@ const recipeData = {
     },
     {
       "id": "marry-me-beans",
-      "name": "Marry Me Beans",
+      "name": "Marry Me Beans by NYT Cooking",
       "url": "https://cooking.nytimes.com/recipes/1025325-creamy-spicy-tomato-beans-and-greens",
       "image": "https://static01.nyt.com/images/2024/04/24/multimedia/aw-tomato-beansrex-mwfq/aw-tomato-beansrex-mwfq-threeByTwoMediumAt2X.jpg?quality=75&auto=webp",
       "ingredients": [
@@ -870,7 +870,7 @@ const recipeData = {
     },
     {
       "id": "minestrone-soup",
-      "name": "Minestrone soup",
+      "name": "Minestrone soup by McCaitlin",
       "image": "https://i0.wp.com/fortheloveofgourmet.com/wp-content/uploads/2025/01/IMG_2256-scaled.jpg?resize=1365%2C2048&ssl=1",
       "ingredients": [
         { "id": "parmesan", "qty": 1 },
@@ -903,7 +903,7 @@ const recipeData = {
     },
     {
       "id": "mushroom-ravioli",
-      "name": "Mushroom ravioli",
+      "name": "Mushroom ravioli by Hello Fresh",
       "url": "https://www.hellofresh.com/recipes/creamiest-mushroom-ravioli-5aaac3ac30006c55e74b0644",
       "image": "https://img.hellofresh.com/c_fit,f_auto,fl_lossy,h_1100,q_50,w_2600/hellofresh_s3/image/5aaac3ac30006c55e74b0644-3b4a0509.jpg",
       "ingredients": [
@@ -954,7 +954,7 @@ const recipeData = {
     },
     {
       "id": "pea-fritters",
-      "name": "Pea, Feta and Mint Fritters",
+      "name": "Pea, Feta and Mint Fritters by Smitten Kitchen",
       "image": "https://dishingupthedirt.com/wp-content/uploads/2021/03/010819_DUTD2_PeaFrittersAmity.jpg",
       "ingredients": [
         { "id": "frozen-peas", "qty": 2 },
@@ -982,7 +982,7 @@ const recipeData = {
     },
     {
       "id": "quinoa-spaghetti-with-broccoli",
-      "name": "Quinoa spaghetti with broccoli",
+      "name": "Quinoa spaghetti with broccoli  by Williams Sonoma",
       "url": "https://www.williams-sonoma.com/recipe/quinoa-spaghetti-with-broccoli-rabe--feta-and-mint.html",
       "image": "https://assets.wsimgs.com/wsimgs/rk/images/dp/recipe/202512/0003/img460l.jpg",
       "ingredients": [
@@ -997,7 +997,7 @@ const recipeData = {
     },
     {
       "id": "roast-butternut-squash-and-red-onion-with-zaatar-tahini-by-ottolenghi",
-      "name": "Roast butternut squash and red onion with za'atar tahini by Ottolenghi",
+      "name": "Roasted butternut squash and red onion with za'atar tahini by Ottolenghi",
       "url": "https://ottolenghi.co.uk/recipes/roast-butternut-squash-and-red-onion-with-tahini-and-za-atar",
       "image": "https://i.guim.co.uk/img/static/sys-images/Guardian/Pix/pictures/2011/12/8/1323360137075/Roasted-butternut-squash--007.jpg?width=620&dpr=2&s=none&crop=none",
       "ingredients": [
@@ -1124,7 +1124,7 @@ const recipeData = {
     },
     {
       "id": "sweet-potato-pita-pocket",
-      "name": "Sweet potato pita pocket",
+      "name": "Sweet potato pita pocket by Hello Fresh",
       "url": "https://www.hellofresh.com/recipes/harissa-sweet-potato-pitas-58b99736d56afa17de02ce53",
       "image": "https://img.hellofresh.com/c_fit,f_auto,fl_lossy,h_1100,q_50,w_2600/hellofresh_s3/image/5c3cb170c445fa2277482006-cabc7683.jpg",
       "ingredients": [
@@ -1141,7 +1141,7 @@ const recipeData = {
     },
     {
       "id": "ricotta-gnocchi",
-      "name": "Toasted Ricotta Gnocchi with Pistachio Pesto",
+      "name": "Toasted Ricotta Gnocchi with Pistachio Pesto by Smitten Kitchen",
       "url": "https://houseandhome.com/recipe/toasted-ricotta-gnocchi-with-pistachio-pesto/",
       "image": "https://houseandhome.com/wp-content/uploads/2023/05/Toasted-Ricotta-Gnocchi-with-Pistachio-Pesto_HH_Apr23_58.jpg",
       "ingredients": [
@@ -1156,7 +1156,7 @@ const recipeData = {
     },
     {
       "id": "veggie-jumble",
-      "name": "Veggie jumble",
+      "name": "Veggie jumble by Hello Fresh",
       "url": "https://www.hellofresh.com/recipes/w19-r8-58d3c741d56afa563047ade3",
       "image": "https://img.hellofresh.com/c_fit,f_auto,fl_lossy,h_1100,q_50,w_2600/hellofresh_s3/image/grilled-cheese-and-veggie-jumble-46f11c36.jpg",
       "ingredients": [
