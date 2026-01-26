@@ -1079,7 +1079,7 @@ const recipeData = {
     {
       "id": "simple-eggplant-parmesan",
       "name": "Simple eggplant parmesan by Smitten Kitchen",
-      "url": "https://smittenkitchen.com/2023/09/simple-eggplant-parmesan/"
+      "url": "https://smittenkitchen.com/2023/09/simple-eggplant-parmesan/",
       "image": "https://i0.wp.com/smittenkitchen.com/wp-content/uploads/2023/09/simple-eggplant-parmesan-12-scaled.jpg?resize=1536%2C1024&ssl=1",
       "ingredients": [
         { "id": "eggplant", "qty": 2 },
