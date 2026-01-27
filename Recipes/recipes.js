@@ -31,6 +31,11 @@ const recipeData = {
       "units": "count",
       "section": "Bread"
     },
+    "basmati-rice": {
+      "name": "Basmati rice",
+      "units": "cup",
+      "section": "Cooking"
+    },
     "berries-kiwi-goldenberries-[lunchbox]": {
       "name": "Berries, kiwi, goldenberries [lunchbox]",
       "units": "package",
@@ -121,6 +126,11 @@ const recipeData = {
       "units": "count",
       "section": "Produce"
     },
+    "coconut": {
+      "name": "Coconut flakes",
+      "units": "oz",
+      "section": "Nuts"
+    },
     "corn-on-cob": {
       "name": "Corn on cob",
       "units": "count",
@@ -179,6 +189,11 @@ const recipeData = {
     "dried-mint": {
       "name": "Dried mint",
       "units": "tsp",
+      "section": "Cooking"
+    },
+    "dried-sour-cherries": {
+      "name": "Dried sour cherries",
+      "units": "cup",
       "section": "Cooking"
     },
     "dumplings-impossible-nuggets-other-gems-[essentials]": {
@@ -351,6 +366,11 @@ const recipeData = {
       "units": "Bag",
       "section": "Produce"
     },
+    "mango": {
+      "name": "Mango",
+      "units": "count",
+      "section": "Produce"
+    },
     "maple-syrup": {
       "name": "Maple syrup",
       "units": "tsp",
@@ -441,6 +461,16 @@ const recipeData = {
       "units": "count",
       "section": "Produce"
     },
+    "peanuts": {
+      "name": "Peanuts",
+      "units": "oz",
+      "section": "Nuts"
+    },
+    "peanut-oil": {
+      "name": "Peanut oil",
+      "units": "oz",
+      "section": "Cooking"
+    },
     "pine-nuts": {
       "name": "Pine nuts",
       "units": "oz",
@@ -471,10 +501,25 @@ const recipeData = {
       "units": "bottle",
       "section": "Cooking"
     },
+    "quinoa": {
+      "name": "Quinoa",
+      "units": "cup",
+      "section": "Cooking"
+    },
     "red-onion": {
       "name": "Red onion",
       "units": "count",
       "section": "Produce"
+    },
+    "red-pepper": {
+      "name": "Red bell pepper",
+      "units": "count",
+      "section": "Produce"
+    },
+    "red-rice": {
+      "name": "Red rice",
+      "units": "oz",
+      "section": "Cooking"
     },
     "ricotta": {
       "name": "Ricotta",
@@ -629,6 +674,11 @@ const recipeData = {
     "whole-tomatoes": {
       "name": "Whole tomatoes",
       "units": "oz can",
+      "section": "Cooking"
+    },
+    "wild-rice": {
+      "name": "Wild rice",
+      "units": "cup",
       "section": "Cooking"
     },
     "yellow-onion": {
@@ -837,6 +887,28 @@ const recipeData = {
       ]
     },
     {
+      "id": "mango-coconut-salad",
+      "name": "Mango and Coconut Rice Salad by Ottolenghi",
+      "url": "https://www.theguardian.com/lifeandstyle/2009/may/30/yotam-ottolenghi-vegetarian-rice-salad",
+      "image": "https://i.guim.co.uk/img/static/sys-images/Lifeandhealth/Pix/pictures/2009/5/29/1243593740045/Yotam-Ottolenghis-mango-a-001.jpg?width=620&dpr=2&s=none&crop=none",
+      "ingredients": [
+        { "id": "jasmine-rice", "qty": 1 },
+        { "id": "butter", "qty": 1 },
+        { "id": "fresh-basil", "qty": 1 },
+        { "id": "red-rice", "qty": 1 },
+        { "id": "red-pepper", "qty": 1 },
+        { "id": "fresh-mint", "qty": 1 },
+        { "id": "cilantro", "qty": 1 },
+        { "id": "scallions", "qty": 2 },
+        { "id": "lemon", "qty": 1 },
+        { "id": "mango", "qty": 2 },
+        { "id": "peanuts", "qty": 2 },
+        { "id": "coconut", "qty": 2 },
+        { "id": "peanut-oil", "qty": 1 },
+        { "id": "shallots", "qty": 1 }
+      ]
+    },
+    {
       "id": "margherita-pizza",
       "name": "Margherita pizza by MoniLew",
       "image": "https://ooni.com/cdn/shop/articles/20220211142347-margherita-9920_ba86be55-674e-4f35-8094-2067ab41a671.jpg?v=1737104576&width=2048",
@@ -935,7 +1007,7 @@ const recipeData = {
     },
     {
       "id": "pantry-essentials",
-      "name": "Pantry essentials",
+      "name": "Pantry essentials by MoniLew",
       "image": "https://simply-delicious-food.com/wp-content/uploads/2020/03/53DE1AE8-4DB2-4821-A11E-39B69931503E-2.jpg",
       "ingredients": [
         { "id": "pouring-olive-oil-[essentials]", "qty": 1 },
@@ -966,6 +1038,27 @@ const recipeData = {
         { "id": "greek-yogurt", "qty": 3/4 }
       ]
     },
+
+    {
+      "id": "rice-salad-ottolength",
+      "name": "Rice Salad With Nuts and Sour Cherries by Ottolenghi",
+      "image": "https://www.seriouseats.com/thmb/d7VNXc_D79vv4oyWfVNbsjpJTZs=/750x0/filters:no_upscale():max_bytes(150000):strip_icc():format(webp)/__opt__aboutcom__coeus__resources__content_migration__serious_eats__seriouseats.com__recipes__images__2014__10__20141003-plenty-more-rice-salad-jonathan-lovekin-fa3c48fdf0154d1a9c6db11533115502.jpg",
+      "url": "https://www.seriouseats.com/rice-salad-with-nuts-and-sour-cherries-from-plenty-more",
+      "ingredients": [
+        { "id": "wild-rice", "qty": 1 },
+        { "id": "basmati-rice", "qty": 1.25 },
+        { "id": "quinoa", "qty": 2/3 },
+        { "id": "sliced-almonds", "qty": 3 },
+        { "id": "pine nuts", "qty": 3 },
+        { "id": "yellow-onion", "qty": 2 },
+        { "id": "fresh-basil", "qty": 1 },
+        { "id": "arugula", "qty": 1 },
+        { "id": "dried-sour-cherries", "qty": 2/3 },
+        { "id": "lemon", "qty": 2 },
+        { "id": "garlic", "qty": 2 }
+      ]
+    },
+
     {
       "id": "peach-panzanella-with-burrata-and-mint-by-good-eggs",
       "name": "Peach panzanella with burrata & mint by Good Eggs",
@@ -1034,7 +1127,7 @@ const recipeData = {
     },
     {
       "id": "sausage-dogs",
-      "name": "Sausage dogs",
+      "name": "Sausage dogs by MoniLew",
       "image": "https://www.connoisseurusveg.com/wp-content/uploads/2023/08/portobello-mushroom-hot-dogs-fb-sq.jpg",
       "ingredients": [
         { "id": "cheddar-cheese", "qty": 1 },
