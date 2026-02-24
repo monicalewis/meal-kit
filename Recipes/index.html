@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recipe Selector</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- ShadcnUI Dependencies -->
+    <link href="https://cdn.jsdelivr.net/npm/@radix-ui/colors/blackA.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/@radix-ui/colors/green.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/@radix-ui/colors/slate.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        
+        :root {
+            --background: 0 0% 100%;
+            --foreground: 222.2 84% 4.9%;
+            --card: 0 0% 100%;
+            --card-foreground: 222.2 84% 4.9%;
+            --popover: 0 0% 100%;
+            --popover-foreground: 222.2 84% 4.9%;
+            --primary: 142.1 76.2% 36.3%;
+            --primary-foreground: 355.7 100% 97.3%;
+            --secondary: 220 14.3% 95.9%;
+            --secondary-foreground: 220.9 39.3% 11%;
+            --muted: 220 14.3% 95.9%;
+            --muted-foreground: 220 8.9% 46.1%;
+            --accent: 220 14.3% 95.9%;
+            --accent-foreground: 220.9 39.3% 11%;
+            --destructive: 0 84.2% 60.2%;
+            --destructive-foreground: 210 20% 98%;
+            --border: 220 13% 91%;
+            --input: 220 13% 91%;
+            --ring: 142.1 76.2% 36.3%;
+            --radius: 0.75rem;
+        }
+
+        * {
+            border-color: hsl(var(--border));
+        }
+
+        body {
+            background-color: hsl(var(--background));
+            color: hsl(var(--foreground));
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            font-feature-settings: "rlig" 1, "calt" 1;
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-slate-50">
+    <div class="container mx-auto px-4 py-8 max-w-6xl pb-36">
+        <h1 class="text-4xl font-bold tracking-tight text-slate-900 mb-8">Meal Planner</h1>
+
+        <div class="space-y-6">
+            <h2 class="text-lg font-semibold text-slate-700 uppercase tracking-wider">Choose your recipes:</h2>
+            
+            <div id="recipe-list" class="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                <!-- Loading state -->
+                <div class="col-span-full text-center py-12">
+                    <div class="text-slate-500">Loading recipes...</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-4">
+            <div class="container mx-auto max-w-6xl">
+                <button id="generate-list-button" 
+                        class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-4 px-6 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        disabled>
+                    <span>Get Shopping List</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Load recipe data from external JS file -->
+    <script src="recipes.js"></script>
+    
+    <script>
+        // --- Global State ---
+        // recipeData is loaded from recipes.js
+        const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=400&q=80';
+
+        // --- DOM References ---
+        const recipeListDiv = document.getElementById('recipe-list');
+        const generateButton = document.getElementById('generate-list-button');
+
+        // --- Get Selectable Recipes (exclude staples) ---
+        function getSelectableRecipes() {
+            if (!recipeData || !recipeData.recipes) return [];
+            
+            return recipeData.recipes
+                .filter(recipe => {
+                    const name = recipe.name.toLowerCase();
+                    return name !== 'everyday staples' && 
+                           name !== 'infrequent staples' &&
+                           name !== 'everday staples';  // typo in original
+                })
+                .sort((a, b) => a.name.localeCompare(b.name));
+        }
+
+        // --- Create Recipe Card ---
+        function createRecipeCard(recipe) {
+            const card = document.createElement('div');
+            card.className = 'group relative bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-200 border-2 border-transparent hover:border-green-500 overflow-hidden';
+            
+            // Image container with aspect ratio
+            const imgContainer = document.createElement('div');
+            imgContainer.className = 'relative aspect-[4/3] overflow-hidden';
+            
+            const img = document.createElement('img');
+            img.className = 'w-full h-full object-cover transition-transform duration-300 group-hover:scale-105';
+            img.src = recipe.image || DEFAULT_IMAGE;
+            img.alt = recipe.name;
+            // Handle broken images
+            img.onerror = () => { img.src = DEFAULT_IMAGE; };
+            imgContainer.appendChild(img);
+            
+            // Checkbox button
+            const checkboxWrapper = document.createElement('label');
+            checkboxWrapper.className = 'absolute top-3 right-3 z-10';
+            
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.name = 'recipe';
+            checkbox.value = recipe.id;
+            checkbox.className = 'peer sr-only';
+            
+            const checkboxButton = document.createElement('div');
+            checkboxButton.className = 'w-10 h-10 rounded-full bg-white/90 shadow-md flex items-center justify-center text-green-600 opacity-0 group-hover:opacity-100 peer-checked:opacity-100 peer-checked:bg-green-600 peer-checked:text-white transition-all duration-200';
+            checkboxButton.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+            `;
+            
+            checkboxWrapper.appendChild(checkbox);
+            checkboxWrapper.appendChild(checkboxButton);
+            
+            // Content
+            const content = document.createElement('div');
+            content.className = 'p-4';
+            
+            const title = document.createElement('div');
+            title.className = 'font-semibold text-slate-900';
+            
+            // Split "Recipe by Source" into two lines
+            const byIndex = recipe.name.toLowerCase().indexOf(' by ');
+            if (byIndex !== -1) {
+                const main = recipe.name.slice(0, byIndex);
+                const by = recipe.name.slice(byIndex);
+                title.innerHTML = `${main}<span class="block text-sm font-normal text-slate-500">${by}</span>`;
+            } else {
+                title.textContent = recipe.name;
+            }
+            
+            content.appendChild(title);
+            
+            // Assemble card
+            card.appendChild(imgContainer);
+            card.appendChild(checkboxWrapper);
+            card.appendChild(content);
+            
+            // Make card clickable
+            card.addEventListener('click', (e) => {
+                if (e.target === checkbox || e.target === checkboxButton) return;
+                checkbox.checked = !checkbox.checked;
+                checkbox.dispatchEvent(new Event('change'));
+            });
+            
+            // Handle checkbox changes
+            checkbox.addEventListener('change', () => {
+                if (checkbox.checked) {
+                    card.classList.add('ring-2', 'ring-green-500');
+                } else {
+                    card.classList.remove('ring-2', 'ring-green-500');
+                }
+                updateButtonState();
+            });
+            
+            return card;
+        }
+
+        // --- Update Button State ---
+        function updateButtonState() {
+            const checked = document.querySelectorAll('input[name="recipe"]:checked').length;
+            const button = document.getElementById('generate-list-button');
+            button.disabled = checked === 0;
+            
+            const cartIcon = `
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+            `;
+            
+            if (checked > 0) {
+                button.innerHTML = `${cartIcon}<span>Get Shopping List (${checked})</span>`;
+            } else {
+                button.innerHTML = `${cartIcon}<span>Get Shopping List</span>`;
+            }
+        }
+
+        // --- Populate Recipe Cards ---
+        function populateRecipeCards() {
+            const selectableRecipes = getSelectableRecipes();
+            recipeListDiv.innerHTML = '';
+
+            if (selectableRecipes.length === 0) {
+                recipeListDiv.innerHTML = `
+                    <div class="col-span-full text-center py-12">
+                        <div class="text-slate-500">No recipes found in the data.</div>
+                    </div>
+                `;
+                return;
+            }
+
+            selectableRecipes.forEach(recipe => {
+                const card = createRecipeCard(recipe);
+                recipeListDiv.appendChild(card);
+            });
+            
+            updateButtonState();
+        }
+
+        // --- Build Shopping List Data (for passing to shopping-list.html) ---
+        function buildShoppingListData(selectedRecipeIds) {
+            const shoppingList = [];
+            
+            selectedRecipeIds.forEach(recipeId => {
+                const recipe = recipeData.recipes.find(r => r.id === recipeId);
+                if (!recipe) return;
+                
+                recipe.ingredients.forEach(ing => {
+                    const def = recipeData.ingredientDefs[ing.id];
+                    if (!def) {
+                        console.warn(`Missing ingredient definition: ${ing.id}`);
+                        return;
+                    }
+                    
+                    // Convert to the flat format expected by shopping-list.html
+                    shoppingList.push({
+                        recipeName: recipe.name,
+                        ingredient: def.name,
+                        quantity: ing.qty,
+                        units: def.units,
+                        section: def.section
+                    });
+                });
+            });
+            
+            return shoppingList;
+        }
+
+        // --- Event Listeners ---
+        generateButton.addEventListener('click', () => {
+            const selectedRecipeIds = Array.from(document.querySelectorAll('input[name="recipe"]:checked'))
+                .map(checkbox => checkbox.value);
+                
+            if (selectedRecipeIds.length === 0) {
+                // Show error toast
+                const toast = document.createElement('div');
+                toast.className = 'fixed bottom-20 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-50';
+                toast.textContent = 'Please select at least one recipe';
+                document.body.appendChild(toast);
+                setTimeout(() => toast.remove(), 3000);
+                return;
+            }
+
+            // Build the shopping list in flat format for compatibility
+            const shoppingListData = buildShoppingListData(selectedRecipeIds);
+            
+            // Get selected recipe names for display
+            const selectedRecipeNames = selectedRecipeIds.map(id => {
+                const recipe = recipeData.recipes.find(r => r.id === id);
+                return recipe ? recipe.name : id;
+            });
+
+            // Store in localStorage for shopping-list.html
+            localStorage.setItem('selectedRecipes', JSON.stringify(selectedRecipeNames));
+            localStorage.setItem('recipeData', JSON.stringify(shoppingListData));
+            
+            window.location.href = 'shopping-list.html';
+        });
+
+        // --- Initialize ---
+        function init() {
+            if (!recipeData || !recipeData.recipes) {
+                recipeListDiv.innerHTML = `
+                    <div class="col-span-full text-center py-12">
+                        <div class="text-red-500">Failed to load recipe data.</div>
+                        <div class="text-slate-500 text-sm mt-2">Make sure recipes.js is in the same directory.</div>
+                    </div>
+                `;
+                return;
+            }
+            
+            try {
+                populateRecipeCards();
+            } catch (error) {
+                console.error("Error initializing recipe list:", error);
+                recipeListDiv.innerHTML = `
+                    <div class="col-span-full text-center py-12">
+                        <div class="text-red-500">An error occurred loading the recipe list.</div>
+                    </div>
+                `;
+            }
+        }
+
+        // Start the app
+        init();
+    </script>
+</body>
+</html>

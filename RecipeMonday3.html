@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recipe Selector</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- ShadcnUI Dependencies -->
+    <link href="https://cdn.jsdelivr.net/npm/@radix-ui/colors/blackA.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/@radix-ui/colors/green.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/@radix-ui/colors/slate.css" rel="stylesheet">
+    <script src="https://unpkg.com/@radix-ui/react-icons"></script>
+    <script src="https://unpkg.com/@radix-ui/react-slot"></script>
+    <script src="https://unpkg.com/class-variance-authority"></script>
+    <script src="https://unpkg.com/clsx"></script>
+    <script src="https://unpkg.com/tailwind-merge"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        
+        :root {
+            --background: 0 0% 100%;
+            --foreground: 222.2 84% 4.9%;
+            --card: 0 0% 100%;
+            --card-foreground: 222.2 84% 4.9%;
+            --popover: 0 0% 100%;
+            --popover-foreground: 222.2 84% 4.9%;
+            --primary: 142.1 76.2% 36.3%;
+            --primary-foreground: 355.7 100% 97.3%;
+            --secondary: 220 14.3% 95.9%;
+            --secondary-foreground: 220.9 39.3% 11%;
+            --muted: 220 14.3% 95.9%;
+            --muted-foreground: 220 8.9% 46.1%;
+            --accent: 220 14.3% 95.9%;
+            --accent-foreground: 220.9 39.3% 11%;
+            --destructive: 0 84.2% 60.2%;
+            --destructive-foreground: 210 20% 98%;
+            --border: 220 13% 91%;
+            --input: 220 13% 91%;
+            --ring: 142.1 76.2% 36.3%;
+            --radius: 0.75rem;
+        }
+
+        * {
+            @apply border-border;
+        }
+
+        body {
+            @apply bg-background text-foreground font-sans antialiased;
+            font-feature-settings: "rlig" 1, "calt" 1;
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-slate-50">
+    <div class="container mx-auto px-4 py-8 max-w-6xl pb-36">
+        <h1 class="text-4xl font-bold tracking-tight text-slate-900 mb-8">Meal Planner</h1>
+
+        <div class="space-y-6">
+            <h2 class="text-lg font-semibold text-slate-700 uppercase tracking-wider">Choose your recipes:</h2>
+            
+            <div id="recipe-list" class="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                <!-- Recipe cards will be populated here -->
+            </div>
+        </div>
+
+        <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-4">
+            <div class="container mx-auto max-w-6xl">
+                <button id="generate-list-button" 
+                        class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-4 px-6 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                    <span>Get Shopping List</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Embedded Recipe Data ---
+        const recipeData = [
+            { recipeName: "Veggie jumble", ingredient: "Grilling cheese", quantity: 4, units: "oz", section: "Cheese area" },
+            { recipeName: "Veggie jumble", ingredient: "Cilantro", quantity: 1, units: "count", section: "Produce" },
+            { recipeName: "Veggie jumble", ingredient: "Garlic", quantity: 1, units: "cloves", section: "Produce" },
+            { recipeName: "Veggie jumble", ingredient: "Avocado", quantity: 1, units: "count", section: "Produce" },
+            { recipeName: "Veggie jumble", ingredient: "Grape tomatoes", quantity: 4, units: "oz", section: "Produce" },
+            { recipeName: "Veggie jumble", ingredient: "Lemon", quantity: 1, units: "count", section: "Produce" },
+            { recipeName: "Veggie jumble", ingredient: "Red onion", quantity: 1, units: "count", section: "Produce" },
+            { recipeName: "Veggie jumble", ingredient: "Sweet potatoes", quantity: 2, units: "count", section: "Produce" },
+            { recipeName: "Veggie jumble", ingredient: "Cumin", quantity: 1, units: "count", section: "Cooking" },
+            { recipeName: "Baked mediterranean veggies", ingredient: "Feta / goats cheese", quantity: 0.5, units: "cups", section: "Cheese area" },
+            { recipeName: "Baked mediterranean veggies", ingredient: "Garlic", quantity: 2, units: "cloves", section: "Produce" },
+            { recipeName: "Baked mediterranean veggies", ingredient: "Grape tomatoes", quantity: 4, units: "oz", section: "Produce" },
+            { recipeName: "Baked mediterranean veggies", ingredient: "Thyme", quantity: 1, units: "count", section: "Produce" },
+            { recipeName: "Baked mediterranean veggies", ingredient: "Asparagus", quantity: 8, units: "oz", section: "Produce" },
+            { recipeName: "Baked mediterranean veggies", ingredient: "Scallions", quantity: 2, units: "count", section: "Produce" },
+            { recipeName: "Baked mediterranean veggies", ingredient: "Israeli couscous", quantity: 0.75, units: "cups", section: "Cooking" },
+            { recipeName: "Baked mediterranean veggies", ingredient: "Sliced almonds", quantity: 1, units: "oz", section: "Nuts" },
+            { recipeName: "Baked mediterranean veggies", ingredient: "Veggie stock", quantity: 2, units: "cubes", section: "Cooking" },
+            { recipeName: "Mushroom buratta pizza by Good Eggs", ingredient: "Pizza dough", quantity: 1, units: "count", section: "Cheese area" },
+            { recipeName: "Mushroom buratta pizza by Good Eggs", ingredient: "Buratta", quantity: 1, units: "balls", section: "Dairy" },
+            { recipeName: "Mushroom buratta pizza by Good Eggs", ingredient: "Arugula", quantity: 1, units: "count", section: "Produce" },
+            { recipeName: "Mushroom buratta pizza by Good Eggs", ingredient: "Garlic", quantity: 1, units: "cloves", section: "Produce" },
+            { recipeName: "Mushroom buratta pizza by Good Eggs", ingredient: "Mushrooms", quantity: 10, units: "oz", section: "Produce" },
+            { recipeName: "Mushroom buratta pizza by Good Eggs", ingredient: "Shallots", quantity: 2, units: "count", section: "Produce" },
+            { recipeName: "Mushroom buratta pizza by Good Eggs", ingredient: "Lemon", quantity: 1, units: "count", section: "Produce" },
+            { recipeName: "Burrito bowls", ingredient: "Mexican cheese", quantity: 0.5, units: "cups", section: "Cheese area" },
+            { recipeName: "Burrito bowls", ingredient: "Tortilla chips", quantity: 1, units: "count", section: "Snacks" },
+            { recipeName: "Burrito bowls", ingredient: "Canned black beans", quantity: 1, units: "count", section: "Cooking" },
+            { recipeName: "Burrito bowls", ingredient: "Canned corn", quantity: 1, units: "count", section: "Cooking" },
+            { recipeName: "Burrito bowls", ingredient: "Jasmine rice", quantity: 0.5, units: "cup", section: "Cooking" },
+            { recipeName: "Burrito bowls", ingredient: "Sour cream", quantity: 4, units: "tbsp", section: "Dairy" },
+            { recipeName: "Burrito bowls", ingredient: "Avocado", quantity: 1, units: "count", section: "Produce" },
+            { recipeName: "Burrito bowls", ingredient: "Cilantro", quantity: 1, units: "count", section: "Produce" },
+            { recipeName: "Burrito bowls", ingredient: "Grape tomatoes", quantity: 4, units: "oz", section: "Produce" },
+            { recipeName: "Burrito bowls", ingredient: "Lime", quantity: 1, units: "count", section: "Produce" },
+            { recipeName: "Burrito bowls", ingredient: "Yellow onion", quantity: 1, units: "count", section: "Produce" },
+            { recipeName: "Margherita pizza", ingredient: "Pizza dough", quantity: 1, units: "count", section: "Cheese area" },
+            { recipeName: "Margherita pizza", ingredient: "Tomato sauce", quantity: 1, units: "can", section: "Cooking" },
+            { recipeName: "Margherita pizza", ingredient: "Buratta", quantity: 1, units: "balls", section: "Dairy" },
+            { recipeName: "Margherita pizza", ingredient: "Basil", quantity: 1, units: "tbsp", section: "Produce" },
+            { recipeName: "Sweet potato pita pocket", ingredient: "Pitas", quantity: 1, units: "packet", section: "Bread" },
+            { recipeName: "Sweet potato pita pocket", ingredient: "Mayonnaise", quantity: 1, units: "count", section: "Cooking" },
+            { recipeName: "Sweet potato pita pocket", ingredient: "Avocado", quantity: 1, units: "count", section: "Produce" },
+            { recipeName: "Sweet potato pita pocket", ingredient: "Cucumber", quantity: 1, units: "count", section: "Produce" },
+            { recipeName: "Sweet potato pita pocket", ingredient: "Garlic", quantity: 1, units: "cloves", section: "Produce" },
+            { recipeName: "Sweet potato pita pocket", ingredient: "Sweet potatoes", quantity: 2, units: "count", section: "Produce" },
+            { recipeName: "Sweet potato pita pocket", ingredient: "Pine nuts", quantity: 1, units: "oz", section: "Nuts" },
+            { recipeName: "Sweet potato pita pocket", ingredient: "White wine vinegar", quantity: 2, units: "tbsp", section: "Cooking" },
+            { recipeName: "Sweet potato pita pocket", ingredient: "Harissa powder", quantity: 1, units: "tbsp", section: "Cooking" },
+            { recipeName: "Mushroom ravioli", ingredient: "Parmesan cheese", quantity: 1, units: "oz", section: "Dairy" },
+            { recipeName: "Mushroom ravioli", ingredient: "Veggie stock", quantity: 1, units: "tsp", section: "Cooking" },
+            { recipeName: "Mushroom ravioli", ingredient: "Mushroom ravioli", quantity: 1, units: "cube", section: "Dairy" },
+            { recipeName: "Mushroom ravioli", ingredient: "Garlic", quantity: 1, units: "cloves", section: "Produce" },
+            { recipeName: "Mushroom ravioli", ingredient: "Sour cream", quantity: 4, units: "tbsp", section: "Dairy" },
+            { recipeName: "Mushroom ravioli", ingredient: "Grape tomatoes", quantity: 4, units: "oz", section: "Produce" },
+            { recipeName: "Mushroom ravioli", ingredient: "Mushrooms", quantity: 10, units: "oz", section: "Produce" },
+            { recipeName: "Mushroom ravioli", ingredient: "Shallots", quantity: 1, units: "count", section: "Produce" },
+            { recipeName: "Mushroom ravioli", ingredient: "Zucchini", quantity: 1, units: "count", section: "Produce" },
+            { recipeName: "Broccoli farro salad by Smitten Kitchen", ingredient: "Parmesan cheese", quantity: 4, units: "oz", section: "Dairy" },
+            { recipeName: "Broccoli farro salad by Smitten Kitchen", ingredient: "Semi pearled farro", quantity: 1, units: "cups", section: "Cooking" },
+            { recipeName: "Broccoli farro salad by Smitten Kitchen", ingredient: "Broccolini", quantity: 1, units: "lbs", section: "Produce" },
+            { recipeName: "Broccoli farro salad by Smitten Kitchen", ingredient: "Garlic", quantity: 2, units: "cloves", section: "Produce" },
+            { recipeName: "Broccoli farro salad by Smitten Kitchen", ingredient: "Lemon", quantity: 1, units: "count", section: "Produce" },
+            { recipeName: "One pot farro with tomato by Smitten Kitchen", ingredient: "Parmesan cheese", quantity: 1, units: "oz", section: "Dairy" },
+            { recipeName: "One pot farro with tomato by Smitten Kitchen", ingredient: "Olive oil", quantity: 1, units: "tsp", section: "Cooking" },
+            { recipeName: "One pot farro with tomato by Smitten Kitchen", ingredient: "Semi pearled farro", quantity: 1, units: "cups", section: "Cooking" },
+            { recipeName: "One pot farro with tomato by Smitten Kitchen", ingredient: "Garlic", quantity: 2, units: "cloves", section: "Produce" },
+            { recipeName: "One pot farro with tomato by Smitten Kitchen", ingredient: "Grape tomatoes", quantity: 9, units: "oz", section: "Produce" },
+            { recipeName: "One pot farro with tomato by Smitten Kitchen", ingredient: "White onion", quantity: 0.5, units: "count", section: "Produce" },
+            { recipeName: "One pot farro with tomato by Smitten Kitchen", ingredient: "Fresh basil", quantity: 1, units: "count", section: "Produce" },
+            { recipeName: "Shakshuka by Smitten Kitchen", ingredient: "Feta / goats cheese", quantity: 0.5, units: "cups", section: "Dairy" },
+            { recipeName: "Shakshuka by Smitten Kitchen", ingredient: "Whole tomatoes", quantity: 28, units: "oz can", section: "Cooking" },
+            { recipeName: "Shakshuka by Smitten Kitchen", ingredient: "Cumin", quantity: 1, units: "tsp", section: "Cooking" },
+            { recipeName: "Shakshuka by Smitten Kitchen", ingredient: "Olive oil", quantity: 4, units: "tsp", section: "Cooking" },
+            { recipeName: "Shakshuka by Smitten Kitchen", ingredient: "Paprika", quantity: 1, units: "tbsp", section: "Cooking" },
+            { recipeName: "Shakshuka by Smitten Kitchen", ingredient: "Eggs", quantity: 6, units: "count", section: "Dairy" },
+            { recipeName: "Shakshuka by Smitten Kitchen", ingredient: "Garlic", quantity: 5, units: "cloves", section: "Produce" },
+            { recipeName: "Shakshuka by Smitten Kitchen", ingredient: "Yellow onion", quantity: 1, units: "count", section: "Produce" },
+            { recipeName: "Shakshuka by Smitten Kitchen", ingredient: "Pita", quantity: 1, units: "pack", section: "Bread" },
+            { recipeName: "Grazing platter", ingredient: "Cheddar cheese", quantity: 1, units: "count", section: "Dairy" },
+            { recipeName: "Grazing platter", ingredient: "Hummus", quantity: 1, units: "count", section: "Dairy" },
+            { recipeName: "Grazing platter", ingredient: "Pitas", quantity: 1, units: "packet", section: "Bread" },
+            { recipeName: "Grazing platter", ingredient: "Crackers", quantity: 1, units: "count", section: "Snacks" },
+            { recipeName: "Grazing platter", ingredient: "Apples", quantity: 1, units: "count", section: "Produce" },
+            { recipeName: "Grazing platter", ingredient: "Grape tomatoes", quantity: 1, units: "oz", section: "Produce" },
+            { recipeName: "Grazing platter", ingredient: "Grapes", quantity: 1, units: "count", section: "Produce" },
+            { recipeName: "Sausage dogs", ingredient: "Cheddar cheese", quantity: 1, units: "count", section: "Dairy" },
+            { recipeName: "Sausage dogs", ingredient: "Hot dog buns", quantity: 1, units: "count", section: "Bread" },
+            { recipeName: "Sausage dogs", ingredient: "Veggie sausage", quantity: 1, units: "count", section: "Dairy" },
+            { recipeName: "Sausage dogs", ingredient: "Mushrooms", quantity: 8, units: "oz", section: "Dairy" },
+            { recipeName: "Sausage dogs", ingredient: "Hummus", quantity: 8, units: "oz", section: "Dairy" },
+            { recipeName: "Sausage dogs", ingredient: "Onion", quantity: 1, units: "count", section: "Produce" },
+            { recipeName: "Spaghetti aglio e olio by Bon Appetit", ingredient: "Parmesan cheese", quantity: 1, units: "oz", section: "Dairy" },
+            { recipeName: "Spaghetti aglio e olio by Bon Appetit", ingredient: "Olive oil", quantity: 12, units: "tsp", section: "Cooking" },
+            { recipeName: "Spaghetti aglio e olio by Bon Appetit", ingredient: "Garlic", quantity: 5, units: "cloves", section: "Produce" },
+            { recipeName: "Spaghetti aglio e olio by Bon Appetit", ingredient: "Spaghetti", quantity: 12, units: "oz", section: "Cooking" },
+            { recipeName: "Spaghetti aglio e olio by Bon Appetit", ingredient: "Kale", quantity: 1.5, units: "lbs", section: "Produce" },
+            { recipeName: "Creamy mushroom pasta by Bon Appetit", ingredient: "Parmesan cheese", quantity: 3, units: "oz", section: "Dairy" },
+            { recipeName: "Creamy mushroom pasta by Bon Appetit", ingredient: "Mushrooms", quantity: 4, units: "oz", section: "Produce" },
+            { recipeName: "Creamy mushroom pasta by Bon Appetit", ingredient: "Yellow onion", quantity: 0.5, units: "count", section: "Produce" },
+            { recipeName: "Creamy mushroom pasta by Bon Appetit", ingredient: "Pasta", quantity: 1, units: "lb", section: "Cooking" },
+            { recipeName: "Creamy mushroom pasta by Bon Appetit", ingredient: "Heavy cream", quantity: 4, units: "tbsp", section: "Dairy" },
+            { recipeName: "Creamy mushroom pasta by Bon Appetit", ingredient: "Chives", quantity: 1, units: "bunch", section: "Produce" },
+            { recipeName: "Chickpea and carrot curry", ingredient: "Jasmine rice", quantity: 0.5, units: "cup", section: "Cooking" },
+            { recipeName: "Chickpea and carrot curry", ingredient: "Cumin", quantity: 2, units: "tsp", section: "Cooking" },
+            { recipeName: "Chickpea and carrot curry", ingredient: "Carrots", quantity: 2, units: "count", section: "Produce" },
+            { recipeName: "Chickpea and carrot curry", ingredient: "Yellow onion", quantity: 0.5, units: "count", section: "Produce" },
+            { recipeName: "Chickpea and carrot curry", ingredient: "Chopped tomatoes", quantity: 28, units: "oz can", section: "Cooking" },
+            { recipeName: "Chickpea and carrot curry", ingredient: "Chickpeas", quantity: 15, units: "oz can", section: "Cooking" },
+            { recipeName: "Chickpea and carrot curry", ingredient: "Baby spinach", quantity: 2, units: "cups", section: "Produce" },
+            { recipeName: "Chickpea and carrot curry", ingredient: "Garlic", quantity: 1, units: "tbsp", section: "Produce" },
+            { recipeName: "Chickpea and carrot curry", ingredient: "Fresh ginger", quantity: 2, units: "tbsp", section: "Produce" },
+            { recipeName: "Quinoa spaghetti with broccoli", ingredient: "Feta / goat's cheese", quantity: 1, units: "cup", section: "Dairy" },
+            { recipeName: "Quinoa spaghetti with broccoli", ingredient: "Olive oil", quantity: 12, units: "tsp", section: "Cooking" },
+            { recipeName: "Quinoa spaghetti with broccoli", ingredient: "Broccoli rabe", quantity: 1, units: "lbs", section: "Produce" },
+            { recipeName: "Quinoa spaghetti with broccoli", ingredient: "Garlic", quantity: 6, units: "cloves", section: "Produce" },
+            { recipeName: "Quinoa spaghetti with broccoli", ingredient: "Fresh mint", quantity: 1, units: "count", section: "Produce" },
+            { recipeName: "Quinoa spaghetti with broccoli", ingredient: "Spaghetti", quantity: 12, units: "oz", section: "Cooking" },
+            { recipeName: "Quinoa spaghetti with broccoli", ingredient: "Walnuts or other", quantity: 1, units: "cup", section: "Nuts" },
+            { recipeName: "Skillet pasta with 5 cheeses by Smitten Kitchen", ingredient: "Ricotta", quantity: 0.5, units: "cups", section: "Dairy" },
+            { recipeName: "Skillet pasta with 5 cheeses by Smitten Kitchen", ingredient: "Whole milk", quantity: 1, units: "count", section: "Dairy" },
+            { recipeName: "Skillet pasta with 5 cheeses by Smitten Kitchen", ingredient: "Mozzarella", quantity: 3, units: "oz", section: "Dairy" },
+            { recipeName: "Skillet pasta with 5 cheeses by Smitten Kitchen", ingredient: "Basil", quantity: 1, units: "count", section: "Produce" },
+            { recipeName: "Skillet pasta with 5 cheeses by Smitten Kitchen", ingredient: "Scallions", quantity: 2, units: "count", section: "Produce" },
+            { recipeName: "Skillet pasta with 5 cheeses by Smitten Kitchen", ingredient: "Parmesan", quantity: 3, units: "oz", section: "Dairy" },
+            { recipeName: "Skillet pasta with 5 cheeses by Smitten Kitchen", ingredient: "Crushed tomatoes", quantity: 28, units: "oz can", section: "Cooking" },
+            { recipeName: "Skillet pasta with 5 cheeses by Smitten Kitchen", ingredient: "Gruyere or gouda", quantity: 3, units: "oz", section: "Dairy" },
+            { recipeName: "Skillet pasta with 5 cheeses by Smitten Kitchen", ingredient: "Pasta shells", quantity: 1, units: "lb", section: "Cooking" },
+            { recipeName: "Caprese sandwiches", ingredient: "Olive oil", quantity: 3, units: "tsp", section: "Cooking" },
+            { recipeName: "Caprese sandwiches", ingredient: "Basil", quantity: 1, units: "tbsp", section: "Produce" },
+            { recipeName: "Caprese sandwiches", ingredient: "Plum tomatoes", quantity: 1, units: "count", section: "Produce" },
+            { recipeName: "Caprese sandwiches", ingredient: "Fresh mozzarella", quantity: 1, units: "ball", section: "Dairy" },
+            { recipeName: "Caprese sandwiches", ingredient: "Baguette", quantity: 0.5, units: "count", section: "Bread" },
+            { recipeName: "Roasted tomatoes with garlic by Smitten Kitchen", ingredient: "Olive oil", quantity: 4, units: "tsp", section: "Cooking" },
+            { recipeName: "Roasted tomatoes with garlic by Smitten Kitchen", ingredient: "Garlic", quantity: 12, units: "cloves", section: "Produce" },
+            { recipeName: "Roasted tomatoes with garlic by Smitten Kitchen", ingredient: "Basil", quantity: 1, units: "count", section: "Produce" },
+            { recipeName: "Roasted tomatoes with garlic by Smitten Kitchen", ingredient: "Plum tomatoes", quantity: 2, units: "count", section: "Produce" },
+            { recipeName: "Enchilada bake", ingredient: "Mexican cheese", quantity: 0.5, units: "cups", section: "Dairy" },
+            { recipeName: "Enchilada bake", ingredient: "Tortilla chips", quantity: 1, units: "count", section: "Snacks" },
+            { recipeName: "Enchilada bake", ingredient: "Sour cream", quantity: 2, units: "tbsp", section: "Dairy" },
+            { recipeName: "Enchilada bake", ingredient: "Avocado", quantity: 1, units: "count", section: "Produce" },
+            { recipeName: "Enchilada bake", ingredient: "Cilantro", quantity: 1, units: "count", section: "Produce" },
+            { recipeName: "Enchilada bake", ingredient: "Lime", quantity: 2, units: "count", section: "Produce" },
+            { recipeName: "Enchilada bake", ingredient: "Scallions", quantity: 2, units: "count", section: "Produce" },
+            { recipeName: "Enchilada bake", ingredient: "Kidney beans", quantity: 1, units: "count", section: "Cooking" },
+            { recipeName: "Enchilada bake", ingredient: "Enchilada sauce", quantity: 1, units: "count", section: "Cooking" },
+            { recipeName: "Minestrone soup", ingredient: "Parmesan", quantity: 1, units: "oz", section: "Dairy" },
+            { recipeName: "Minestrone soup", ingredient: "Veggie stock concentrate", quantity: 1, units: "count", section: "Cooking" },
+            { recipeName: "Minestrone soup", ingredient: "Basil", quantity: 1, units: "tbsp", section: "Produce" },
+            { recipeName: "Minestrone soup", ingredient: "Garlic", quantity: 1, units: "cloves", section: "Produce" },
+            { recipeName: "Minestrone soup", ingredient: "Yellow onion", quantity: 1, units: "count", section: "Produce" },
+            { recipeName: "Minestrone soup", ingredient: "Kidney beans", quantity: 1, units: "count", section: "Cooking" },
+            { recipeName: "Minestrone soup", ingredient: "White beans", quantity: 1, units: "count", section: "Cooking" },
+            { recipeName: "Minestrone soup", ingredient: "Celery", quantity: 1, units: "count", section: "Produce" },
+            { recipeName: "Minestrone soup", ingredient: "Carrots", quantity: 1, units: "count", section: "Produce" },
+            { recipeName: "Minestrone soup", ingredient: "Panko", quantity: 1, units: "count", section: "Cooking" },
+            { recipeName: "Minestrone soup", ingredient: "Diced tomatoes", quantity: 1, units: "can", section: "Cooking" },
+            { recipeName: "Roasted yams and chickpeas with yogurt by Smitten Kitchen", ingredient: "Greek yogurt", quantity: 1, units: "count", section: "Dairy" },
+            { recipeName: "Roasted yams and chickpeas with yogurt by Smitten Kitchen", ingredient: "Sweet potatoes", quantity: 3, units: "count", section: "Produce" },
+            { recipeName: "Roasted yams and chickpeas with yogurt by Smitten Kitchen", ingredient: "Chickpeas", quantity: 15, units: "oz", section: "Cooking" },
+            { recipeName: "Roasted yams and chickpeas with yogurt by Smitten Kitchen", ingredient: "Garlic", quantity: 1, units: "cloves", section: "Produce" },
+            { recipeName: "Roasted yams and chickpeas with yogurt by Smitten Kitchen", ingredient: "Lemon", quantity: 1, units: "count", section: "Produce" },
+            { recipeName: "Roast butternut squash and red onion with za'atar tahini by Ottolenghi", ingredient: "Tahini", quantity: 1, units: "tbsp", section: "Cooking" },
+            { recipeName: "Roast butternut squash and red onion with za'atar tahini by Ottolenghi", ingredient: "Red onion", quantity: 2, units: "count", section: "Produce" },
+            { recipeName: "Roast butternut squash and red onion with za'atar tahini by Ottolenghi", ingredient: "Butternut squash", quantity: 1, units: "count", section: "Produce" },
+            { recipeName: "Roast butternut squash and red onion with za'atar tahini by Ottolenghi", ingredient: "Za'atar", quantity: 1, units: "count", section: "Cooking" },
+            { recipeName: "Kale salad", ingredient: "Feta / goats cheese", quantity: 1, units: "c", section: "Cheese area" },
+            { recipeName: "Kale salad", ingredient: "Hazelnuts", quantity: 1, units: "count", section: "Nuts" },
+            { recipeName: "Kale salad", ingredient: "Olive oil", quantity: 1, units: "tsp", section: "Cooking" },
+            { recipeName: "Kale salad", ingredient: "Avocado", quantity: 1, units: "count", section: "Produce" },
+            { recipeName: "Kale salad", ingredient: "Garlic", quantity: 1, units: "cloves", section: "Produce" },
+            { recipeName: "Kale salad", ingredient: "Kale", quantity: 1, units: "lbs", section: "Produce" },
+            { recipeName: "Kale salad", ingredient: "Pine nuts", quantity: 1, units: "count", section: "Nuts" },
+            { recipeName: "Peach panzanella with burrata & mint by Good Eggs", ingredient: "Cherry Tomato", quantity: 8, units: "ounces", section: "Dairy" },
+            { recipeName: "Peach panzanella with burrata & mint by Good Eggs", ingredient: "Buratta", quantity: 1, units: "balls", section: "Cheese area" },
+            { recipeName: "Peach panzanella with burrata & mint by Good Eggs", ingredient: "Mint", quantity: 1, units: "tsp", section: "Produce" },
+            { recipeName: "Peach panzanella with burrata & mint by Good Eggs", ingredient: "Peaches", quantity: 1, units: "count", section: "Produce" },
+            { recipeName: "Peach panzanella with burrata & mint by Good Eggs", ingredient: "Baguette", quantity: 0.5, units: "count", section: "Bread" },
+            { recipeName: "Peach panzanella with burrata & mint by Good Eggs", ingredient: "Pine nuts", quantity: 2, units: "oz", section: "Nuts" },
+            { recipeName: "Simple cauliflower tacos by Smitten Kitchen", ingredient: "Cilantro", quantity: 1, units: "count", section: "Produce" },
+            { recipeName: "Simple cauliflower tacos by Smitten Kitchen", ingredient: "Lime", quantity: 1, units: "count", section: "Produce" },
+            { recipeName: "Simple cauliflower tacos by Smitten Kitchen", ingredient: "Red onion", quantity: 1, units: "count", section: "Produce" },
+            { recipeName: "Simple cauliflower tacos by Smitten Kitchen", ingredient: "Cauliflower", quantity: 1, units: "count", section: "Produce" },
+            { recipeName: "Simple cauliflower tacos by Smitten Kitchen", ingredient: "Tortillas", quantity: 1, units: "count", section: "Bread" },
+            { recipeName: "Haricots verts with minty tahini by Ottolenghi", ingredient: "Hazelnuts", quantity: 0.25, units: "count", section: "Nuts" },
+            { recipeName: "Haricots verts with minty tahini by Ottolenghi", ingredient: "Semi pearled farro", quantity: 0.25, units: "cups", section: "Cooking" },
+            { recipeName: "Haricots verts with minty tahini by Ottolenghi", ingredient: "Olive oil", quantity: 1, units: "tsp", section: "Cooking" },
+            { recipeName: "Haricots verts with minty tahini by Ottolenghi", ingredient: "Green beans", quantity: 1, units: "lb", section: "Produce" },
+            { recipeName: "Haricots verts with minty tahini by Ottolenghi", ingredient: "Tahini", quantity: 2, units: "tbsp", section: "Cooking" },
+            { recipeName: "Haricots verts with minty tahini by Ottolenghi", ingredient: "Mint", quantity: 0.5, units: "tsp", section: "Produce" },
+            { recipeName: "Haricots verts with minty tahini by Ottolenghi", ingredient: "Garlic", quantity: 1, units: "cloves", section: "Produce" },
+            { recipeName: "Haricots verts with minty tahini by Ottolenghi", ingredient: "Lemon", quantity: 1, units: "count", section: "Produce" },
+            { recipeName: "Haricots verts with minty tahini by Ottolenghi", ingredient: "Maple syrup", quantity: 0.5, units: "tsp", section: "Cooking" },
+            { recipeName: "Baked farro with summer vegetables by Smitten Kitchen", ingredient: "Corn on cob", quantity: 2, units: "count", section: "Produce" },
+            { recipeName: "Baked farro with summer vegetables by Smitten Kitchen", ingredient: "Zucchini or summer squash", quantity: 4, units: "count", section: "Produce" },
+            { recipeName: "Baked farro with summer vegetables by Smitten Kitchen", ingredient: "Onion", quantity: 1, units: "count", section: "Produce" },
+            { recipeName: "Baked farro with summer vegetables by Smitten Kitchen", ingredient: "Oregano", quantity: 1, units: "tsp", section: "Produce" },
+            { recipeName: "Baked farro with summer vegetables by Smitten Kitchen", ingredient: "Garlic", quantity: 2, units: "cloves", section: "Produce" },
+            { recipeName: "Baked farro with summer vegetables by Smitten Kitchen", ingredient: "Roma tomatoes", quantity: 4, units: "count", section: "Produce" },
+            { recipeName: "Baked farro with summer vegetables by Smitten Kitchen", ingredient: "Tomato paste", quantity: 1, units: "tbsp", section: "Cooking" },
+            { recipeName: "Baked farro with summer vegetables by Smitten Kitchen", ingredient: "White wine", quantity: 0.25, units: "cups", section: "Other" },
+            { recipeName: "Baked farro with summer vegetables by Smitten Kitchen", ingredient: "Fresh basil", quantity: 0.5, units: "cups", section: "Produce" },
+            { recipeName: "Baked farro with summer vegetables by Smitten Kitchen", ingredient: "Farro", quantity: 1, units: "cup", section: "Cooking" },
+            { recipeName: "Baked farro with summer vegetables by Smitten Kitchen", ingredient: "Mozzarella cheese", quantity: 6, units: "oz", section: "Dairy" },
+            { recipeName: "Baked farro with summer vegetables by Smitten Kitchen", ingredient: "Parmesan cheese", quantity: 2, units: "oz", section: "Dairy" },
+            { recipeName: "Lunchbox", ingredient: "String cheese [lunchbox]", quantity: 1, units: "package", section: "Cheese area" },
+            { recipeName: "Lunchbox", ingredient: "Tofu [lunchbox]", quantity: 1, units: "package", section: "Cheese area" },
+            { recipeName: "Lunchbox", ingredient: "Cucumbers [lunchbox]", quantity: 1, units: "package", section: "Produce" },
+            { recipeName: "Lunchbox", ingredient: "Berries, kiwi, goldenberries [lunchbox]", quantity: 1, units: "package", section: "Produce" },
+            { recipeName: "Lunchbox", ingredient: "Seaweed [lunchbox]", quantity: 1, units: "package", section: "Snacks" },
+            { recipeName: "Lunchbox", ingredient: "Gogurts [lunchbox]", quantity: 1, units: "box", section: "Dairy" },
+            { recipeName: "Lunchbox", ingredient: "Sticky apricots [lunchbox]", quantity: 1, units: "box", section: "Nuts" },
+            { recipeName: "Pantry essentials", ingredient: "Pouring olive oil [essentials]", quantity: 1, units: "bottle", section: "Cooking" },
+            { recipeName: "Pantry essentials", ingredient: "Hazelnuts, pine nuts [essentials]", quantity: 1, units: "bottle", section: "Nuts" },
+            { recipeName: "Pantry essentials", ingredient: "Gummy apricots [essentials]", quantity: 1, units: "bottle", section: "Nuts" },
+            { recipeName: "Pantry essentials", ingredient: "Daddy bread, bagels, green bread... [essentials]", quantity: 1, units: "packet", section: "Bread" },
+            { recipeName: "Pantry essentials", ingredient: "Cream cheese [essentials]", quantity: 1, units: "container", section: "Cheese area" },
+            { recipeName: "Pantry essentials", ingredient: "Mangoes, Peaches, Honeycrisp apples [essentials]", quantity: 1, units: "Bag", section: "Produce" },
+            { recipeName: "Pantry essentials", ingredient: "Sparkling water [essentials]", quantity: 1, units: "case", section: "Cooking" },
+            { recipeName: "Pantry essentials", ingredient: "Turtle gummies [essentials]", quantity: 1, units: "bag", section: "Frozen" },
+            { recipeName: "Pantry essentials", ingredient: "Mini ice creams [essentials]", quantity: 1, units: "box", section: "Frozen" },
+            { recipeName: "Pantry essentials", ingredient: "Cereal [essentials]", quantity: 1, units: "box", section: "Cooking" },
+            { recipeName: "Pantry essentials", ingredient: "Milk, half & half [essentials]", quantity: 1, units: "carton", section: "Dairy" },
+            { recipeName: "Pantry essentials", ingredient: "Dumplings, impossible nuggets, other gems [essentials]", quantity: 1, units: "box", section: "Frozen" },
+        ];
+
+        // Placeholder images for recipes
+        const recipeImages = {
+            "Veggie jumble": "https://img.hellofresh.com/c_fit,f_auto,fl_lossy,h_1100,q_50,w_2600/hellofresh_s3/image/grilled-cheese-and-veggie-jumble-46f11c36.jpg",
+            "Baked mediterranean veggies": "https://img.hellofresh.com/c_fit,f_auto,fl_lossy,h_1100,q_50,w_2600/hellofresh_s3/image/5a958ac730006c32be67bfd2-1f072c43.jpg",
+            "Mushroom buratta pizza by Good Eggs": "https://goodeggs4.imgix.net/da949f17-33ce-4864-bc35-76ae05d5c10a.jpg?w=840&h=525&fm=jpg&q=80&fit=crop",
+            "Burrito bowls": "https://img.hellofresh.com/c_fit,f_auto,fl_lossy,h_1100,q_50,w_2600/hellofresh_s3/image/5e5ea67325ed1a2b107a3598-296940aa.jpg",
+            "Margherita pizza": "https://ooni.com/cdn/shop/articles/20220211142347-margherita-9920_ba86be55-674e-4f35-8094-2067ab41a671.jpg?v=1737104576&width=2048",
+            "Sweet potato pita pocket": "https://img.hellofresh.com/c_fit,f_auto,fl_lossy,h_1100,q_50,w_2600/hellofresh_s3/image/5c3cb170c445fa2277482006-cabc7683.jpg",
+            "Mushroom ravioli": "https://img.hellofresh.com/c_fit,f_auto,fl_lossy,h_1100,q_50,w_2600/hellofresh_s3/image/5aaac3ac30006c55e74b0644-3b4a0509.jpg",
+            "Broccoli farro salad by Smitten Kitchen": "https://i0.wp.com/smittenkitchen.com/wp-content/uploads//2017/05/broccoli-rubble-farro-salad.jpg?fit=750%2C500&ssl=1",
+            "One pot farro with tomato by Smitten Kitchen": "https://i0.wp.com/smittenkitchen.com/wp-content/uploads//2013/07/one-pan-farro-with-tomatoes.jpg?fit=750%2C500&ssl=1",
+            "Shakshuka by Smitten Kitchen": "https://i0.wp.com/smittenkitchen.com/wp-content/uploads/2010/04/shakshuka-1-scaled.jpg?resize=1536%2C1021&ssl=1",
+            "Grazing platter": "https://www.chefnotrequired.com/wp-content/uploads/2019/12/grazing-board-blog-hero.jpg",
+            "Sausage dogs": "https://www.connoisseurusveg.com/wp-content/uploads/2023/08/portobello-mushroom-hot-dogs-fb-sq.jpg",
+            "Spaghetti aglio e olio by Bon Appetit": "https://assets.bonappetit.com/photos/58700a2f725909250df59f9c/master/w_1280,c_limit/spaghetti-aglio-e-olio-with-lots-of-kale.jpg",
+            "Creamy mushroom pasta by Bon Appetit": "https://assets.bonappetit.com/photos/5d4ddd602c815a00080f9771/1:1/w_2240,c_limit/BA-0919-Creamy-Pasta-Crispy-Mushroom-Playbook.jpg",
+            "Chickpea and carrot curry": "https://assets.wsimgs.com/wsimgs/rk/images/dp/recipe/202508/0012/img74l.jpg",
+            "Caprese sandwiches": "https://cdn.loveandlemons.com/wp-content/uploads/2020/06/caprese-sandwich-1.jpg",
+            "Enchilada bake": "https://img.hellofresh.com/c_fit,f_auto,fl_lossy,h_1100,q_50,w_2600/hellofresh_s3/image/one-pan-rice-bean-enchilada-bake-a73f6f46.jpg",
+            "Haricots verts with minty tahini by Ottolenghi": "https://assets.bonappetit.com/photos/57ad3b1653e63daf11a4dd26/1:1/w_2240,c_limit/haricots-verts-and-freekeh-with-minty-tahini-dressing.jpg",
+            "Kale salad": "https://i0.wp.com/smittenkitchen.com/wp-content/uploads//2013/08/kale-salad-with-pecorino-and-walnuts.jpg?fit=750%2C500&ssl=1",
+            "Minestrone soup": "https://i0.wp.com/fortheloveofgourmet.com/wp-content/uploads/2025/01/IMG_2256-scaled.jpg?resize=1365%2C2048&ssl=1",
+            "Peach panzanella with burrata & mint by Good Eggs": "https://goodeggs4.imgix.net/c2470fe2-bb40-4f1e-93f6-8681eaaea4c4.jpg?w=840&h=525&fm=jpg&q=80&fit=crop",
+            "Quinoa spaghetti with broccoli": "https://assets.wsimgs.com/wsimgs/rk/images/dp/recipe/202512/0003/img460l.jpg",
+            "Roast butternut squash and red onion with za'atar tahini by Ottolenghi": "https://i.guim.co.uk/img/static/sys-images/Guardian/Pix/pictures/2011/12/8/1323360137075/Roasted-butternut-squash--007.jpg?width=620&dpr=2&s=none&crop=none",
+            "Roasted tomatoes with garlic by Smitten Kitchen": "https://i0.wp.com/smittenkitchen.com/wp-content/uploads//2008/08/slow-roasted-tomatoes1.jpg?resize=1536%2C1025&ssl=1",
+            "Roasted yams and chickpeas with yogurt by Smitten Kitchen": "https://i0.wp.com/smittenkitchen.com/wp-content/uploads//2016/02/roasted-yams-and-chickpeas-with-yogurt1.jpg?fit=640%2C427&ssl=1",
+            "Simple cauliflower tacos by Smitten Kitchen": "https://i0.wp.com/smittenkitchen.com/wp-content/uploads/2020/10/simple-cauliflower-tacos-scaled.jpg?resize=1536%2C1024&ssl=1",
+            "Skillet pasta with 5 cheeses by Smitten Kitchen": "https://i0.wp.com/smittenkitchen.com/wp-content/uploads//2016/10/skillet-baked-pasta-with-five-cheeses.jpg?fit=750%2C500&ssl=1",
+            "Baked farro with summer vegetables by Smitten Kitchen": "https://i0.wp.com/smittenkitchen.com/wp-content/uploads/2021/08/baked-farro-with-summer-vegetables-scaled.jpg?resize=1536%2C1024&ssl=1",
+            "Lunchbox": "https://holleygrainger.com/wp-content/uploads/2019/08/blt-skewer-lunchbox.jpg",
+            "Pantry essentials": "https://simply-delicious-food.com/wp-content/uploads/2020/03/53DE1AE8-4DB2-4821-A11E-39B69931503E-2.jpg",
+        };
+
+        // --- DOM References ---
+        const recipeListDiv = document.getElementById('recipe-list');
+        const generateButton = document.getElementById('generate-list-button');
+
+        // --- Get Unique Recipe Names from Data ---
+        const availableRecipes = [...new Set(recipeData.map(item => item.recipeName))];
+        const selectableRecipes = availableRecipes.filter(name =>
+            name &&
+            name.toLowerCase() !== 'everday staples' &&
+            name.toLowerCase() !== 'infrequent staples'
+        ).sort();
+
+        // Add error message element above the button
+        const errorMessageDiv = document.createElement('div');
+        errorMessageDiv.className = 'error-message';
+        errorMessageDiv.style.display = 'none';
+        generateButton.parentNode.insertBefore(errorMessageDiv, generateButton);
+
+        function createRecipeCard(recipeName) {
+            const card = document.createElement('div');
+            card.className = 'group relative bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-200 border-2 border-transparent hover:border-green-500 overflow-hidden';
+            
+            // Image container with aspect ratio
+            const imgContainer = document.createElement('div');
+            imgContainer.className = 'relative aspect-[4/3] overflow-hidden';
+            
+            const img = document.createElement('img');
+            img.className = 'w-full h-full object-cover transition-transform duration-300 group-hover:scale-105';
+            img.src = recipeImages[recipeName] || 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=400&q=80';
+            img.alt = recipeName;
+            imgContainer.appendChild(img);
+            
+            // Checkbox button
+            const checkboxWrapper = document.createElement('label');
+            checkboxWrapper.className = 'absolute top-3 right-3 z-10';
+            
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.name = 'recipe';
+            checkbox.value = recipeName;
+            checkbox.className = 'peer sr-only';
+            
+            const checkboxButton = document.createElement('div');
+            checkboxButton.className = 'w-10 h-10 rounded-full bg-white/90 shadow-md flex items-center justify-center text-green-600 opacity-0 group-hover:opacity-100 peer-checked:opacity-100 peer-checked:bg-green-600 peer-checked:text-white transition-all duration-200';
+            checkboxButton.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+            `;
+            
+            checkboxWrapper.appendChild(checkbox);
+            checkboxWrapper.appendChild(checkboxButton);
+            
+            // Content
+            const content = document.createElement('div');
+            content.className = 'p-4';
+            
+            const title = document.createElement('div');
+            title.className = 'font-semibold text-slate-900';
+            
+            const byIndex = recipeName.toLowerCase().indexOf(' by ');
+            if (byIndex !== -1) {
+                const main = recipeName.slice(0, byIndex);
+                const by = recipeName.slice(byIndex);
+                title.innerHTML = `${main}<span class="block text-sm font-normal text-slate-500">${by}</span>`;
+            } else {
+                title.textContent = recipeName;
+            }
+            
+            content.appendChild(title);
+            
+            // Assemble card
+            card.appendChild(imgContainer);
+            card.appendChild(checkboxWrapper);
+            card.appendChild(content);
+            
+            // Make card clickable
+            card.addEventListener('click', (e) => {
+                if (e.target === checkbox || e.target === checkboxButton) return;
+                checkbox.checked = !checkbox.checked;
+                checkbox.dispatchEvent(new Event('change'));
+            });
+            
+            // Handle checkbox changes
+            checkbox.addEventListener('change', () => {
+                if (checkbox.checked) {
+                    card.classList.add('ring-2', 'ring-green-500');
+                } else {
+                    card.classList.remove('ring-2', 'ring-green-500');
+                }
+                updateButtonState();
+            });
+            
+            return card;
+        }
+
+        function updateButtonState() {
+            const checked = document.querySelectorAll('input[name="recipe"]:checked').length;
+            const button = document.getElementById('generate-list-button');
+            button.disabled = checked === 0;
+            
+            if (checked > 0) {
+                button.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                    <span>Get Shopping List (${checked})</span>
+                `;
+            } else {
+                button.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                    <span>Get Shopping List</span>
+                `;
+            }
+        }
+
+        function populateRecipeCards() {
+            recipeListDiv.innerHTML = '';
+
+            if (selectableRecipes.length === 0) {
+                recipeListDiv.innerHTML = `
+                    <div class="col-span-full text-center py-12">
+                        <div class="text-slate-500">No recipes found in the data.</div>
+                    </div>
+                `;
+                return;
+            }
+
+            selectableRecipes.forEach(recipeName => {
+                const card = createRecipeCard(recipeName);
+                recipeListDiv.appendChild(card);
+            });
+            
+            updateButtonState();
+        }
+
+        // Event listener for generate button
+        document.getElementById('generate-list-button').addEventListener('click', () => {
+            const selectedRecipeNames = Array.from(document.querySelectorAll('input[name="recipe"]:checked'))
+                .map(checkbox => checkbox.value);
+                
+            if (selectedRecipeNames.length === 0) {
+                // Show error toast
+                const toast = document.createElement('div');
+                toast.className = 'fixed bottom-20 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg';
+                toast.textContent = 'Please select at least one recipe';
+                document.body.appendChild(toast);
+                setTimeout(() => toast.remove(), 3000);
+                return;
+            }
+
+            localStorage.setItem('selectedRecipes', JSON.stringify(selectedRecipeNames));
+            localStorage.setItem('recipeData', JSON.stringify(recipeData));
+            window.location.href = 'shopping-list.html';
+        });
+
+        // Initialize
+        try {
+            populateRecipeCards();
+        } catch (error) {
+            console.error("Error initializing recipe list:", error);
+            document.getElementById('recipe-list').innerHTML = `
+                <div class="col-span-full text-center py-12">
+                    <div class="text-red-500">An error occurred loading the recipe list.</div>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>
