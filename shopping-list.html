@@ -921,6 +921,60 @@
                     });
                 });
             }
+
+            // Attach persistence listeners to all shopping list checkboxes
+            document.querySelectorAll('.shopping-list-checkbox').forEach(cb => {
+                cb.addEventListener('change', saveCheckedItems);
+            });
+
+            // Restore custom ingredients (each gets its own change listener via addIngredientToList)
+            loadCustomIngredients();
+
+            // Restore checked state for all items (recipe + custom)
+            restoreCheckedItems();
+        }
+
+        // --- Persist / Restore Shopping List State ---
+        function saveCheckedItems() {
+            const checkedIds = Array.from(document.querySelectorAll('.shopping-list-checkbox:checked'))
+                .map(cb => cb.id);
+            localStorage.setItem('checkedShoppingItems', JSON.stringify(checkedIds));
+        }
+
+        function restoreCheckedItems() {
+            const saved = JSON.parse(localStorage.getItem('checkedShoppingItems') || '[]');
+            saved.forEach(id => {
+                const checkbox = document.getElementById(id);
+                if (checkbox) checkbox.checked = true;
+            });
+        }
+
+        function saveCustomIngredients() {
+            const items = [];
+            document.querySelectorAll('.user-added').forEach(span => {
+                const listItem = span.closest('.ingredient-item');
+                if (!listItem) return;
+                const label = listItem.querySelector('.ingredient-name');
+                const name = label ? label.textContent.replace(/\s*\(added by you\)\s*$/, '').trim() : '';
+                let section = 'Other';
+                let el = listItem.previousElementSibling;
+                while (el) {
+                    if (el.classList.contains('section-header')) {
+                        section = el.textContent;
+                        break;
+                    }
+                    el = el.previousElementSibling;
+                }
+                if (name) items.push({ name, section });
+            });
+            localStorage.setItem('customIngredients', JSON.stringify(items));
+        }
+
+        function loadCustomIngredients() {
+            const saved = JSON.parse(localStorage.getItem('customIngredients') || '[]');
+            saved.forEach(item => {
+                addIngredientToList(item.name, item.section);
+            });
         }
 
         // Load data when page loads — fetch recipe data first for URL lookup
@@ -1183,6 +1237,7 @@
             const checkboxId = `item-${safeKey}-custom`;
             checkbox.id = checkboxId;
             checkbox.classList.add('shopping-list-checkbox');
+            checkbox.addEventListener('change', saveCheckedItems);
 
             const label = document.createElement('label');
             label.htmlFor = checkboxId;
@@ -1211,6 +1266,7 @@
                         sectionHeader.remove();
                     }
                 }
+                saveCustomIngredients();
             });
 
             listItem.appendChild(checkbox);
@@ -1252,6 +1308,7 @@
             }
 
             addIngredientInput.value = '';
+            saveCustomIngredients();
         }
 
         addIngredientInput.addEventListener('input', (e) => {

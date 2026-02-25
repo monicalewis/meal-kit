@@ -398,6 +398,7 @@
                     card.classList.remove('ring-2', 'ring-green-500');
                 }
                 updateButtonState();
+                saveSelectedRecipeIds();
             });
 
             return card;
@@ -422,6 +423,25 @@
             }
         }
 
+        // --- Persist / Restore Recipe Selections ---
+        function saveSelectedRecipeIds() {
+            const ids = Array.from(document.querySelectorAll('input[name="recipe"]:checked'))
+                .map(cb => cb.value);
+            localStorage.setItem('selectedRecipeIds', JSON.stringify(ids));
+        }
+
+        function restoreSelectedRecipeIds() {
+            const saved = JSON.parse(localStorage.getItem('selectedRecipeIds') || '[]');
+            saved.forEach(id => {
+                const checkbox = document.querySelector(`input[name="recipe"][value="${id}"]`);
+                if (checkbox && !checkbox.disabled) {
+                    checkbox.checked = true;
+                    const card = checkbox.closest('.group');
+                    if (card) card.classList.add('ring-2', 'ring-green-500');
+                }
+            });
+        }
+
         // --- Populate Recipe Cards ---
         function populateRecipeCards() {
             const selectableRecipes = getSelectableRecipes();
@@ -440,7 +460,8 @@
                 const card = createRecipeCard(recipe);
                 recipeListDiv.appendChild(card);
             });
-            
+
+            restoreSelectedRecipeIds();
             updateButtonState();
         }
 
@@ -511,10 +532,20 @@
                 return recipe ? recipe.name : id;
             });
 
+            // Clear shopping list state if recipe selection changed
+            const previousIds = JSON.parse(localStorage.getItem('selectedRecipeIds') || '[]');
+            const selectionsChanged = JSON.stringify(selectedRecipeIds.slice().sort())
+                                   !== JSON.stringify(previousIds.slice().sort());
+            if (selectionsChanged) {
+                localStorage.removeItem('checkedShoppingItems');
+                localStorage.removeItem('customIngredients');
+            }
+
             // Store in localStorage for shopping-list.html
             localStorage.setItem('selectedRecipes', JSON.stringify(selectedRecipeNames));
             localStorage.setItem('recipeData', JSON.stringify(shoppingListData));
-            
+            localStorage.setItem('selectedRecipeIds', JSON.stringify(selectedRecipeIds));
+
             window.location.href = 'shopping-list.html';
         });
 
