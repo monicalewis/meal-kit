@@ -31,6 +31,11 @@ const recipeData = {
       "units": "count",
       "section": "Bread"
     },
+    "balsamic-vinegar": {
+      "name": "Balsamic Vinegar",
+      "units": "tbsp",
+      "section": "Cooking"
+    },
     "basmati-rice": {
       "name": "Basmati rice",
       "units": "cup",
@@ -769,13 +774,15 @@ const recipeData = {
     },
     {
       "id": "caprese-sandwiches",
-      "name": "Caprese sandwiches by MoniLew",
-      "image": "https://cdn.loveandlemons.com/wp-content/uploads/2020/06/caprese-sandwich-1.jpg",
+      "name": "Caprese sandwiches by Tastefully Grace",
+      "url": "https://tastefullygrace.com/caprese-sandwich/#caprese-sandwich-ingredients",
+      "image": "https://tastefullygrace.com/wp-content/uploads/2023/08/Caprese-Sandwich-Recipe.jpg",
       "ingredients": [
         { "id": "olive-oil", "qty": 3 },
         { "id": "fresh-basil", "qty": 1 },
         { "id": "plum-tomatoes", "qty": 1 },
         { "id": "fresh-mozzarella", "qty": 1 },
+        { "id": "balasmic-vinegar", "qty": 1 },
         { "id": "baguette", "qty": 0.5 }
       ]
     },

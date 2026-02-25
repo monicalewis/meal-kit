@@ -557,13 +557,15 @@
             opacity: 1;
             color: #dc3545;
         }
+
     </style>
 </head>
 <body>
+    <script src="/js/auth.js"></script>
     <div class="container">
         <div class="button-container">
             <a href="index.html" class="back-button">← Back to Recipe Selection</a>
-            <div class="share-link-container">
+            <div class="share-link-container" style="display: flex; gap: 10px; align-items: center;">
                 <a href="#" class="share-button" id="share-button">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/>
@@ -610,72 +612,22 @@
     <!-- Toast Notification -->
     <div class="toast" id="toast">Copied to clipboard!</div>
 
+    <script src="/js/unit-conversion.js"></script>
     <script>
         // --- Global State ---
         let recipeData = null;
 
-        // --- Unit conversion system ---
-        const UNIT_INFO = {
-            'tsp':  { type: 'volume', toBase: 1 },
-            'tbsp': { type: 'volume', toBase: 3 },
-            'cup':  { type: 'volume', toBase: 48 },
-            'ml':   { type: 'volume', toBase: 1 / 4.929 },
-            'g':    { type: 'weight', toBase: 1 },
-            'kg':   { type: 'weight', toBase: 1000 },
-            'oz':   { type: 'weight', toBase: 28.3495 },
-            'lbs':  { type: 'weight', toBase: 453.592 },
-        };
-
-        // Pick the best volume display unit for a total in tsp
-        function bestVolumeUnit(totalTsp) {
-            if (totalTsp >= 48) return 'cup';
-            if (totalTsp >= 3)  return 'tbsp';
-            return 'tsp';
-        }
-
-        // Fetch grams-per-cup from Claude for a list of ingredient names
-        async function fetchGramsPerCup(ingredientNames) {
-            try {
-                const res = await fetch('/api/convert-units', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ingredients: ingredientNames })
-                });
-                if (!res.ok) return {};
-                return await res.json();
-            } catch (e) {
-                console.error('Unit conversion API error:', e);
-                return {};
-            }
-        }
-
         // Merge entries that share the same ingredient name but have different units.
-        // Converts everything to volume. Calls Claude API for weight→volume conversion.
-        async function mergeCompatibleUnits(shoppingList) {
+        // Uses deterministic density lookup table (no API calls).
+        function mergeCompatibleUnits(shoppingList, ingredientDefs) {
+            const UI = UnitConversion.UNIT_INFO;
+
             // Group entries by ingredient name (lowercase)
             const byName = {};
             for (const [key, item] of Object.entries(shoppingList)) {
                 const name = item.originalName.toLowerCase().trim();
                 if (!byName[name]) byName[name] = [];
                 byName[name].push({ key, item });
-            }
-
-            // Identify ingredients that need weight→volume conversion
-            const needConversion = [];
-            for (const [name, entries] of Object.entries(byName)) {
-                if (entries.length <= 1) continue;
-                const units = entries.map(e => e.item.units.toLowerCase().trim());
-                const infos = units.map(u => UNIT_INFO[u]);
-                const types = new Set(infos.filter(i => i).map(i => i.type));
-                if (types.has('volume') && types.has('weight')) {
-                    needConversion.push(entries[0].item.originalName);
-                }
-            }
-
-            // Fetch conversion factors from Claude if needed
-            let gramsPerCup = {};
-            if (needConversion.length > 0) {
-                gramsPerCup = await fetchGramsPerCup(needConversion);
             }
 
             const merged = {};
@@ -686,7 +638,7 @@
                 }
 
                 const units = entries.map(e => e.item.units.toLowerCase().trim());
-                const infos = units.map(u => UNIT_INFO[u]);
+                const infos = units.map(u => UI[u]);
                 const types = new Set(infos.filter(i => i).map(i => i.type));
                 const allKnown = infos.every(i => i);
 
@@ -695,6 +647,11 @@
                     entries.forEach(e => { merged[e.key] = e.item; });
                     continue;
                 }
+
+                // Look up density via slug
+                const ingredientName = entries[0].item.originalName;
+                const slug = UnitConversion.findSlugByName(ingredientName, ingredientDefs || {});
+                const gpc = UnitConversion.getDensity(slug);
 
                 if (types.size === 1) {
                     // Same type (all volume or all weight) — convert within type
@@ -705,22 +662,14 @@
                     });
                     let displayUnit, displayQty;
                     if (type === 'volume') {
-                        displayUnit = bestVolumeUnit(totalBase);
-                        displayQty = totalBase / UNIT_INFO[displayUnit].toBase;
+                        displayUnit = UnitConversion.bestVolumeUnit(totalBase);
+                        displayQty = totalBase / UI[displayUnit].toBase;
                     } else {
-                        // All weight — convert to volume via gramsPerCup if available
-                        const ingredientName = entries[0].item.originalName;
-                        const gpc = gramsPerCup[ingredientName];
-                        if (gpc) {
-                            const totalCups = totalBase / gpc;
-                            const totalTsp = totalCups * 48;
-                            displayUnit = bestVolumeUnit(totalTsp);
-                            displayQty = totalTsp / UNIT_INFO[displayUnit].toBase;
-                        } else {
-                            // No conversion available — show in grams
-                            displayUnit = totalBase >= 1000 ? 'kg' : 'g';
-                            displayQty = displayUnit === 'kg' ? totalBase / 1000 : totalBase;
-                        }
+                        // All weight — convert to volume via density
+                        const totalCups = totalBase / gpc;
+                        const totalTsp = totalCups * 48;
+                        displayUnit = UnitConversion.bestVolumeUnit(totalTsp);
+                        displayQty = totalTsp / UI[displayUnit].toBase;
                     }
                     const first = entries[0].item;
                     merged[`${name}|${displayUnit}`] = {
@@ -730,37 +679,28 @@
                         originalName: first.originalName
                     };
                 } else if (types.has('volume') && types.has('weight')) {
-                    // Mixed volume + weight — convert weight to volume using gramsPerCup
-                    const ingredientName = entries[0].item.originalName;
-                    const gpc = gramsPerCup[ingredientName];
-
-                    if (gpc) {
-                        // Convert everything to tsp (volume base)
-                        let totalTsp = 0;
-                        entries.forEach((e, i) => {
-                            const info = infos[i];
-                            if (info.type === 'volume') {
-                                totalTsp += e.item.quantity * info.toBase;
-                            } else {
-                                // weight: convert to grams, then to cups, then to tsp
-                                const grams = e.item.quantity * info.toBase;
-                                const cups = grams / gpc;
-                                totalTsp += cups * 48;
-                            }
-                        });
-                        const displayUnit = bestVolumeUnit(totalTsp);
-                        const displayQty = totalTsp / UNIT_INFO[displayUnit].toBase;
-                        const first = entries[0].item;
-                        merged[`${name}|${displayUnit}`] = {
-                            quantity: displayQty,
-                            units: displayUnit,
-                            section: first.section,
-                            originalName: first.originalName
-                        };
-                    } else {
-                        // No conversion factor — keep separate
-                        entries.forEach(e => { merged[e.key] = e.item; });
-                    }
+                    // Mixed volume + weight — convert weight to volume using density
+                    let totalTsp = 0;
+                    entries.forEach((e, i) => {
+                        const info = infos[i];
+                        if (info.type === 'volume') {
+                            totalTsp += e.item.quantity * info.toBase;
+                        } else {
+                            // weight → grams → cups → tsp
+                            const grams = e.item.quantity * info.toBase;
+                            const cups = grams / gpc;
+                            totalTsp += cups * 48;
+                        }
+                    });
+                    const displayUnit = UnitConversion.bestVolumeUnit(totalTsp);
+                    const displayQty = totalTsp / UI[displayUnit].toBase;
+                    const first = entries[0].item;
+                    merged[`${name}|${displayUnit}`] = {
+                        quantity: displayQty,
+                        units: displayUnit,
+                        section: first.section,
+                        originalName: first.originalName
+                    };
                 } else {
                     // Other mixed types — keep separate
                     entries.forEach(e => { merged[e.key] = e.item; });
@@ -771,6 +711,7 @@
 
         // Build recipe URL lookup (populated after async fetch)
         const recipeUrls = {};
+        const recipeById = {};
 
         // DOM References
         const recipeLinksDiv = document.getElementById('selected-recipe-links');
@@ -781,12 +722,31 @@
             const selectedRecipes = JSON.parse(localStorage.getItem('selectedRecipes') || '[]');
             const recipeData = JSON.parse(localStorage.getItem('recipeData') || '[]');
 
-            // Display recipe links
+            // Display recipe links (use IDs for stable lookup, fall back to name)
+            const selectedRecipeIds = JSON.parse(localStorage.getItem('selectedRecipeIds') || '[]');
             if (selectedRecipes.length > 0) {
                 recipeLinksDiv.style.display = 'block';
                 recipeLinksDiv.innerHTML = '<h4>Recipe Links:</h4>';
-                
+
+                // Build links from recipe IDs (stable) with name fallback
+                const linkedIds = new Set();
+                selectedRecipeIds.forEach(id => {
+                    const recipe = recipeById[id];
+                    if (recipe && recipe.url) {
+                        linkedIds.add(recipe.name);
+                        const linkContainer = document.createElement('div');
+                        const link = document.createElement('a');
+                        link.href = recipe.url;
+                        link.textContent = recipe.name;
+                        link.target = "_blank";
+                        link.rel = "noopener noreferrer";
+                        linkContainer.appendChild(link);
+                        recipeLinksDiv.appendChild(linkContainer);
+                    }
+                });
+                // Fallback: any selected recipe name not yet linked
                 selectedRecipes.sort().forEach(recipeName => {
+                    if (linkedIds.has(recipeName)) return;
                     const url = recipeUrls[recipeName];
                     if (url) {
                         const linkContainer = document.createElement('div');
@@ -832,7 +792,8 @@
             });
 
             // Merge ingredients that differ only by unit (e.g. cups + grams)
-            const mergedList = await mergeCompatibleUnits(shoppingList);
+            const defs = recipeData && recipeData.ingredientDefs ? recipeData.ingredientDefs : {};
+            const mergedList = mergeCompatibleUnits(shoppingList, defs);
 
             // Display shopping list
             shoppingListUl.innerHTML = '';
@@ -980,11 +941,19 @@
         // Load data when page loads — fetch recipe data first for URL lookup
         async function initShoppingList() {
             try {
-                const res = await fetch('/api/recipes');
+                const res = await fetch('/api/recipes', { credentials: 'same-origin' });
                 if (res.ok) {
                     recipeData = await res.json();
+                    // Build typeahead from ingredientDefs (single source of truth)
+                    if (recipeData.ingredientDefs) {
+                        commonGroceries = Object.values(recipeData.ingredientDefs)
+                            .map(def => ({ name: def.name, section: def.section }))
+                            .concat(extraGroceries)
+                            .sort((a, b) => a.name.localeCompare(b.name));
+                    }
                     recipeData.recipes.forEach(recipe => {
                         if (recipe.url) recipeUrls[recipe.name] = recipe.url;
+                        if (recipe.id) recipeById[recipe.id] = recipe;
                     });
                 }
             } catch (err) {
@@ -995,10 +964,11 @@
         window.addEventListener('load', initShoppingList);
 
         // Share functionality
-        async function formatShoppingList() {
+        async function formatShoppingList(planUrl) {
             const selectedRecipes = JSON.parse(localStorage.getItem('selectedRecipes') || '[]');
             const recipeData = JSON.parse(localStorage.getItem('recipeData') || '[]');
-            let text = 'Shopping List:\n\n';
+            let text = planUrl ? `Meal plan: ${planUrl}\n\n` : '';
+            text += 'Shopping List:\n\n';
 
             // Generate shopping list
             const shoppingList = {};
@@ -1029,7 +999,8 @@
             });
 
             // Merge ingredients that differ only by unit
-            const mergedList = await mergeCompatibleUnits(shoppingList);
+            const shareDefs = recipeData && recipeData.ingredientDefs ? recipeData.ingredientDefs : {};
+            const mergedList = mergeCompatibleUnits(shoppingList, shareDefs);
 
             // Get checked off items (exclude from share)
             const checkedKeys = new Set();
@@ -1075,7 +1046,7 @@
                     : parseFloat(item.quantity.toFixed(2));
                 text += `- ${item.originalName}: ${displayQuantity} ${item.units}\n`;
             });
-            text += '\nPlan your meals here: https://monicalewis.github.io/meal-kit/MealKit2/RecipeMonday5.html';
+            if (!planUrl) text += '\nPlan your meals here: ' + window.location.origin;
             return text;
         }
 
@@ -1088,8 +1059,37 @@
         const shareText = document.getElementById('share-text');
         const toast = document.getElementById('toast');
 
+        let cachedPlanUrl = null;
+
         shareButton.addEventListener('click', async () => {
-            const text = await formatShoppingList();
+            // Create a shareable plan link if logged in
+            if (!cachedPlanUrl && typeof Auth !== 'undefined' && Auth.isUser()) {
+                const ids = JSON.parse(localStorage.getItem('selectedRecipeIds') || '[]');
+                if (ids.length > 0) {
+                    try {
+                        const res = await Auth.fetch('/api/meal-plans/share', {
+                            method: 'POST',
+                            body: JSON.stringify({ recipeIds: ids })
+                        });
+                        if (res.ok) {
+                            const d = await res.json();
+                            cachedPlanUrl = window.location.origin + d.url;
+                        }
+                    } catch {}
+                }
+            }
+            const text = await formatShoppingList(cachedPlanUrl);
+            // Track share activity with recipe details
+            if (typeof Auth !== 'undefined') {
+                const sharedRecipeNames = JSON.parse(localStorage.getItem('selectedRecipes') || '[]');
+                const sharedRecipeIds = JSON.parse(localStorage.getItem('selectedRecipeIds') || '[]');
+                Auth.trackActivity('share_shopping_list', {
+                    recipe_ids: sharedRecipeIds,
+                    recipe_names: sharedRecipeNames,
+                    recipe_count: sharedRecipeNames.length,
+                    share_method: navigator.share ? 'native' : 'clipboard'
+                });
+            }
 
             if (navigator.share) {
                 try {
@@ -1130,56 +1130,17 @@
             }
         });
 
-        function showToast() {
+        function showToast(message) {
+            if (message) toast.textContent = message;
+            else toast.textContent = 'Copied to clipboard!';
             toast.classList.add('active');
             setTimeout(() => {
                 toast.classList.remove('active');
             }, 2500);
         }
 
-        // Common grocery items for typeahead
-        const commonGroceries = [
-            { name: "Bagels", section: "Bread" },
-            { name: "Apples", section: "Produce" },
-            { name: "Avocado", section: "Produce" },
-            { name: "Bananas", section: "Produce" },
-            { name: "Basil", section: "Produce" },
-            { name: "Black pepper", section: "Cooking" },
-            { name: "Bread", section: "Bread" },
-            { name: "Broccoli", section: "Produce" },
-            { name: "Butter", section: "Dairy" },
-            { name: "Carrots", section: "Produce" },
-            { name: "Cheese", section: "Dairy" },
-            { name: "Cilantro", section: "Produce" },
-            { name: "Cinnamon", section: "Cooking" },
-            { name: "Coffee", section: "Cooking" },
-            { name: "Cucumber", section: "Produce" },
-            { name: "Eggs", section: "Dairy" },
-            { name: "Flour", section: "Cooking" },
-            { name: "Garlic", section: "Produce" },
-            { name: "Ginger", section: "Produce" },
-            { name: "Honey", section: "Cooking" },
-            { name: "Lemons", section: "Produce" },
-            { name: "Limes", section: "Produce" },
-            { name: "Maple syrup", section: "Cooking" },
-            { name: "Milk", section: "Dairy" },
-            { name: "Mushrooms", section: "Produce" },
-            { name: "Olive oil", section: "Cooking" },
-            { name: "Onions", section: "Produce" },
-            { name: "Oranges", section: "Produce" },
-            { name: "Oregano", section: "Produce" },
-            { name: "Pasta", section: "Cooking" },
-            { name: "Peanut butter", section: "Cooking" },
-            { name: "Potatoes", section: "Produce" },
-            { name: "Rice", section: "Cooking" },
-            { name: "Salt", section: "Cooking" },
-            { name: "Spinach", section: "Produce" },
-            { name: "Sugar", section: "Cooking" },
-            { name: "Sweet potatoes", section: "Produce" },
-            { name: "Tomatoes", section: "Produce" },
-            { name: "Yogurt", section: "Dairy" },
-            { name: "Half and half", section: "Dairy" },
-            { name: "Tofu", section: "Dairy" },
+        // Household staples not typically in recipes
+        const extraGroceries = [
             { name: "Crackers", section: "Snacks" },
             { name: "Chips", section: "Snacks" },
             { name: "Sparkling water", section: "Snacks" },
@@ -1190,6 +1151,9 @@
             { name: "Fried rice", section: "Snacks" },
             { name: "French fries", section: "Snacks" },
         ];
+
+        // Built from ingredientDefs after data loads (single source of truth)
+        let commonGroceries = extraGroceries;
 
         // Add ingredient functionality
         const addIngredientInput = document.getElementById('add-ingredient-input');

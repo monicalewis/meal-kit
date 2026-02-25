@@ -911,59 +911,22 @@
             }, 2500);
         }
 
-        // Common grocery items for typeahead
-        const commonGroceries = [
-            { name: "Bagels", section: "Bread" },
-            { name: "Apples", section: "Produce" },
-            { name: "Avocado", section: "Produce" },
-            { name: "Bananas", section: "Produce" },
-            { name: "Basil", section: "Produce" },
-            { name: "Black pepper", section: "Cooking" },
-            { name: "Bread", section: "Bread" },
-            { name: "Broccoli", section: "Produce" },
-            { name: "Butter", section: "Dairy" },
-            { name: "Carrots", section: "Produce" },
-            { name: "Cheese", section: "Dairy" },
-            { name: "Cilantro", section: "Produce" },
-            { name: "Cinnamon", section: "Cooking" },
-            { name: "Coffee", section: "Cooking" },
-            { name: "Cucumber", section: "Produce" },
-            { name: "Eggs", section: "Dairy" },
-            { name: "Flour", section: "Cooking" },
-            { name: "Garlic", section: "Produce" },
-            { name: "Ginger", section: "Produce" },
-            { name: "Honey", section: "Cooking" },
-            { name: "Lemons", section: "Produce" },
-            { name: "Limes", section: "Produce" },
-            { name: "Maple syrup", section: "Cooking" },
-            { name: "Milk", section: "Dairy" },
-            { name: "Mushrooms", section: "Produce" },
-            { name: "Olive oil", section: "Cooking" },
-            { name: "Onions", section: "Produce" },
-            { name: "Oranges", section: "Produce" },
-            { name: "Oregano", section: "Produce" },
-            { name: "Pasta", section: "Cooking" },
-            { name: "Peanut butter", section: "Cooking" },
-            { name: "Potatoes", section: "Produce" },
-            { name: "Rice", section: "Cooking" },
-            { name: "Salt", section: "Cooking" },
-            { name: "Spinach", section: "Produce" },
-            { name: "Sugar", section: "Cooking" },
-            { name: "Sweet potatoes", section: "Produce" },
-            { name: "Tomatoes", section: "Produce" },
-            { name: "Yogurt", section: "Dairy" },
-            { name: "Half and half", section: "Dairy" },
-            { name: "Tofu", section: "Dairy" },
-            { name: "Crackers", section: "Snacks" },
-            { name: "Chips", section: "Snacks" },
-            { name: "Sparkling water", section: "Snacks" },
-            { name: "String cheese", section: "Dairy" },
-            { name: "Frozen pizza", section: "Frozen" },
-            { name: "Chicken nuggets", section: "Frozen" },
-            { name: "Ice cream", section: "Frozen" },
-            { name: "Fried rice", section: "Snacks" },
-            { name: "French fries", section: "Snacks" },
-        ];
+        // Build typeahead list from ingredientDefs (single source of truth)
+        const commonGroceries = Object.values(recipeData.ingredientDefs)
+            .map(def => ({ name: def.name, section: def.section }))
+            .concat([
+                // Household staples not typically in recipes
+                { name: "Crackers", section: "Snacks" },
+                { name: "Chips", section: "Snacks" },
+                { name: "Sparkling water", section: "Snacks" },
+                { name: "String cheese", section: "Dairy" },
+                { name: "Frozen pizza", section: "Frozen" },
+                { name: "Chicken nuggets", section: "Frozen" },
+                { name: "Ice cream", section: "Frozen" },
+                { name: "Fried rice", section: "Snacks" },
+                { name: "French fries", section: "Snacks" },
+            ])
+            .sort((a, b) => a.name.localeCompare(b.name));
 
         // Add ingredient functionality
         const addIngredientInput = document.getElementById('add-ingredient-input');

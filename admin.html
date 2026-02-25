@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - DIY Meal Planner</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="min-h-screen bg-slate-50">
+    <script src="/js/auth.js"></script>
+
+    <!-- Nav -->
+    <nav class="bg-white border-b border-slate-200 px-4 py-3">
+        <div class="container mx-auto max-w-6xl flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <span class="text-lg font-bold text-slate-800">DIY Meal Planner</span>
+                <span class="text-xs font-medium bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">Admin</span>
+            </div>
+            <div class="flex items-center gap-4">
+                <span class="text-sm font-medium text-slate-700">Dashboard</span>
+                <a href="/" class="text-sm text-slate-500 hover:text-slate-700">Recipes</a>
+                <button type="button" id="admin-logout-btn" class="text-sm text-slate-500 hover:text-slate-700 cursor-pointer">Log out</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto max-w-6xl px-4 py-8">
+        <!-- Loading state -->
+        <div id="admin-loading" class="text-center py-20 text-slate-400">Loading dashboard...</div>
+
+        <!-- Dashboard content (hidden until loaded) -->
+        <div id="admin-content" class="hidden">
+            <h1 class="text-2xl font-bold text-slate-900 mb-6">Dashboard</h1>
+
+            <!-- Stats Cards — Row 1: Users -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                <div class="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
+                    <div class="text-2xl font-bold text-slate-900" id="stat-total-users">-</div>
+                    <div class="text-xs text-slate-500 mt-1">Total Users</div>
+                </div>
+                <div class="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
+                    <div class="text-2xl font-bold text-green-600" id="stat-new-week">-</div>
+                    <div class="text-xs text-slate-500 mt-1">New This Week</div>
+                </div>
+                <div class="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
+                    <div class="text-2xl font-bold text-slate-900" id="stat-total-recipes">-</div>
+                    <div class="text-xs text-slate-500 mt-1">Custom Recipes</div>
+                </div>
+                <div class="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
+                    <div class="text-2xl font-bold text-blue-600" id="stat-active-today">-</div>
+                    <div class="text-xs text-slate-500 mt-1">Active Today</div>
+                </div>
+            </div>
+
+            <!-- Stats Cards — Row 2: Activity -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                <div class="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
+                    <div class="text-2xl font-bold text-purple-600" id="stat-shopping-lists">-</div>
+                    <div class="text-xs text-slate-500 mt-1">Shopping Lists (30d)</div>
+                </div>
+                <div class="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
+                    <div class="text-2xl font-bold text-indigo-600" id="stat-shares">-</div>
+                    <div class="text-xs text-slate-500 mt-1">Lists Shared (30d)</div>
+                </div>
+                <div class="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
+                    <div class="text-2xl font-bold text-amber-600" id="stat-ai-calls">-</div>
+                    <div class="text-xs text-slate-500 mt-1">AI Calls (30d)</div>
+                </div>
+                <div class="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
+                    <div class="text-2xl font-bold text-red-600" id="stat-failed-logins">-</div>
+                    <div class="text-xs text-slate-500 mt-1">Failed Logins (7d)</div>
+                </div>
+            </div>
+
+            <!-- Users Table -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-100 mb-8">
+                <div class="px-5 py-4 border-b border-slate-100">
+                    <h2 class="font-semibold text-slate-800">Users</h2>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="bg-slate-50 text-left">
+                                <th class="px-5 py-3 text-xs font-medium text-slate-500 uppercase">Email</th>
+                                <th class="px-5 py-3 text-xs font-medium text-slate-500 uppercase">Name</th>
+                                <th class="px-5 py-3 text-xs font-medium text-slate-500 uppercase">Role</th>
+                                <th class="px-5 py-3 text-xs font-medium text-slate-500 uppercase">Joined</th>
+                                <th class="px-5 py-3 text-xs font-medium text-slate-500 uppercase">Recipes</th>
+                                <th class="px-5 py-3 text-xs font-medium text-slate-500 uppercase">Last Active</th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-table-body">
+                        </tbody>
+                    </table>
+                </div>
+                <div id="users-pagination" class="px-5 py-3 border-t border-slate-100 flex justify-between items-center">
+                    <span id="users-showing" class="text-xs text-slate-400"></span>
+                    <div class="flex gap-2">
+                        <button id="users-prev" class="px-3 py-1 text-xs border border-slate-200 rounded hover:bg-slate-50 disabled:opacity-30" disabled>Prev</button>
+                        <button id="users-next" class="px-3 py-1 text-xs border border-slate-200 rounded hover:bg-slate-50 disabled:opacity-30" disabled>Next</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Activity Log -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-100">
+                <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                    <h2 class="font-semibold text-slate-800">Activity Log</h2>
+                    <select id="activity-filter" class="text-xs border border-slate-200 rounded px-2 py-1 text-slate-600">
+                        <option value="">All Actions</option>
+                        <option value="generate_shopping_list,share_shopping_list">Shopping Lists</option>
+                        <option value="login,signup,logout,login_failed">Auth Events</option>
+                        <option value="ai_parse_recipe,ai_extract_recipe,ai_extract_recipe_image,ai_convert_units">AI Usage</option>
+                        <option value="save_recipe,import_recipe,delete_recipe,archive_recipe">Recipe CRUD</option>
+                        <option value="page_view">Page Views</option>
+                    </select>
+                </div>
+                <div id="activity-list" class="divide-y divide-slate-50">
+                </div>
+                <div class="px-5 py-3 border-t border-slate-100 text-center">
+                    <button id="activity-load-more" class="text-xs text-green-600 hover:text-green-700 font-medium">Load more</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const ACTION_COLORS = {
+            signup: 'bg-green-100 text-green-700',
+            login: 'bg-green-50 text-green-600',
+            logout: 'bg-slate-100 text-slate-500',
+            login_failed: 'bg-red-100 text-red-700',
+            save_recipe: 'bg-blue-100 text-blue-700',
+            delete_recipe: 'bg-red-100 text-red-700',
+            archive_recipe: 'bg-yellow-100 text-yellow-700',
+            import_recipe: 'bg-blue-50 text-blue-600',
+            generate_shopping_list: 'bg-purple-100 text-purple-700',
+            share_shopping_list: 'bg-purple-50 text-purple-600',
+            ai_parse_recipe: 'bg-amber-100 text-amber-700',
+            ai_extract_recipe: 'bg-amber-100 text-amber-700',
+            ai_extract_recipe_image: 'bg-amber-50 text-amber-600',
+            ai_convert_units: 'bg-amber-50 text-amber-600',
+            page_view: 'bg-slate-50 text-slate-500'
+        };
+
+        function formatDetails(action, details) {
+            if (!details) return '';
+            switch (action) {
+                case 'generate_shopping_list':
+                    return `${details.recipe_count || 0} recipe(s): ${(details.recipe_names || []).join(', ')}`;
+                case 'share_shopping_list':
+                    return `${details.recipe_count || '?'} recipe(s) via ${details.share_method || 'unknown'}`;
+                case 'login_failed':
+                    return `${details.email || 'unknown'}`;
+                case 'ai_parse_recipe':
+                    return details.recipe_name || '';
+                case 'ai_extract_recipe':
+                    return details.source_url || '';
+                case 'ai_extract_recipe_image':
+                    return details.mime_type || 'image';
+                case 'ai_convert_units':
+                    return `${details.ingredient_count || 0} ingredients`;
+                case 'page_view':
+                    return details.page || '';
+                case 'import_recipe':
+                    return details.url || '';
+                case 'save_recipe':
+                case 'archive_recipe':
+                case 'delete_recipe':
+                    return details.recipe_id || '';
+                case 'login':
+                    return details.email || '';
+                default:
+                    return JSON.stringify(details);
+            }
+        }
+
+        function getCsrf() {
+            return document.cookie.match(/csrf_token=([^;]+)/)?.[1] || '';
+        }
+
+        async function adminFetch(url) {
+            const res = await fetch(url, {
+                headers: { 'X-CSRF-Token': getCsrf() },
+                credentials: 'same-origin'
+            });
+            if (res.status === 403) {
+                window.location.href = '/';
+                return null;
+            }
+            return res.json();
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '-';
+            const d = new Date(dateStr);
+            return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        }
+
+        function timeAgo(dateStr) {
+            if (!dateStr) return 'Never';
+            const seconds = Math.floor((Date.now() - new Date(dateStr)) / 1000);
+            if (seconds < 60) return 'Just now';
+            if (seconds < 3600) return Math.floor(seconds / 60) + 'm ago';
+            if (seconds < 86400) return Math.floor(seconds / 3600) + 'h ago';
+            if (seconds < 604800) return Math.floor(seconds / 86400) + 'd ago';
+            return formatDate(dateStr);
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        // --- Stats ---
+        async function loadStats() {
+            const stats = await adminFetch('/api/admin/stats');
+            if (!stats) return;
+            document.getElementById('stat-total-users').textContent = stats.totalUsers;
+            document.getElementById('stat-new-week').textContent = stats.usersThisWeek;
+            document.getElementById('stat-total-recipes').textContent = stats.totalUserRecipes;
+            document.getElementById('stat-active-today').textContent = stats.activeUsersToday;
+            document.getElementById('stat-shopping-lists').textContent = stats.shoppingLists30d;
+            document.getElementById('stat-shares').textContent = stats.shares30d;
+            document.getElementById('stat-ai-calls').textContent = stats.aiCalls30d;
+            document.getElementById('stat-failed-logins').textContent = stats.failedLogins7d;
+        }
+
+        // --- Users ---
+        let usersPage = 1;
+        const usersLimit = 25;
+
+        async function loadUsers(page) {
+            const data = await adminFetch(`/api/admin/users?page=${page}&limit=${usersLimit}`);
+            if (!data) return;
+
+            const tbody = document.getElementById('users-table-body');
+            tbody.innerHTML = '';
+
+            data.users.forEach(u => {
+                const tr = document.createElement('tr');
+                tr.className = 'border-t border-slate-50 hover:bg-slate-50';
+                tr.innerHTML = `
+                    <td class="px-5 py-3 text-slate-700">${escapeHtml(u.email)}</td>
+                    <td class="px-5 py-3 text-slate-600">${escapeHtml(u.display_name || '-')}</td>
+                    <td class="px-5 py-3">
+                        <span class="text-xs font-medium px-2 py-0.5 rounded-full ${u.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'}">${escapeHtml(u.role)}</span>
+                    </td>
+                    <td class="px-5 py-3 text-slate-500 text-xs">${formatDate(u.created_at)}</td>
+                    <td class="px-5 py-3 text-slate-700 font-medium">${u.recipe_count}</td>
+                    <td class="px-5 py-3 text-slate-500 text-xs">${timeAgo(u.last_active)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            usersPage = page;
+            const from = (page - 1) * usersLimit + 1;
+            const to = Math.min(page * usersLimit, data.total);
+            document.getElementById('users-showing').textContent = `Showing ${from}-${to} of ${data.total}`;
+            document.getElementById('users-prev').disabled = page <= 1;
+            document.getElementById('users-next').disabled = to >= data.total;
+        }
+
+        document.getElementById('users-prev').addEventListener('click', () => loadUsers(usersPage - 1));
+        document.getElementById('users-next').addEventListener('click', () => loadUsers(usersPage + 1));
+
+        // --- Activity ---
+        let activityPage = 1;
+        let activityFilter = '';
+
+        async function loadActivity(page, append) {
+            let url = `/api/admin/activity?page=${page}&limit=50`;
+            if (activityFilter) url += `&action=${encodeURIComponent(activityFilter)}`;
+            const data = await adminFetch(url);
+            if (!data) return;
+
+            const list = document.getElementById('activity-list');
+            if (!append) list.innerHTML = '';
+
+            data.activity.forEach(a => {
+                const div = document.createElement('div');
+                div.className = 'px-5 py-3 flex items-center gap-3 text-sm';
+                const colorClass = ACTION_COLORS[a.action] || 'bg-slate-100 text-slate-600';
+                const details = formatDetails(a.action, a.details);
+                div.innerHTML = `
+                    <span class="text-xs text-slate-400 w-24 flex-shrink-0">${timeAgo(a.created_at)}</span>
+                    <span class="text-xs text-slate-600 w-40 truncate flex-shrink-0">${escapeHtml(a.email || a.display_name || 'Guest')}</span>
+                    <span class="text-xs font-medium px-2 py-0.5 rounded-full ${colorClass}">${escapeHtml(a.action)}</span>
+                    <span class="text-xs text-slate-400 truncate flex-1">${escapeHtml(details)}</span>
+                `;
+                list.appendChild(div);
+            });
+
+            activityPage = page;
+            document.getElementById('activity-load-more').style.display = data.activity.length < 50 ? 'none' : '';
+        }
+
+        document.getElementById('activity-load-more').addEventListener('click', () => {
+            loadActivity(activityPage + 1, true);
+        });
+
+        document.getElementById('activity-filter').addEventListener('change', (e) => {
+            activityFilter = e.target.value;
+            activityPage = 1;
+            loadActivity(1);
+        });
+
+        // Nav logout button
+        document.getElementById('admin-logout-btn').addEventListener('click', () => Auth.logout());
+
+        // --- Init ---
+        Auth.onReady(async (user) => {
+            if (!user || user.role !== 'admin') {
+                window.location.href = '/';
+                return;
+            }
+            document.getElementById('admin-loading').classList.add('hidden');
+            document.getElementById('admin-content').classList.remove('hidden');
+
+            await Promise.all([loadStats(), loadUsers(1), loadActivity(1)]);
+        });
+    </script>
+</body>
+</html>

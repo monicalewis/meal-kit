@@ -3,9 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Recipe Selector</title>
+    <title>DIY Meal Planner</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/js/auth.js"></script>
     <!-- ShadcnUI Dependencies -->
     <link href="https://cdn.jsdelivr.net/npm/@radix-ui/colors/blackA.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/@radix-ui/colors/green.css" rel="stylesheet">
@@ -120,6 +121,29 @@
             text-transform: uppercase;
             letter-spacing: 0.05em;
         }
+        .card-own-badge {
+            position: absolute;
+            bottom: 6px;
+            left: 6px;
+            background: rgba(79, 70, 229, 0.85);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 9999px;
+            font-size: 0.65rem;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+        }
+        @keyframes recipe-pop-in {
+            0% { opacity: 0; transform: scale(0.9); }
+            50% { transform: scale(1.03); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+        @keyframes recipe-glow {
+            0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5); }
+            70% { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+        }
+
         .ing-row-new {
             border-left: 3px solid #eab308;
             cursor: pointer;
@@ -172,29 +196,95 @@
         .combobox-new-option:hover {
             background-color: #fef9c3;
         }
+
+        /* Mobile FAB for import button */
+        @media (max-width: 639px) {
+            #import-recipe-button {
+                position: fixed;
+                bottom: 5.5rem;
+                right: 1rem;
+                z-index: 30;
+                width: 3.5rem;
+                height: 3.5rem;
+                border-radius: 9999px;
+                padding: 0;
+                background-color: hsl(var(--primary));
+                color: white;
+                border: none;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            #import-recipe-button:hover {
+                background-color: hsl(142.1 76.2% 30%);
+            }
+            #import-recipe-button svg {
+                width: 1.5rem;
+                height: 1.5rem;
+                stroke: white;
+            }
+            #import-recipe-button .import-label {
+                display: none;
+            }
+        }
     </style>
 </head>
 <body class="min-h-screen bg-slate-50">
     <div class="container mx-auto px-4 py-8 max-w-6xl pb-36">
-        <h1 class="text-4xl font-bold tracking-tight text-slate-900 mb-8">Meal Planner</h1>
-
-        <div class="space-y-6">
-            <div class="flex items-center justify-between flex-wrap gap-2">
-                <h2 class="text-lg font-semibold text-slate-700 uppercase tracking-wider">Choose your recipes:</h2>
-                <div class="flex items-center gap-3">
-                    <label id="show-archived-toggle" class="flex items-center gap-1.5 cursor-pointer text-xs text-slate-500 select-none">
-                        <input type="checkbox" id="show-archived-checkbox" class="rounded border-slate-300 text-green-600 focus:ring-green-500 h-3.5 w-3.5">
-                        Show archived
-                    </label>
-                    <button id="import-recipe-button"
-                            class="bg-white hover:bg-slate-50 text-slate-700 font-medium py-2 px-4 rounded-lg border border-slate-300 hover:border-green-500 transition-colors duration-200 flex items-center gap-2 text-sm">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                        </svg>
-                        Import from URL
-                    </button>
+        <div class="flex items-center justify-between flex-wrap gap-2 mb-2">
+            <h1 class="text-4xl font-bold tracking-tight text-slate-900">DIY Meal Planner</h1>
+            <div class="flex items-center gap-3">
+                <div data-auth="guest" style="display:none">
+                    <a href="/login.html" class="text-sm text-green-600 hover:text-green-700 font-medium">Log in</a>
+                </div>
+                <div data-auth="admin" style="display:none">
+                    <a href="/admin.html" class="text-sm text-slate-500 hover:text-slate-700">Dashboard</a>
+                </div>
+                <div data-auth="loggedin" style="display:none" class="flex items-center gap-3">
+                    <span class="text-sm text-slate-600">Welcome, <span id="auth-user-name"></span></span>
+                    <div class="relative" id="user-menu-container">
+                        <button type="button" id="user-menu-btn" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors" title="Account menu">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 011.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.893.149c-.425.07-.765.383-.93.78-.165.398-.143.854.107 1.204l.527.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 01-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.397.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 01-.12-1.45l.527-.737c.25-.35.273-.806.108-1.204-.165-.397-.505-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.107-1.204l-.527-.738a1.125 1.125 0 01.12-1.45l.773-.773a1.125 1.125 0 011.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                        </button>
+                        <div id="user-menu-dropdown" class="hidden absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-50">
+                            <button type="button" id="menu-change-email" class="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" /></svg>
+                                Update Email
+                            </button>
+                            <button type="button" id="menu-change-password" class="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" /></svg>
+                                Update Password
+                            </button>
+                            <div class="border-t border-slate-100 my-1"></div>
+                            <button type="button" id="menu-logout" class="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" /></svg>
+                                Log Out
+                            </button>
+                            <div class="border-t border-slate-100 my-1"></div>
+                            <button type="button" id="menu-delete-account" class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
+                                Delete Account
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
+        </div>
+        <div class="flex items-center justify-between flex-wrap gap-2 mb-6">
+            <p class="text-slate-500">Choose recipes to make, and we'll take it from there to generate your shopping list!</p>
+            <button id="import-recipe-button"
+                    class="bg-white hover:bg-slate-50 text-slate-700 font-medium py-2 px-4 rounded-lg border border-slate-300 hover:border-green-500 transition-colors duration-200 flex items-center gap-2 text-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+                <span class="import-label">Add Recipe</span>
+            </button>
+        </div>
+        <div class="space-y-6">
             
             <div id="recipe-list" class="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                 <!-- Loading state -->
@@ -205,12 +295,87 @@
         </div>
 
         <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-4">
-            <div class="container mx-auto max-w-6xl">
-                <button id="generate-list-button" 
-                        class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-4 px-6 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            <div class="container mx-auto max-w-6xl flex gap-3">
+                <div data-auth="loggedin" style="display:none" class="flex-shrink-0">
+                    <button id="share-plan-button"
+                            class="h-full bg-white hover:bg-slate-50 text-green-700 font-semibold py-4 px-5 rounded-lg border-2 border-green-600 hover:border-green-700 transition-colors duration-200 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+                            disabled>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                        </svg>
+                        <span class="share-plan-label">Share</span>
+                    </button>
+                </div>
+                <button id="generate-list-button"
+                        class="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-4 px-6 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                         disabled>
                     <span>Get Shopping List</span>
                 </button>
+            </div>
+        </div>
+
+        <!-- Share Plan Modal -->
+        <div id="share-plan-overlay" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 hidden"></div>
+        <div id="share-plan-modal" class="fixed inset-x-4 top-[15%] max-w-md mx-auto bg-white rounded-2xl shadow-2xl z-50 hidden overflow-hidden">
+            <div class="p-6 space-y-5">
+                <div class="flex justify-between items-start">
+                    <h3 class="text-lg font-bold text-slate-900">Share Meal Plan</h3>
+                    <button id="share-plan-close" class="text-slate-400 hover:text-slate-600 text-2xl leading-none -mt-1">&times;</button>
+                </div>
+                <div class="bg-slate-50 rounded-xl p-4 border border-slate-200">
+                    <p class="text-sm text-slate-800 font-medium">Hey! Check out what I'm cooking this week:</p>
+                    <a id="share-plan-url-display" href="#" target="_blank" rel="noopener noreferrer" class="text-sm text-green-700 hover:text-green-800 underline break-all mt-1 block"></a>
+                </div>
+                <div class="grid grid-cols-4 gap-3" id="share-channels">
+                    <button data-channel="messages" class="share-channel-btn flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl hover:bg-slate-50 transition-colors">
+                        <span class="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center">
+                            <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.17L4 17.17V4h16v12z"/><path d="M7 9h10v2H7zm0-3h10v2H7zm0 6h7v2H7z"/></svg>
+                        </span>
+                        <span class="text-xs text-slate-600">Message</span>
+                    </button>
+                    <button data-channel="whatsapp" class="share-channel-btn flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl hover:bg-slate-50 transition-colors">
+                        <span class="w-10 h-10 rounded-full bg-[#25D366] flex items-center justify-center">
+                            <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                        </span>
+                        <span class="text-xs text-slate-600">WhatsApp</span>
+                    </button>
+                    <button data-channel="email" class="share-channel-btn flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl hover:bg-slate-50 transition-colors">
+                        <span class="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center">
+                            <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+                        </span>
+                        <span class="text-xs text-slate-600">Email</span>
+                    </button>
+                    <button data-channel="facebook" class="share-channel-btn flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl hover:bg-slate-50 transition-colors">
+                        <span class="w-10 h-10 rounded-full bg-[#1877F2] flex items-center justify-center">
+                            <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+                        </span>
+                        <span class="text-xs text-slate-600">Facebook</span>
+                    </button>
+                    <button data-channel="x" class="share-channel-btn flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl hover:bg-slate-50 transition-colors">
+                        <span class="w-10 h-10 rounded-full bg-black flex items-center justify-center">
+                            <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                        </span>
+                        <span class="text-xs text-slate-600">X</span>
+                    </button>
+                    <button data-channel="linkedin" class="share-channel-btn flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl hover:bg-slate-50 transition-colors">
+                        <span class="w-10 h-10 rounded-full bg-[#0A66C2] flex items-center justify-center">
+                            <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+                        </span>
+                        <span class="text-xs text-slate-600">LinkedIn</span>
+                    </button>
+                    <button data-channel="copy" class="share-channel-btn flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl hover:bg-slate-50 transition-colors">
+                        <span class="w-10 h-10 rounded-full bg-slate-500 flex items-center justify-center" id="share-copy-icon">
+                            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                        </span>
+                        <span class="text-xs text-slate-600" id="share-copy-label">Copy Link</span>
+                    </button>
+                    <button data-channel="more" class="share-channel-btn flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl hover:bg-slate-50 transition-colors">
+                        <span class="w-10 h-10 rounded-full bg-slate-400 flex items-center justify-center">
+                            <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+                        </span>
+                        <span class="text-xs text-slate-600">More</span>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -228,10 +393,73 @@
         </div>
     </div>
 
+    <!-- Account Settings Modal -->
+    <div id="account-modal-overlay" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 hidden"></div>
+    <div id="account-modal" class="fixed inset-x-4 top-[10%] max-w-md mx-auto bg-white rounded-2xl shadow-2xl z-50 hidden max-h-[80vh] flex flex-col">
+        <div class="p-6 border-b border-slate-200 flex items-center justify-between">
+            <h3 class="text-lg font-bold text-slate-900">Account Settings</h3>
+            <button type="button" id="account-modal-close" class="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>
+        </div>
+        <div class="p-6 overflow-y-auto flex-1 space-y-4">
+            <!-- Change Password Tab -->
+            <div id="account-tab-password" class="account-tab-content hidden space-y-4">
+                <h4 class="text-sm font-semibold text-slate-800">Update Password</h4>
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 mb-1">Current Password</label>
+                    <input type="password" id="account-current-password" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent" placeholder="Enter current password">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 mb-1">New Password</label>
+                    <input type="password" id="account-new-password" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent" placeholder="Min 8 chars, letter + number">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 mb-1">Confirm New Password</label>
+                    <input type="password" id="account-confirm-password" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent" placeholder="Confirm new password">
+                </div>
+                <div id="account-password-error" class="account-error text-red-600 text-xs" style="display:none;"></div>
+                <div id="account-password-success" class="account-success text-green-600 text-xs" style="display:none;"></div>
+                <button type="button" id="account-password-submit" class="w-full py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg text-sm transition-colors">Update Password</button>
+            </div>
+
+            <!-- Change Email Tab -->
+            <div id="account-tab-email" class="account-tab-content hidden space-y-4">
+                <h4 class="text-sm font-semibold text-slate-800">Update Email Address</h4>
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 mb-1">New Email</label>
+                    <input type="email" id="account-new-email" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent" placeholder="newemail@example.com">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 mb-1">Confirm Password</label>
+                    <input type="password" id="account-email-password" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent" placeholder="Enter your password">
+                </div>
+                <div id="account-email-error" class="account-error text-red-600 text-xs" style="display:none;"></div>
+                <div id="account-email-success" class="account-success text-green-600 text-xs" style="display:none;"></div>
+                <button type="button" id="account-email-submit" class="w-full py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg text-sm transition-colors">Update Email</button>
+            </div>
+
+            <!-- Delete Account Tab -->
+            <div id="account-tab-delete" class="account-tab-content hidden space-y-4">
+                <h4 class="text-sm font-semibold text-red-700">Delete Account</h4>
+                <p class="text-xs text-slate-500">This will permanently delete your account and all your saved recipes. This action cannot be undone.</p>
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 mb-1">Enter your password to confirm</label>
+                    <input type="password" id="account-delete-password" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent" placeholder="Enter your password">
+                </div>
+                <label class="flex items-start gap-2 text-xs text-slate-600 cursor-pointer">
+                    <input type="checkbox" id="account-delete-confirm" class="mt-0.5 rounded border-slate-300">
+                    <span>I understand this is permanent and all my data will be deleted.</span>
+                </label>
+                <div id="account-delete-error" class="account-error text-red-600 text-xs" style="display:none;"></div>
+                <button type="button" id="account-delete-submit" class="w-full py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg text-sm transition-colors">Delete My Account</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // --- Global State ---
         // recipeData is loaded asynchronously from /api/recipes
         let recipeData = null;
+        let favoritesData = {};
         const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=400&q=80';
 
         // --- DOM References ---
@@ -248,14 +476,13 @@
                 .filter(recipe => {
                     const name = recipe.name.toLowerCase();
                     if (name === 'everyday staples' || name === 'infrequent staples' || name === 'everday staples') return false;
-                    if (recipe.hidden && !showArchived) return false;
                     return true;
                 })
                 .sort((a, b) => a.name.localeCompare(b.name));
         }
 
         // --- Create Recipe Card ---
-        function createRecipeCard(recipe) {
+        function createRecipeCard(recipe, isFavorite = false) {
             const isArchived = recipe.hidden === true;
             const card = document.createElement('div');
             card.className = 'group relative bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-200 border-2 border-transparent hover:border-green-500 overflow-hidden' + (isArchived ? ' card-archived' : '');
@@ -271,15 +498,50 @@
             img.onerror = () => { img.src = DEFAULT_IMAGE; };
             imgContainer.appendChild(img);
 
-            // Archived badge overlay
+            // Hidden badge overlay
             if (isArchived) {
-                const archivedBadge = document.createElement('div');
-                archivedBadge.className = 'card-archived-badge';
-                archivedBadge.textContent = 'Archived';
-                imgContainer.appendChild(archivedBadge);
+                const hiddenBadge = document.createElement('div');
+                hiddenBadge.className = 'card-archived-badge';
+                hiddenBadge.textContent = 'Hidden';
+                imgContainer.appendChild(hiddenBadge);
+            }
+
+            // Favorite heart button (bottom-right of image, visible on favorite cards)
+            if (isFavorite) {
+                const starBtn = document.createElement('button');
+                starBtn.className = 'absolute bottom-2 right-2 z-10 w-8 h-8 rounded-full bg-white/90 shadow-md flex items-center justify-center text-red-400 hover:text-red-500 transition-colors';
+                starBtn.title = 'Remove from favorites';
+                starBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
+                starBtn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    try {
+                        await Auth.fetch('/api/favorites/remove', {
+                            method: 'POST',
+                            body: JSON.stringify({ recipeId: recipe.id })
+                        });
+                        if (favoritesData[recipe.id]) favoritesData[recipe.id].removed = true;
+                        populateRecipeCards();
+                    } catch (err) {
+                        showToast('Failed to update favorites', true);
+                    }
+                });
+                imgContainer.appendChild(starBtn);
             }
 
             // Three-dot menu (top-left)
+            // Determine if user can manage this recipe
+            const isPreloaded = recipe.owner === 'preloaded';
+            const isOwnRecipe = !isPreloaded && Auth.isUser() && String(recipe.owner) === String(Auth.user?.id);
+            const canManage = Auth.isAdmin() || isOwnRecipe;
+
+            // "Your Recipe" badge for user-created recipes
+            if (isOwnRecipe && !isArchived) {
+                const ownBadge = document.createElement('div');
+                ownBadge.className = 'card-own-badge';
+                ownBadge.textContent = 'Your Recipe';
+                imgContainer.appendChild(ownBadge);
+            }
+
             const menuWrapper = document.createElement('div');
             menuWrapper.className = 'card-menu';
 
@@ -294,34 +556,44 @@
             if (isArchived) {
                 const restoreItem = document.createElement('div');
                 restoreItem.className = 'card-menu-item';
-                restoreItem.innerHTML = '\u21A9 Restore';
+                restoreItem.innerHTML = '\u21A9 Unhide';
                 restoreItem.addEventListener('click', e => {
                     e.stopPropagation();
                     menuDropdown.classList.add('hidden');
+                    if (isPreloaded && Auth.isGuest()) {
+                        Auth.showLoginPrompt('Log in to manage recipes');
+                        return;
+                    }
                     archiveRecipe(recipe.id, recipe.name, false);
                 });
                 menuDropdown.appendChild(restoreItem);
             } else {
                 const archiveItem = document.createElement('div');
                 archiveItem.className = 'card-menu-item';
-                archiveItem.innerHTML = '\uD83D\uDCE6 Archive';
+                archiveItem.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" style="display:inline;vertical-align:middle;width:1em;height:1em;margin-right:4px" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>Hide';
                 archiveItem.addEventListener('click', e => {
                     e.stopPropagation();
                     menuDropdown.classList.add('hidden');
+                    if (isPreloaded && Auth.isGuest()) {
+                        Auth.showLoginPrompt('Create an account to customize your recipe collection');
+                        return;
+                    }
                     archiveRecipe(recipe.id, recipe.name, true);
                 });
                 menuDropdown.appendChild(archiveItem);
             }
 
-            const deleteItem = document.createElement('div');
-            deleteItem.className = 'card-menu-item destructive';
-            deleteItem.innerHTML = '\uD83D\uDDD1 Delete';
-            deleteItem.addEventListener('click', e => {
-                e.stopPropagation();
-                menuDropdown.classList.add('hidden');
-                confirmDeleteRecipe(recipe.id, recipe.name);
-            });
-            menuDropdown.appendChild(deleteItem);
+            if (canManage) {
+                const deleteItem = document.createElement('div');
+                deleteItem.className = 'card-menu-item destructive';
+                deleteItem.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" style="display:inline;vertical-align:middle;width:1em;height:1em;margin-right:4px" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>Delete';
+                deleteItem.addEventListener('click', e => {
+                    e.stopPropagation();
+                    menuDropdown.classList.add('hidden');
+                    confirmDeleteRecipe(recipe.id, recipe.name);
+                });
+                menuDropdown.appendChild(deleteItem);
+            }
 
             menuBtn.addEventListener('click', e => {
                 e.stopPropagation();
@@ -375,6 +647,18 @@
 
             content.appendChild(title);
 
+            // Cooking times (only shown when data exists)
+            if (recipe.activeTime || recipe.totalTime) {
+                const timesDiv = document.createElement('div');
+                timesDiv.className = 'flex items-center gap-3 mt-1.5 text-xs text-slate-400';
+                const clockSvg = '<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>';
+                const parts = [];
+                if (recipe.activeTime) parts.push(recipe.activeTime + ' active');
+                if (recipe.totalTime) parts.push(recipe.totalTime + ' total');
+                timesDiv.innerHTML = clockSvg + ' ' + parts.join(' &middot; ');
+                content.appendChild(timesDiv);
+            }
+
             // Assemble card
             card.appendChild(imgContainer);
             card.appendChild(menuWrapper);
@@ -385,6 +669,7 @@
             card.addEventListener('click', (e) => {
                 if (isArchived) return;
                 if (e.target.closest('.card-menu')) return;
+                if (e.target.closest('button[title="Remove from favorites"]')) return;
                 if (e.target === checkbox || e.target === checkboxButton) return;
                 checkbox.checked = !checkbox.checked;
                 checkbox.dispatchEvent(new Event('change'));
@@ -408,7 +693,9 @@
         function updateButtonState() {
             const checked = document.querySelectorAll('input[name="recipe"]:checked').length;
             const button = document.getElementById('generate-list-button');
+            const shareBtn = document.getElementById('share-plan-button');
             button.disabled = checked === 0;
+            if (shareBtn) shareBtn.disabled = checked === 0;
             
             const cartIcon = `
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -456,10 +743,94 @@
                 return;
             }
 
-            selectableRecipes.forEach(recipe => {
-                const card = createRecipeCard(recipe);
-                recipeListDiv.appendChild(card);
-            });
+            // Split into visible vs hidden
+            const visibleRecipes = selectableRecipes.filter(r => !r.hidden);
+            const hiddenRecipes = selectableRecipes.filter(r => r.hidden);
+
+            // Split visible into favorites and non-favorites
+            const favoriteRecipes = visibleRecipes
+                .filter(r => favoritesData[r.id] && !favoritesData[r.id].removed)
+                .sort((a, b) => {
+                    // Reverse chronological by lastSelected
+                    const aTime = favoritesData[a.id]?.lastSelected || '';
+                    const bTime = favoritesData[b.id]?.lastSelected || '';
+                    return bTime.localeCompare(aTime);
+                });
+
+            const otherRecipes = visibleRecipes
+                .filter(r => !favoritesData[r.id] || favoritesData[r.id].removed)
+                .sort((a, b) => {
+                    // User-created recipes first, then preloaded; alphabetical within each group
+                    const aIsUser = a.owner !== 'preloaded' ? 0 : 1;
+                    const bIsUser = b.owner !== 'preloaded' ? 0 : 1;
+                    if (aIsUser !== bIsUser) return aIsUser - bIsUser;
+                    return a.name.localeCompare(b.name);
+                });
+
+            if (favoriteRecipes.length > 0) {
+                // Favorites section heading
+                const favHeading = document.createElement('div');
+                favHeading.className = 'col-span-full';
+                favHeading.innerHTML = '<h3 class="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-1">Favorites</h3>';
+                recipeListDiv.appendChild(favHeading);
+
+                favoriteRecipes.forEach(recipe => {
+                    recipeListDiv.appendChild(createRecipeCard(recipe, true));
+                });
+            }
+
+            // All Recipes section (user-created first, then preloaded alphabetically)
+            if (otherRecipes.length > 0) {
+                if (favoriteRecipes.length > 0) {
+                    const allHeading = document.createElement('div');
+                    allHeading.className = 'col-span-full mt-4';
+                    allHeading.innerHTML = '<h3 class="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-1">All Recipes</h3>';
+                    recipeListDiv.appendChild(allHeading);
+                }
+
+                otherRecipes.forEach(recipe => {
+                    recipeListDiv.appendChild(createRecipeCard(recipe));
+                });
+            }
+            // "Hidden recipes" tile — only for logged-in users, only if hidden recipes exist
+            if (Auth.isUser() && hiddenRecipes.length > 0) {
+                if (!showArchived) {
+                    // Show a tile that reveals hidden recipes
+                    const tile = document.createElement('div');
+                    tile.className = 'group relative bg-slate-100 rounded-xl border-2 border-dashed border-slate-300 overflow-hidden cursor-pointer hover:border-slate-400 transition-colors';
+                    tile.innerHTML = `
+                        <div class="aspect-[4/3] flex flex-col items-center justify-center text-slate-400">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L6.59 6.59m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                            </svg>
+                            <span class="text-sm font-medium">Hidden recipes</span>
+                            <span class="text-xs mt-0.5">${hiddenRecipes.length} recipe${hiddenRecipes.length === 1 ? '' : 's'}</span>
+                        </div>
+                    `;
+                    tile.addEventListener('click', () => {
+                        showArchived = true;
+                        populateRecipeCards();
+                    });
+                    recipeListDiv.appendChild(tile);
+                } else {
+                    // Show hidden section with a heading and a collapse link
+                    const heading = document.createElement('div');
+                    heading.className = 'col-span-full mt-6 flex items-center justify-between';
+                    heading.innerHTML = `
+                        <h3 class="text-sm font-semibold text-slate-500 uppercase tracking-wider">Hidden</h3>
+                        <button id="collapse-hidden-btn" class="text-xs text-slate-400 hover:text-slate-600 transition-colors">Collapse</button>
+                    `;
+                    recipeListDiv.appendChild(heading);
+                    heading.querySelector('#collapse-hidden-btn').addEventListener('click', () => {
+                        showArchived = false;
+                        populateRecipeCards();
+                    });
+
+                    hiddenRecipes.forEach(recipe => {
+                        recipeListDiv.appendChild(createRecipeCard(recipe));
+                    });
+                }
+            }
 
             restoreSelectedRecipeIds();
             updateButtonState();
@@ -546,6 +917,26 @@
             localStorage.setItem('recipeData', JSON.stringify(shoppingListData));
             localStorage.setItem('selectedRecipeIds', JSON.stringify(selectedRecipeIds));
 
+            // Track shopping list generation
+            Auth.trackActivity('generate_shopping_list', {
+                recipe_ids: selectedRecipeIds,
+                recipe_names: selectedRecipeNames,
+                recipe_count: selectedRecipeIds.length,
+                ingredient_count: shoppingListData.length
+            });
+
+            // Record selected recipes as favorites (fire-and-forget, logged-in only)
+            if (Auth.isUser()) {
+                const now = new Date().toISOString();
+                selectedRecipeIds.forEach(id => {
+                    favoritesData[id] = { lastSelected: now, removed: false };
+                });
+                Auth.fetch('/api/favorites/record', {
+                    method: 'POST',
+                    body: JSON.stringify({ recipeIds: selectedRecipeIds })
+                }).catch(() => {});
+            }
+
             window.location.href = 'shopping-list.html';
         });
 
@@ -582,15 +973,122 @@
             setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 500); }, 3000);
         }
 
+        // --- Share Meal Plan ---
+        function showSharePlanModal(url) {
+            const overlay = document.getElementById('share-plan-overlay');
+            const modal = document.getElementById('share-plan-modal');
+            const closeBtn = document.getElementById('share-plan-close');
+            const urlDisplay = document.getElementById('share-plan-url-display');
+
+            const shareText = "Hey! Check out what I'm cooking this week:";
+            const shareTextWithUrl = shareText + ' ' + url;
+
+            urlDisplay.textContent = url;
+            urlDisplay.href = url;
+            overlay.classList.remove('hidden');
+            modal.classList.remove('hidden');
+
+            const close = () => {
+                overlay.classList.add('hidden');
+                modal.classList.add('hidden');
+            };
+            closeBtn.onclick = close;
+            overlay.onclick = close;
+
+            // Wire up channel buttons
+            modal.querySelectorAll('.share-channel-btn').forEach(btn => {
+                btn.onclick = async () => {
+                    const channel = btn.dataset.channel;
+                    const encoded = encodeURIComponent(shareTextWithUrl);
+                    const encodedUrl = encodeURIComponent(url);
+                    const encodedSubject = encodeURIComponent("My Meal Plan");
+
+                    switch (channel) {
+                        case 'messages':
+                            window.open('sms:?&body=' + encoded, '_blank');
+                            break;
+                        case 'whatsapp':
+                            window.open('https://wa.me/?text=' + encoded, '_blank');
+                            break;
+                        case 'email':
+                            window.location.href = 'mailto:?subject=' + encodedSubject + '&body=' + encoded;
+                            break;
+                        case 'facebook':
+                            window.open('https://www.facebook.com/sharer/sharer.php?u=' + encodedUrl, '_blank', 'width=600,height=400');
+                            break;
+                        case 'x':
+                            window.open('https://x.com/intent/tweet?text=' + encodeURIComponent(shareText) + '&url=' + encodedUrl, '_blank', 'width=600,height=400');
+                            break;
+                        case 'linkedin':
+                            window.open('https://www.linkedin.com/sharing/share-offsite/?url=' + encodedUrl, '_blank', 'width=600,height=400');
+                            break;
+                        case 'copy':
+                            try {
+                                await navigator.clipboard.writeText(url);
+                                document.getElementById('share-copy-label').textContent = 'Copied!';
+                                setTimeout(() => { document.getElementById('share-copy-label').textContent = 'Copy Link'; }, 2000);
+                            } catch {}
+                            break;
+                        case 'more':
+                            if (navigator.share) {
+                                navigator.share({ title: 'My Meal Plan', text: shareText, url }).catch(() => {});
+                            } else {
+                                try {
+                                    await navigator.clipboard.writeText(url);
+                                    document.getElementById('share-copy-label').textContent = 'Copied!';
+                                    setTimeout(() => { document.getElementById('share-copy-label').textContent = 'Copy Link'; }, 2000);
+                                } catch {}
+                            }
+                            break;
+                    }
+
+                    Auth.trackActivity('share_meal_plan_channel', { channel, url });
+                };
+            });
+        }
+
+        document.getElementById('share-plan-button')?.addEventListener('click', Auth.requireLogin(async function() {
+            const selectedRecipeIds = Array.from(document.querySelectorAll('input[name="recipe"]:checked'))
+                .map(cb => cb.value);
+            if (selectedRecipeIds.length === 0) return;
+
+            const btn = document.getElementById('share-plan-button');
+            const label = btn.querySelector('.share-plan-label');
+            const originalText = label.textContent;
+            btn.disabled = true;
+            label.textContent = 'Creating...';
+
+            try {
+                const res = await Auth.fetch('/api/meal-plans/share', {
+                    method: 'POST',
+                    body: JSON.stringify({ recipeIds: selectedRecipeIds })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Failed to create share link');
+
+                const shareUrl = window.location.origin + data.url;
+                showSharePlanModal(shareUrl);
+
+                Auth.trackActivity('share_meal_plan', {
+                    share_id: data.shareId,
+                    recipe_count: selectedRecipeIds.length
+                });
+            } catch (err) {
+                showToast(err.message || 'Failed to create share link', true);
+            } finally {
+                btn.disabled = false;
+                label.textContent = originalText;
+            }
+        }, 'Log in to share your meal plan'));
+
         // --- Archive / Delete / Restore ---
         async function archiveRecipe(recipeId, recipeName, hide) {
             try {
-                const res = await fetch('/api/archive-recipe', {
+                const res = await Auth.fetch('/api/archive-recipe', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ recipeId, hidden: hide })
                 });
-                if (!res.ok) throw new Error('Failed to archive recipe');
+                if (!res.ok) throw new Error('Failed to update recipe');
 
                 // Update local data
                 const recipe = recipeData.recipes.find(r => r.id === recipeId);
@@ -601,7 +1099,7 @@
                     // Show undo toast
                     const toast = document.createElement('div');
                     toast.className = 'fixed bottom-20 left-1/2 transform -translate-x-1/2 bg-slate-800 text-white px-6 py-3 rounded-lg shadow-lg z-50 flex items-center gap-3';
-                    toast.innerHTML = `<span>Archived "${recipeName}"</span>`;
+                    toast.innerHTML = `<span>"${recipeName}" hidden</span>`;
                     const undoBtn = document.createElement('button');
                     undoBtn.className = 'text-green-400 hover:text-green-300 font-medium underline';
                     undoBtn.textContent = 'Undo';
@@ -613,7 +1111,7 @@
                     document.body.appendChild(toast);
                     setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.5s'; setTimeout(() => toast.remove(), 500); }, 5000);
                 } else {
-                    showToast(`"${recipeName}" restored`);
+                    showToast(`"${recipeName}" unhidden`);
                 }
             } catch (err) {
                 showToast(err.message, true);
@@ -650,7 +1148,7 @@
             if (!pendingDeleteId) return;
             deleteConfirmBtn.disabled = true;
             try {
-                const res = await fetch(`/api/recipes/${encodeURIComponent(pendingDeleteId)}`, { method: 'DELETE' });
+                const res = await Auth.fetch(`/api/recipes/${encodeURIComponent(pendingDeleteId)}`, { method: 'DELETE' });
                 if (!res.ok) throw new Error('Failed to delete recipe');
 
                 // Remove from local data
@@ -665,34 +1163,207 @@
             }
         });
 
-        // --- "Show archived" toggle ---
-        const showArchivedCheckbox = document.getElementById('show-archived-checkbox');
-        showArchivedCheckbox.addEventListener('change', () => {
-            showArchived = showArchivedCheckbox.checked;
-            populateRecipeCards();
-        });
+        // --- "Show archived" tile toggle (handled inside populateRecipeCards) ---
 
-        // Close card menus on outside click
+        // --- User dropdown menu ---
+        const userMenuBtn = document.getElementById('user-menu-btn');
+        const userMenuDropdown = document.getElementById('user-menu-dropdown');
+        if (userMenuBtn) {
+            userMenuBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                userMenuDropdown.classList.toggle('hidden');
+            });
+        }
+
+        // Close card menus and user menu on outside click
         document.addEventListener('click', e => {
             if (!e.target.closest('.card-menu')) {
                 document.querySelectorAll('.card-menu-dropdown').forEach(d => d.classList.add('hidden'));
             }
+            if (!e.target.closest('#user-menu-container')) {
+                userMenuDropdown.classList.add('hidden');
+            }
         });
 
-        // Start the app — fetch recipe data then initialize
+        // Menu actions
+        document.getElementById('menu-logout').addEventListener('click', () => Auth.logout());
+        document.getElementById('menu-change-password').addEventListener('click', () => openAccountModal('password'));
+        document.getElementById('menu-change-email').addEventListener('click', () => openAccountModal('email'));
+        document.getElementById('menu-delete-account').addEventListener('click', () => openAccountModal('delete'));
+
+        // --- Account Settings Modal ---
+        function openAccountModal(tab) {
+            userMenuDropdown.classList.add('hidden');
+            const overlay = document.getElementById('account-modal-overlay');
+            const modal = document.getElementById('account-modal');
+            overlay.classList.remove('hidden');
+            modal.classList.remove('hidden');
+            showAccountTab(tab);
+            // Clear all fields and errors
+            modal.querySelectorAll('input').forEach(i => i.value = '');
+            modal.querySelectorAll('.account-error, .account-success').forEach(el => { el.textContent = ''; el.style.display = 'none'; });
+        }
+
+        function closeAccountModal() {
+            document.getElementById('account-modal-overlay').classList.add('hidden');
+            document.getElementById('account-modal').classList.add('hidden');
+        }
+
+        function showAccountTab(tab) {
+            document.querySelectorAll('.account-tab-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById('account-tab-' + tab).classList.remove('hidden');
+        }
+
+        document.getElementById('account-modal-overlay').addEventListener('click', closeAccountModal);
+        document.getElementById('account-modal-close').addEventListener('click', closeAccountModal);
+
+        // Change password submit
+        document.getElementById('account-password-submit').addEventListener('click', async () => {
+            const errorEl = document.getElementById('account-password-error');
+            const successEl = document.getElementById('account-password-success');
+            errorEl.style.display = 'none';
+            successEl.style.display = 'none';
+
+            const currentPassword = document.getElementById('account-current-password').value;
+            const newPassword = document.getElementById('account-new-password').value;
+            const confirmPassword = document.getElementById('account-confirm-password').value;
+
+            if (!currentPassword || !newPassword) {
+                errorEl.textContent = 'Please fill in all fields.';
+                errorEl.style.display = '';
+                return;
+            }
+            if (newPassword.length < 8 || !/[a-zA-Z]/.test(newPassword) || !/[0-9]/.test(newPassword)) {
+                errorEl.textContent = 'New password must be at least 8 characters with a letter and a number.';
+                errorEl.style.display = '';
+                return;
+            }
+            if (newPassword !== confirmPassword) {
+                errorEl.textContent = 'New passwords do not match.';
+                errorEl.style.display = '';
+                return;
+            }
+
+            try {
+                const res = await Auth.fetch('/api/auth/change-password', {
+                    method: 'POST',
+                    body: JSON.stringify({ currentPassword, newPassword })
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    errorEl.textContent = data.error || 'Failed to change password.';
+                    errorEl.style.display = '';
+                    return;
+                }
+                successEl.textContent = 'Password updated successfully.';
+                successEl.style.display = '';
+                document.getElementById('account-current-password').value = '';
+                document.getElementById('account-new-password').value = '';
+                document.getElementById('account-confirm-password').value = '';
+            } catch {
+                errorEl.textContent = 'Connection error. Please try again.';
+                errorEl.style.display = '';
+            }
+        });
+
+        // Change email submit
+        document.getElementById('account-email-submit').addEventListener('click', async () => {
+            const errorEl = document.getElementById('account-email-error');
+            const successEl = document.getElementById('account-email-success');
+            errorEl.style.display = 'none';
+            successEl.style.display = 'none';
+
+            const newEmail = document.getElementById('account-new-email').value.trim();
+            const password = document.getElementById('account-email-password').value;
+
+            if (!newEmail || !password) {
+                errorEl.textContent = 'Please fill in all fields.';
+                errorEl.style.display = '';
+                return;
+            }
+
+            try {
+                const res = await Auth.fetch('/api/auth/change-email', {
+                    method: 'POST',
+                    body: JSON.stringify({ newEmail, password })
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    errorEl.textContent = data.error || 'Failed to update email.';
+                    errorEl.style.display = '';
+                    return;
+                }
+                successEl.textContent = 'Email updated to ' + data.email;
+                successEl.style.display = '';
+                document.getElementById('account-new-email').value = '';
+                document.getElementById('account-email-password').value = '';
+                // Update displayed name if it was email-based
+                if (Auth.user) {
+                    Auth.user.email = data.email;
+                    Auth.updateUI();
+                }
+            } catch {
+                errorEl.textContent = 'Connection error. Please try again.';
+                errorEl.style.display = '';
+            }
+        });
+
+        // Delete account submit
+        document.getElementById('account-delete-submit').addEventListener('click', async () => {
+            const errorEl = document.getElementById('account-delete-error');
+            errorEl.style.display = 'none';
+
+            const password = document.getElementById('account-delete-password').value;
+            const confirm = document.getElementById('account-delete-confirm').checked;
+
+            if (!password) {
+                errorEl.textContent = 'Please enter your password.';
+                errorEl.style.display = '';
+                return;
+            }
+            if (!confirm) {
+                errorEl.textContent = 'Please confirm that you understand this action is permanent.';
+                errorEl.style.display = '';
+                return;
+            }
+
+            try {
+                const res = await Auth.fetch('/api/auth/delete-account', {
+                    method: 'POST',
+                    body: JSON.stringify({ password })
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    errorEl.textContent = data.error || 'Failed to delete account.';
+                    errorEl.style.display = '';
+                    return;
+                }
+                window.location.href = '/';
+            } catch {
+                errorEl.textContent = 'Connection error. Please try again.';
+                errorEl.style.display = '';
+            }
+        });
+
+        // Start the app — wait for auth, then fetch recipe data
         async function initApp() {
             recipeListDiv.innerHTML = `
                 <div class="col-span-full text-center py-12">
                     <div class="text-slate-500">Loading recipes...</div>
                 </div>
             `;
+            // Wait for auth to initialize
+            await new Promise(resolve => Auth.onReady(resolve));
             try {
-                const res = await fetch('/api/recipes');
+                const res = await fetch('/api/recipes', { credentials: 'same-origin' });
                 if (!res.ok) throw new Error('Failed to load recipes');
-                recipeData = await res.json();
+                const data = await res.json();
+                recipeData = data;
+                favoritesData = data.favorites || {};
             } catch (err) {
                 console.error('Error fetching recipe data:', err);
             }
+
             init();
         }
         initApp();
@@ -702,14 +1373,46 @@
     <div id="import-overlay" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 hidden"></div>
     <div id="import-modal" class="fixed inset-x-4 top-[10%] max-w-lg mx-auto bg-white rounded-2xl shadow-2xl z-50 hidden max-h-[80vh] flex flex-col">
         <div class="p-6 border-b border-slate-200">
-            <h3 class="text-xl font-bold text-slate-900">Import Recipe from URL</h3>
-            <p class="text-sm text-slate-500 mt-1">Paste a recipe URL and we'll extract the ingredients</p>
+            <h3 class="text-xl font-bold text-slate-900">Add Recipe</h3>
+            <p class="text-sm text-slate-500 mt-1">Paste a URL or take a photo of a recipe</p>
         </div>
         <div class="p-6 overflow-y-auto flex-1 space-y-4" id="import-modal-body">
-            <div>
+            <!-- Tab switcher -->
+            <div id="import-tabs" class="flex bg-slate-100 rounded-lg p-1 gap-1">
+                <button id="import-tab-url"
+                        class="flex-1 py-2 px-3 text-sm font-medium rounded-md bg-white shadow-sm text-slate-900 transition-all">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="inline h-4 w-4 mr-1 -mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                    </svg>
+                    From URL
+                </button>
+                <button id="import-tab-photo"
+                        class="flex-1 py-2 px-3 text-sm font-medium rounded-md text-slate-500 hover:text-slate-700 transition-all">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="inline h-4 w-4 mr-1 -mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    From Photo
+                </button>
+            </div>
+
+            <!-- URL input section -->
+            <div id="import-section-url">
                 <label class="block text-sm font-medium text-slate-700 mb-1">Recipe URL</label>
                 <input type="url" id="import-url" placeholder="https://smittenkitchen.com/..."
                        class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none">
+            </div>
+
+            <!-- Photo input section (hidden by default) — painted door test -->
+            <div id="import-section-photo" class="hidden">
+                <div class="rounded-lg border border-slate-200 bg-slate-50 p-8 text-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto h-12 w-12 text-slate-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    <p class="text-base font-semibold text-slate-700 mb-1">Coming Soon</p>
+                    <p class="text-sm text-slate-500">Photo import is on the way! We're working on the ability to snap a photo of a recipe and have it automatically imported.</p>
+                </div>
             </div>
             <div id="import-status" class="hidden">
                 <div class="flex items-center gap-2 text-sm text-slate-600">
@@ -729,6 +1432,10 @@
                 <div id="preview-image-section">
                     <h5 class="text-sm font-medium text-slate-700 mb-2">Choose an image:</h5>
                     <div id="preview-image-grid" class="flex gap-2 overflow-x-auto pb-2"></div>
+                    <div class="mt-2 flex gap-2">
+                        <input id="preview-image-url" type="url" placeholder="Or paste an image URL" class="flex-1 text-sm px-2 py-1 border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500">
+                        <button id="preview-image-url-btn" type="button" class="text-sm px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700">Use</button>
+                    </div>
                 </div>
                 <!-- Editable ingredients -->
                 <div>
@@ -744,7 +1451,7 @@
         <div class="p-6 border-t border-slate-200 flex gap-3 justify-end">
             <button id="import-cancel" class="px-4 py-2 text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">Cancel</button>
             <button id="import-fetch" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed">
-                Fetch &amp; Parse
+                Upload Recipe
             </button>
             <button id="import-save" class="hidden px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors font-medium">
                 Add Recipe
@@ -766,13 +1473,46 @@
         const importError = document.getElementById('import-error');
         const importPreview = document.getElementById('import-preview');
 
+        // Photo import elements (painted door test)
+        const importTabUrl = document.getElementById('import-tab-url');
+        const importTabPhoto = document.getElementById('import-tab-photo');
+        const importSectionUrl = document.getElementById('import-section-url');
+        const importSectionPhoto = document.getElementById('import-section-photo');
+
         let pendingRecipe = null;
+        let activeImportTab = 'url';
+
+        // --- Tab switching ---
+        function switchImportTab(tab) {
+            activeImportTab = tab;
+            if (tab === 'url') {
+                importTabUrl.className = 'flex-1 py-2 px-3 text-sm font-medium rounded-md bg-white shadow-sm text-slate-900 transition-all';
+                importTabPhoto.className = 'flex-1 py-2 px-3 text-sm font-medium rounded-md text-slate-500 hover:text-slate-700 transition-all';
+                importSectionUrl.classList.remove('hidden');
+                importSectionPhoto.classList.add('hidden');
+                importFetchBtn.classList.remove('hidden');
+            } else {
+                importTabPhoto.className = 'flex-1 py-2 px-3 text-sm font-medium rounded-md bg-white shadow-sm text-slate-900 transition-all';
+                importTabUrl.className = 'flex-1 py-2 px-3 text-sm font-medium rounded-md text-slate-500 hover:text-slate-700 transition-all';
+                importSectionUrl.classList.add('hidden');
+                importSectionPhoto.classList.remove('hidden');
+                importFetchBtn.classList.add('hidden');
+                // Track painted door interest
+                fetch('/api/activity/log', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'photo_import_interest', details: {} })
+                }).catch(() => {});
+            }
+        }
+        importTabUrl.addEventListener('click', () => switchImportTab('url'));
+        importTabPhoto.addEventListener('click', () => switchImportTab('photo'));
 
         function openImportModal() {
             importOverlay.classList.remove('hidden');
             importModal.classList.remove('hidden');
             resetImportModal();
-            importUrlInput.focus();
+            if (activeImportTab === 'url') importUrlInput.focus();
         }
 
         function closeImportModal() {
@@ -789,6 +1529,7 @@
             importFetchBtn.classList.remove('hidden');
             importFetchBtn.disabled = false;
             importSaveBtn.classList.add('hidden');
+            switchImportTab('url');
         }
 
         function showImportError(message) {
@@ -800,6 +1541,28 @@
         importButton.addEventListener('click', openImportModal);
         importCancel.addEventListener('click', closeImportModal);
         importOverlay.addEventListener('click', closeImportModal);
+
+        // Parse ISO 8601 duration (PT30M, PT1H15M) or plain text (30m, 25 minutes) to readable string
+        function parseDuration(dur) {
+            if (!dur) return null;
+            let m = dur.match(/^PT(?:(\d+)H)?(?:(\d+)M)?$/i);
+            if (m && (m[1] || m[2])) {
+                const h = parseInt(m[1] || 0), min = parseInt(m[2] || 0);
+                if (h > 0 && min > 0) return h + ' hr ' + min + ' min';
+                if (h > 0) return h + ' hr';
+                return min + ' min';
+            }
+            m = dur.match(/^(\d+)\s*m$/i);
+            if (m) return m[1] + ' min';
+            m = dur.match(/(\d+)\s*hour/i);
+            const h2 = m ? parseInt(m[1]) : 0;
+            m = dur.match(/(\d+)\s*min/i);
+            const min2 = m ? parseInt(m[1]) : 0;
+            if (h2 > 0 && min2 > 0) return h2 + ' hr ' + min2 + ' min';
+            if (h2 > 0) return h2 + ' hr';
+            if (min2 > 0) return min2 + ' min';
+            return null;
+        }
 
         // --- Extract JSON-LD Recipe from HTML ---
         function extractRecipeFromHtml(html, sourceUrl) {
@@ -824,7 +1587,9 @@
                                        (typeof item.image === 'object' ? item.image.url : item.image),
                                 ingredients: item.recipeIngredient || [],
                                 url: sourceUrl,
-                                author: typeof item.author === 'object' ? item.author.name : item.author
+                                author: typeof item.author === 'object' ? item.author.name : item.author,
+                                activeTime: parseDuration(item.prepTime),
+                                totalTime: parseDuration(item.totalTime)
                             };
                         }
                     }
@@ -879,6 +1644,67 @@
                 });
             });
 
+            // Lazy-loaded images (data-src, data-srcset, data-bg)
+            doc.querySelectorAll('[data-src], [data-srcset], [data-bgset]').forEach(el => {
+                for (const attr of ['data-src', 'data-srcset', 'data-bgset']) {
+                    const val = el.getAttribute(attr);
+                    if (!val) continue;
+                    if (attr === 'data-src') {
+                        if (!val.startsWith('data:') && /\.(jpg|jpeg|png|webp)/i.test(val)) images.add(val);
+                    } else {
+                        val.split(',').map(s => s.trim().split(/\s+/)[0]).forEach(src => {
+                            if (src && !src.startsWith('data:')) images.add(src);
+                        });
+                    }
+                }
+            });
+
+            // Preloaded images (common on modern sites)
+            doc.querySelectorAll('link[rel="preload"][as="image"]').forEach(link => {
+                const href = link.getAttribute('href');
+                if (href && !href.startsWith('data:') && !/icon|logo|avatar|pixel/i.test(href)) images.add(href);
+            });
+
+            // noscript fallback images (common with lazy loading)
+            doc.querySelectorAll('noscript').forEach(ns => {
+                const inner = new DOMParser().parseFromString(ns.textContent, 'text/html');
+                inner.querySelectorAll('img[src]').forEach(img => {
+                    const src = img.getAttribute('src');
+                    if (src && !src.startsWith('data:') && !/icon|logo|avatar|pixel/i.test(src)) images.add(src);
+                });
+            });
+
+            // Scan inline scripts for image URLs (JS-rendered sites like Shopify)
+            if (images.size < 3) {
+                const imgUrlRe = /https?:\/\/[^\s"'`,<>]+?\/[^\s"'`,<>]*\.(?:jpg|jpeg|png|webp)(?:\?[^\s"'`,<>]*)?/gi;
+                doc.querySelectorAll('script:not([src])').forEach(script => {
+                    const text = script.textContent;
+                    if (!text) return;
+                    const matches = text.match(imgUrlRe);
+                    if (matches) {
+                        matches.forEach(url => {
+                            if (/placeholder|icon|logo|avatar|badge|pixel|\.svg/i.test(url)) return;
+                            const clean = url.replace(/\\u002F/g, '/').replace(/\\\//g, '/');
+                            images.add(clean);
+                        });
+                    }
+                });
+            }
+
+            // Also scan JSON-LD blocks for image fields (some sites embed images only here)
+            doc.querySelectorAll('script[type="application/ld+json"]').forEach(script => {
+                try {
+                    const text = script.textContent;
+                    if (!text) return;
+                    const imgMatches = text.match(/https?:\/\/[^\s"']+\.(?:jpg|jpeg|png|webp)(?:\?[^"']*)?\b/gi);
+                    if (imgMatches) {
+                        imgMatches.forEach(url => {
+                            if (!/icon|logo|avatar|pixel|placeholder/i.test(url)) images.add(url);
+                        });
+                    }
+                } catch (_) {}
+            });
+
             return [...images].slice(0, 12); // Cap at 12 candidates
         }
 
@@ -919,6 +1745,11 @@
 
         // --- Fetch & Parse Flow ---
         importFetchBtn.addEventListener('click', async () => {
+            if (Auth.isGuest()) {
+                Auth.showLoginPrompt('Create an account to import and save your own recipes');
+                return;
+            }
+
             const url = importUrlInput.value.trim();
             if (!url) {
                 showImportError('Please enter a recipe URL.');
@@ -942,9 +1773,8 @@
             try {
                 // Step 1: Fetch HTML via server
                 importStatusText.textContent = 'Fetching recipe page...';
-                const fetchRes = await fetch('/api/fetch-url', {
+                const fetchRes = await Auth.fetch('/api/fetch-url', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ url })
                 });
                 const fetchData = await fetchRes.json();
@@ -954,14 +1784,13 @@
                 importStatusText.textContent = 'Extracting recipe data...';
                 const extracted = extractRecipeFromHtml(fetchData.html, url);
 
-                let recipeName, recipeImage, parsedIngredients, newDefs;
+                let recipeName, recipeImage, parsedIngredients, newDefs, activeTime, totalTime;
 
                 if (extracted && extracted.ingredients && extracted.ingredients.length > 0) {
                     // JSON-LD path: parse structured ingredients with Claude
                     importStatusText.textContent = 'Parsing ingredients with AI...';
-                    const parseRes = await fetch('/api/parse-recipe', {
+                    const parseRes = await Auth.fetch('/api/parse-recipe', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             recipeName: extracted.name,
                             ingredients: extracted.ingredients,
@@ -976,13 +1805,14 @@
                     recipeImage = extracted.image || '';
                     parsedIngredients = parsed.ingredients;
                     newDefs = parsed.newIngredientDefs || {};
+                    activeTime = extracted.activeTime || null;
+                    totalTime = extracted.totalTime || null;
                 } else {
                     // Fallback: send page text to Claude for full extraction
                     importStatusText.textContent = 'Extracting recipe with AI...';
                     const pageText = extractPageText(fetchData.html);
-                    const extractRes = await fetch('/api/extract-recipe', {
+                    const extractRes = await Auth.fetch('/api/extract-recipe', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             pageText,
                             sourceUrl: url,
@@ -997,6 +1827,8 @@
                     recipeImage = result.image || '';
                     parsedIngredients = result.ingredients;
                     newDefs = result.newIngredientDefs || {};
+                    activeTime = result.activeTime || null;
+                    totalTime = result.totalTime || null;
                 }
 
                 // Extract candidate images from the page
@@ -1008,14 +1840,18 @@
 
                 const recipeId = slugify(recipeName);
 
+                const recipeObj = {
+                    id: recipeId,
+                    name: recipeName,
+                    url: url,
+                    image: recipeImage,
+                    ingredients: parsedIngredients
+                };
+                if (activeTime) recipeObj.activeTime = activeTime;
+                if (totalTime) recipeObj.totalTime = totalTime;
+
                 pendingRecipe = {
-                    recipe: {
-                        id: recipeId,
-                        name: recipeName,
-                        url: url,
-                        image: recipeImage,
-                        ingredients: parsedIngredients
-                    },
+                    recipe: recipeObj,
                     newIngredientDefs: newDefs,
                     candidateImages: candidateImages
                 };
@@ -1024,7 +1860,13 @@
                 showImportPreview(pendingRecipe);
 
             } catch (err) {
-                showImportError(err.message);
+                if (err instanceof TypeError && err.message === 'Failed to fetch') {
+                    showImportError('Could not reach the server. Please make sure you are connected and try again.');
+                } else if (err.message === 'Authentication required') {
+                    Auth.showLoginPrompt('Create an account to import and save your own recipes');
+                } else {
+                    showImportError(err.message);
+                }
             } finally {
                 importStatus.classList.add('hidden');
                 importFetchBtn.disabled = false;
@@ -1045,8 +1887,12 @@
             // --- Image picker ---
             const images = pending.candidateImages || [];
             previewImageGrid.innerHTML = '';
+            previewImageSection.classList.remove('hidden');
+            const imageUrlInput = document.getElementById('preview-image-url');
+            const imageUrlBtn = document.getElementById('preview-image-url-btn');
+            imageUrlInput.value = '';
+
             if (images.length > 0) {
-                previewImageSection.classList.remove('hidden');
                 images.forEach((src, i) => {
                     const wrapper = document.createElement('div');
                     wrapper.className = 'flex-shrink-0 cursor-pointer rounded-lg overflow-hidden border-2 transition-all ' +
@@ -1063,6 +1909,7 @@
                     wrapper.appendChild(img);
                     wrapper.addEventListener('click', () => {
                         pending.recipe.image = src;
+                        imageUrlInput.value = '';
                         // Update selection styling
                         previewImageGrid.querySelectorAll('div').forEach(d => {
                             d.className = d.className
@@ -1073,9 +1920,19 @@
                     });
                     previewImageGrid.appendChild(wrapper);
                 });
-            } else {
-                previewImageSection.classList.add('hidden');
             }
+
+            // Manual image URL input
+            imageUrlBtn.onclick = () => {
+                const manualUrl = imageUrlInput.value.trim();
+                if (!manualUrl) return;
+                pending.recipe.image = manualUrl;
+                // Deselect grid thumbnails
+                previewImageGrid.querySelectorAll('div').forEach(d => {
+                    d.className = d.className
+                        .replace(/border-green-500 ring-2 ring-green-500/g, 'border-transparent opacity-60 hover:opacity-100')
+                });
+            };
 
             // --- Editable ingredients ---
             const existingIngredientList = Object.entries(recipeData.ingredientDefs)
@@ -1401,9 +2258,8 @@
             importStatusText.textContent = 'Saving recipe...';
 
             try {
-                const res = await fetch('/api/save-recipe', {
+                const res = await Auth.fetch('/api/save-recipe', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         recipe: pendingRecipe.recipe,
                         newIngredientDefs: pendingRecipe.newIngredientDefs
@@ -1412,10 +2268,21 @@
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || 'Failed to save recipe');
 
+                // Capture values before closeImportModal() nulls pendingRecipe
+                const savedRecipe = pendingRecipe.recipe;
+                const savedIngredientDefs = pendingRecipe.newIngredientDefs;
+
+                // Update in-memory data so the new recipe appears without a reload
+                if (savedIngredientDefs) {
+                    Object.assign(recipeData.ingredientDefs, savedIngredientDefs);
+                }
+                savedRecipe.owner = String(Auth.user?.id);
+                recipeData.recipes.push(savedRecipe);
+
                 closeImportModal();
-                showToast(`"${pendingRecipe.recipe.name}" added successfully!`);
-                // Reload to pick up the updated recipes.js
-                setTimeout(() => window.location.reload(), 1000);
+                showToast(`"${savedRecipe.name}" added successfully!`);
+
+                populateRecipeCards();
             } catch (err) {
                 importStatus.classList.add('hidden');
                 showImportError(err.message);
