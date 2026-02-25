@@ -852,6 +852,12 @@ Return ONLY valid JSON in this exact format, no other text:
       return res.status(500).json({ error: 'Could not parse AI response as JSON' });
     }
     const parsed = JSON.parse(jsonMatch[0]);
+    if (parsed.not_a_recipe) {
+      return res.status(422).json({ error: 'This page doesn\'t appear to contain a recipe. Please try a URL from a recipe website.' });
+    }
+    if (!parsed.ingredients || parsed.ingredients.length === 0) {
+      return res.status(422).json({ error: 'No ingredients found on this page. Please make sure the URL points to a specific recipe.' });
+    }
     if (parsed.ingredients) {
       parsed.ingredients = UnitConversion.convertParsedIngredients(
         parsed.ingredients,
