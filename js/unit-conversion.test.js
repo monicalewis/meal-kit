@@ -1,4 +1,4 @@
-const UC = require('./unit-conversion');
+const UC = require('../public/js/unit-conversion.js');
 
 // ── convertQty: identity ────────────────────────────────────────────
 

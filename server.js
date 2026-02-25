@@ -11,7 +11,8 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { body, validationResult } = require('express-validator');
 const { loadUser, requireAuth, requireAdmin } = require('./middleware/auth');
-const UnitConversion = require('./js/unit-conversion');
+const UnitConversion = require('./public/js/unit-conversion');
+const { fetchWithBrowser } = require('./scraper');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -119,7 +120,7 @@ app.use(csrfProtection);
 app.use(loadUser);
 
 // --- Shared meal plan page (with dynamic OG tags) ---
-const planHtmlTemplate = fs.readFileSync(path.join(__dirname, 'plan.html'), 'utf-8');
+const planHtmlTemplate = fs.readFileSync(path.join(__dirname, 'public', 'plan.html'), 'utf-8');
 
 app.get('/plan/:shareId', async (req, res) => {
   const { shareId } = req.params;
@@ -204,7 +205,7 @@ function escapeAttr(str) {
 }
 
 // --- Static files ---
-app.use(express.static(path.join(__dirname)));
+app.use(express.static(path.join(__dirname, 'public')));
 
 // --- Groq AI setup ---
 const groq = process.env.GROQ_API_KEY
@@ -257,31 +258,17 @@ async function saveRecipeData(recipeData) {
   fs.writeFileSync(recipesPath, newContent, 'utf-8');
 }
 
-async function getFavorites() {
-  if (pool) {
-    const result = await pool.query("SELECT value FROM app_data WHERE key = 'favorites'");
-    if (result.rows.length > 0) return result.rows[0].value;
-    return {};
+async function getUserFavorites(userId) {
+  if (!pool || !userId) return {};
+  const result = await pool.query(
+    'SELECT recipe_id, last_selected FROM user_favorites WHERE user_id = $1',
+    [userId]
+  );
+  const favorites = {};
+  for (const row of result.rows) {
+    favorites[row.recipe_id] = { lastSelected: row.last_selected.toISOString(), removed: false };
   }
-  const favPath = path.join(__dirname, 'favorites.json');
-  try {
-    return JSON.parse(fs.readFileSync(favPath, 'utf-8'));
-  } catch {
-    return {};
-  }
-}
-
-async function saveFavorites(favorites) {
-  if (pool) {
-    await pool.query(
-      `INSERT INTO app_data (key, value) VALUES ('favorites', $1)
-       ON CONFLICT (key) DO UPDATE SET value = $1`,
-      [JSON.stringify(favorites)]
-    );
-    return;
-  }
-  const favPath = path.join(__dirname, 'favorites.json');
-  fs.writeFileSync(favPath, JSON.stringify(favorites, null, 2), 'utf-8');
+  return favorites;
 }
 
 async function getUserRecipes(userId) {
@@ -555,7 +542,7 @@ app.post('/api/activity/log', activityLimiter, (req, res) => {
 // GET /api/recipes — merge preloaded + user recipes + favorites
 app.get('/api/recipes', async (req, res) => {
   try {
-    const [globalData, favorites] = await Promise.all([getRecipeData(), getFavorites()]);
+    const globalData = await getRecipeData();
     const preloadedRecipes = globalData.recipes.map(r => ({ ...r, owner: 'preloaded' }));
 
     if (!req.user) {
@@ -563,10 +550,11 @@ app.get('/api/recipes', async (req, res) => {
       return res.json({ ingredientDefs: globalData.ingredientDefs, recipes: preloadedRecipes, favorites: {} });
     }
 
-    // Logged-in user: merge preloaded + own custom recipes
-    const [userRows, userPrefs] = await Promise.all([
+    // Logged-in user: merge preloaded + own custom recipes + per-user favorites
+    const [userRows, userPrefs, favorites] = await Promise.all([
       getUserRecipes(req.user.id),
-      req.user.role === 'admin' ? {} : getUserRecipePrefs(req.user.id)
+      req.user.role === 'admin' ? {} : getUserRecipePrefs(req.user.id),
+      getUserFavorites(req.user.id)
     ]);
 
     // Apply per-user archive overrides to preloaded recipes (non-admin only)
@@ -604,12 +592,14 @@ app.post('/api/favorites/record', requireAuth, async (req, res) => {
     return res.status(400).json({ error: 'recipeIds array required' });
   }
   try {
-    const favorites = await getFavorites();
-    const now = new Date().toISOString();
-    for (const id of recipeIds) {
-      favorites[id] = { lastSelected: now, removed: false };
+    if (pool) {
+      const values = recipeIds.map((id, i) => `($1, $${i + 2}, NOW())`).join(', ');
+      await pool.query(
+        `INSERT INTO user_favorites (user_id, recipe_id, last_selected) VALUES ${values}
+         ON CONFLICT (user_id, recipe_id) DO UPDATE SET last_selected = NOW()`,
+        [req.user.id, ...recipeIds]
+      );
     }
-    await saveFavorites(favorites);
     res.json({ success: true });
   } catch (err) {
     console.error('Error recording favorites:', err.message);
@@ -622,10 +612,11 @@ app.post('/api/favorites/remove', requireAuth, async (req, res) => {
   const { recipeId } = req.body;
   if (!recipeId) return res.status(400).json({ error: 'recipeId required' });
   try {
-    const favorites = await getFavorites();
-    if (favorites[recipeId]) {
-      favorites[recipeId].removed = true;
-      await saveFavorites(favorites);
+    if (pool) {
+      await pool.query(
+        'DELETE FROM user_favorites WHERE user_id = $1 AND recipe_id = $2',
+        [req.user.id, recipeId]
+      );
     }
     res.json({ success: true });
   } catch (err) {
@@ -639,59 +630,84 @@ app.post('/api/fetch-url', requireAuth, async (req, res) => {
   const { url } = req.body;
   if (!url) return res.status(400).json({ error: 'URL is required' });
 
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9'
-      },
-      signal: controller.signal,
-      redirect: 'follow'
-    });
-    clearTimeout(timeout);
-    if (!response.ok) {
-      return res.status(502).json({ error: `Failed to fetch URL (HTTP ${response.status})` });
-    }
-    let html = await response.text();
+  // Crawl-style UAs get pre-rendered HTML with og:image and full content from
+  // JS-rendered sites (Shopify, Next.js, etc.), so try them first.
+  const uaStrategies = [
+    'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)',
+    'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+  ];
 
-    // JS-rendered sites (e.g. Shopify) serve empty shells to browsers.
-    // Many of them serve pre-rendered HTML with og:image to crawlers/bots.
-    const hasOgImage = /meta\s[^>]*property=["']og:image["']/i.test(html);
-    const hasImgTags = /<img\s[^>]*src=["']https?:\/\//i.test(html);
+  let html = null;
+  let ogImage = null;
 
-    if (!hasOgImage && !hasImgTags) {
-      try {
-        const botController = new AbortController();
-        const botTimeout = setTimeout(() => botController.abort(), 10000);
-        const botResponse = await fetch(url, {
-          headers: {
-            'User-Agent': 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.9'
-          },
-          signal: botController.signal,
-          redirect: 'follow'
-        });
-        clearTimeout(botTimeout);
-        if (botResponse.ok) {
-          const botHtml = await botResponse.text();
-          const botHasImages = /meta\s[^>]*property=["']og:image["']/i.test(botHtml)
-            || /<img\s[^>]*src=["']https?:\/\//i.test(botHtml);
-          if (botHasImages) {
-            html = botHtml;
-          }
-        }
-      } catch (_) { /* bot fetch failed, continue with original HTML */ }
-    }
+  for (const ua of uaStrategies) {
+    try {
+      console.log('[fetch-url] Trying UA:', ua.substring(0, 50));
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 12000);
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': ua,
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9'
+        },
+        signal: controller.signal,
+        redirect: 'follow'
+      });
+      clearTimeout(timeout);
+      if (!response.ok) continue;
 
-    logActivity(req.user.id, 'import_recipe', { url }, req.ip);
-    res.json({ html });
-  } catch (err) {
-    res.status(502).json({ error: `Could not reach URL: ${err.message}` });
+      const candidate = await response.text();
+
+      // Extract og:image server-side (both http and secure_url variants)
+      const ogMatch = candidate.match(
+        /meta\s[^>]*property=["']og:image(?::secure_url)?["'][^>]*content=["']([^"']+)["']/i
+      ) || candidate.match(
+        /meta\s[^>]*content=["']([^"']+)["'][^>]*property=["']og:image(?::secure_url)?["']/i
+      );
+
+      if (ogMatch) ogImage = ogMatch[1];
+
+      // Use this HTML if it has og:image or visible <img> tags
+      const hasContent = ogImage
+        || /<img\s[^>]*src=["'](?:https?:)?\/\//i.test(candidate);
+
+      if (!html) html = candidate; // always keep first successful fetch
+      if (hasContent) { console.log('[fetch-url] Found content with UA:', ua.substring(0, 50), 'ogImage:', ogImage ? 'YES' : 'NO', 'htmlSize:', candidate.length); html = candidate; break; }
+      console.log('[fetch-url] No content with this UA, htmlSize:', candidate.length);
+    } catch (e) { console.log('[fetch-url] UA error:', e.message); continue; }
   }
+
+  if (!html) {
+    return res.status(502).json({ error: 'Could not fetch the recipe page' });
+  }
+
+  // Normalize og:image to https
+  if (ogImage) {
+    if (ogImage.startsWith('//')) ogImage = 'https:' + ogImage;
+    else if (ogImage.startsWith('http://')) ogImage = ogImage.replace('http://', 'https://');
+  }
+  console.log('[fetch-url] Final ogImage:', ogImage, 'htmlSize:', html.length);
+
+  // Fallback: if no og:image and no real <img> tags, try headless browser
+  let browserImages = [];
+  const hasImages = ogImage || /<img\s[^>]*src=["'](?:https?:)?\/\//i.test(html);
+  if (!hasImages) {
+    console.log('[fetch-url] No images found, trying headless browser...');
+    try {
+      const result = await fetchWithBrowser(url);
+      if (result) {
+        html = result.html;
+        if (result.ogImage) ogImage = result.ogImage;
+        browserImages = result.images || [];
+      }
+    } catch (_) { /* keep original HTML fetch result */ }
+  }
+
+  console.log('[fetch-url] Sending response: ogImage:', ogImage, 'browserImages:', browserImages.length, 'htmlSize:', html.length);
+  logActivity(req.user.id, 'import_recipe', { url }, req.ip);
+  res.json({ html, ogImage, browserImages });
 });
 
 // POST /api/parse-recipe — requires auth
@@ -704,7 +720,7 @@ app.post('/api/parse-recipe', requireAuth, aiLimiter, async (req, res) => {
   const prompt = `You are a recipe ingredient parser for a meal planning app.
 
 Here are the existing ingredient definitions in the app (JSON object keyed by slug ID):
-${JSON.stringify(existingDefs, null, 2)}
+${JSON.stringify(existingDefs)}
 
 A user wants to import a recipe called "${recipeName}" with these raw ingredient strings:
 ${ingredients.map((s, i) => `${i + 1}. ${s}`).join('\n')}
@@ -739,9 +755,10 @@ Return ONLY valid JSON in this exact format, no other text:
   try {
     if (!groq) return res.status(500).json({ error: 'AI service not configured (GROQ_API_KEY missing)' });
     const result = await groq.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
+      model: 'llama-3.1-8b-instant',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.2,
+      max_tokens: 2048,
     });
     const text = result.choices[0].message.content;
     const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -771,33 +788,37 @@ app.post('/api/extract-recipe', requireAuth, aiLimiter, async (req, res) => {
 
   const prompt = `You are a recipe extractor and ingredient parser for a meal planning app.
 
-I have the text content of a recipe web page. Extract the recipe and parse its ingredients.
+I have the text content of a web page. First, determine if this page actually contains a recipe. If it does NOT contain a recipe (e.g., it's a news article, blog post without a recipe, social media page, search results, homepage, error page, etc.), return ONLY this JSON:
+{"not_a_recipe": true}
+
+If the page DOES contain a recipe, extract it and parse its ingredients.
 
 Here are the existing ingredient definitions in the app (JSON object keyed by slug ID):
-${JSON.stringify(existingDefs, null, 2)}
+${JSON.stringify(existingDefs)}
 
 Here is the page text:
 ---
-${pageText.substring(0, 8000)}
+${pageText.substring(0, 4000)}
 ---
 
 Your job:
-1. Extract the recipe name and author/source from the page.
-2. For the image field, ALWAYS return an empty string "". Do NOT guess or invent image URLs — they are extracted separately.
-3. Extract cooking times if mentioned: active/prep time and total time. Use short readable format like "15 min", "1 hr 30 min". Return null if not found.
-4. Identify all recipe ingredients from the page text.
-5. For each ingredient, determine the core ingredient and quantity, ignoring preparation instructions.
-6. Match each ingredient to an existing ingredientDef by slug ID if a reasonable match exists. Use fuzzy matching — e.g., "yellow onion" matches "yellow-onion", "fresh basil leaves" matches "fresh-basil".
-7. For ingredients that do NOT match any existing def, create a new ingredientDef entry with:
+1. First, determine if this page contains a recipe. If not, return {"not_a_recipe": true}.
+2. Extract the recipe name and author/source from the page.
+3. For the image field, ALWAYS return an empty string "". Do NOT guess or invent image URLs — they are extracted separately.
+4. Extract cooking times if mentioned: active/prep time and total time. Use short readable format like "15 min", "1 hr 30 min". Return null if not found.
+5. Identify all recipe ingredients from the page text.
+6. For each ingredient, determine the core ingredient and quantity, ignoring preparation instructions.
+7. Match each ingredient to an existing ingredientDef by slug ID if a reasonable match exists. Use fuzzy matching — e.g., "yellow onion" matches "yellow-onion", "fresh basil leaves" matches "fresh-basil".
+8. For ingredients that do NOT match any existing def, create a new ingredientDef entry with:
    - slug: lowercase, hyphenated (e.g., "coconut-milk")
    - name: Readable name (e.g., "Coconut milk")
    - units: the most appropriate unit (e.g., "cup", "oz", "count", "tbsp", "tsp", "lbs", "bunch", "can", "cloves", "g", "ml", "kg")
    - section: one of "Produce", "Bread", "Cooking", "Cheese section", "Dairy", "Nuts", "Frozen", "Snacks", "Other"
-8. Skip ingredients that are just salt, pepper, water, or basic cooking oil (olive oil, vegetable oil) UNLESS they appear in the existing defs.
-9. Convert fractional quantities to decimals (e.g., 1/2 = 0.5, 1/3 = 0.33, 2/3 = 0.67).
-10. For "to taste" ingredients, use qty of 1.
-11. For quantity RANGES like "120-150 g" or "2-3 cups", use the lower value of the range (e.g., 120 g, 2 cups).
-12. IMPORTANT unit handling:
+9. Skip ingredients that are just salt, pepper, water, or basic cooking oil (olive oil, vegetable oil) UNLESS they appear in the existing defs.
+10. Convert fractional quantities to decimals (e.g., 1/2 = 0.5, 1/3 = 0.33, 2/3 = 0.67).
+11. For "to taste" ingredients, use qty of 1.
+12. For quantity RANGES like "120-150 g" or "2-3 cups", use the lower value of the range (e.g., 120 g, 2 cups).
+13. IMPORTANT unit handling:
    - Return the quantity and unit EXACTLY as they appear in the recipe text. In addition to "id" and "qty", ALSO return "unit" — the unit from the recipe (e.g., "g", "cup", "tbsp", "ml", "oz", "lbs", "tsp", "kg", "count", "cloves", "bunch", "can"). Normalize to lowercase.
    - Do NOT convert units or do any math. Return the raw values from the recipe. Unit conversion is handled separately in code.
    - When creating a NEW ingredientDef, use the recipe's original units. If the recipe uses metric (g, ml, kg), keep those units.
@@ -820,9 +841,10 @@ Return ONLY valid JSON in this exact format, no other text:
   try {
     if (!groq) return res.status(500).json({ error: 'AI service not configured (GROQ_API_KEY missing)' });
     const result = await groq.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
+      model: 'llama-3.1-8b-instant',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.2,
+      max_tokens: 2048,
     });
     const text = result.choices[0].message.content;
     const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -1229,6 +1251,10 @@ app.get('/api/admin/activity', requireAdmin, async (req, res) => {
 // START SERVER
 // =============================
 
-app.listen(PORT, () => {
-  console.log(`Recipe Planner running at http://localhost:${PORT}`);
-});
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Recipe Planner running at http://localhost:${PORT}`);
+  });
+}
+
+module.exports = app;

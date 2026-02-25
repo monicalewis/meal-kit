@@ -65,6 +65,15 @@ CREATE INDEX IF NOT EXISTS idx_activity_log_user ON activity_log (user_id);
 CREATE INDEX IF NOT EXISTS idx_activity_log_action ON activity_log (action);
 CREATE INDEX IF NOT EXISTS idx_activity_log_created ON activity_log (created_at);
 
+-- Per-user favorites
+CREATE TABLE IF NOT EXISTS user_favorites (
+  user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  recipe_id    VARCHAR(255) NOT NULL,
+  last_selected TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (user_id, recipe_id)
+);
+CREATE INDEX IF NOT EXISTS idx_user_favorites_user ON user_favorites (user_id);
+
 -- Shareable meal plan links
 CREATE TABLE IF NOT EXISTS shared_meal_plans (
   id               SERIAL PRIMARY KEY,

@@ -7,6 +7,7 @@
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="/js/auth.js"></script>
+    <script src="/js/unit-conversion.js"></script>
     <!-- ShadcnUI Dependencies -->
     <link href="https://cdn.jsdelivr.net/npm/@radix-ui/colors/blackA.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/@radix-ui/colors/green.css" rel="stylesheet">
@@ -1608,19 +1609,34 @@
             return doc.body.textContent.replace(/\s+/g, ' ').trim();
         }
 
+        // Normalize protocol-relative and http URLs to absolute https
+        function normalizeImageUrl(url) {
+            if (!url) return url;
+            if (url.startsWith('//')) return 'https:' + url;
+            if (url.startsWith('http://')) return url.replace('http://', 'https://');
+            return url;
+        }
+
         // Extract candidate images from HTML
-        function extractImagesFromHtml(html) {
+        function extractImagesFromHtml(html, serverOgImage) {
             const parser = new DOMParser();
             const doc = parser.parseFromString(html, 'text/html');
             const images = new Set();
 
-            // og:image meta tag (usually the best one)
+            // Use server-extracted og:image first (most reliable)
+            if (serverOgImage) images.add(serverOgImage);
+
+            // og:image meta tag
             const ogImage = doc.querySelector('meta[property="og:image"]');
-            if (ogImage && ogImage.content) images.add(ogImage.content);
+            if (ogImage && ogImage.content) images.add(normalizeImageUrl(ogImage.content));
+
+            // og:image:secure_url (HTTPS variant)
+            const ogSecure = doc.querySelector('meta[property="og:image:secure_url"]');
+            if (ogSecure && ogSecure.content) images.add(normalizeImageUrl(ogSecure.content));
 
             // twitter:image
             const twImage = doc.querySelector('meta[name="twitter:image"]');
-            if (twImage && twImage.content) images.add(twImage.content);
+            if (twImage && twImage.content) images.add(normalizeImageUrl(twImage.content));
 
             // All img tags — filter out tiny icons/tracking pixels
             doc.querySelectorAll('img[src]').forEach(img => {
@@ -1628,11 +1644,13 @@
                 if (!src || src.startsWith('data:')) return;
                 // Skip common icon/tracking patterns
                 if (/gravatar|pixel|track|badge|icon|logo|avatar|emoji|widget/i.test(src)) return;
+                // Skip SVG icons
+                if (/\.svg(\?|$)/i.test(src)) return;
                 // Skip tiny explicit dimensions
                 const w = parseInt(img.getAttribute('width'));
                 const h = parseInt(img.getAttribute('height'));
                 if ((w && w < 100) || (h && h < 100)) return;
-                images.add(src);
+                images.add(normalizeImageUrl(src));
             });
 
             // Also check srcset for higher-res versions
@@ -1640,7 +1658,7 @@
                 const srcset = img.getAttribute('srcset');
                 const parts = srcset.split(',').map(s => s.trim().split(/\s+/)[0]);
                 parts.forEach(src => {
-                    if (src && !src.startsWith('data:')) images.add(src);
+                    if (src && !src.startsWith('data:')) images.add(normalizeImageUrl(src));
                 });
             });
 
@@ -1650,10 +1668,10 @@
                     const val = el.getAttribute(attr);
                     if (!val) continue;
                     if (attr === 'data-src') {
-                        if (!val.startsWith('data:') && /\.(jpg|jpeg|png|webp)/i.test(val)) images.add(val);
+                        if (!val.startsWith('data:') && /\.(jpg|jpeg|png|webp)/i.test(val)) images.add(normalizeImageUrl(val));
                     } else {
                         val.split(',').map(s => s.trim().split(/\s+/)[0]).forEach(src => {
-                            if (src && !src.startsWith('data:')) images.add(src);
+                            if (src && !src.startsWith('data:')) images.add(normalizeImageUrl(src));
                         });
                     }
                 }
@@ -1662,7 +1680,7 @@
             // Preloaded images (common on modern sites)
             doc.querySelectorAll('link[rel="preload"][as="image"]').forEach(link => {
                 const href = link.getAttribute('href');
-                if (href && !href.startsWith('data:') && !/icon|logo|avatar|pixel/i.test(href)) images.add(href);
+                if (href && !href.startsWith('data:') && !/icon|logo|avatar|pixel/i.test(href)) images.add(normalizeImageUrl(href));
             });
 
             // noscript fallback images (common with lazy loading)
@@ -1670,7 +1688,7 @@
                 const inner = new DOMParser().parseFromString(ns.textContent, 'text/html');
                 inner.querySelectorAll('img[src]').forEach(img => {
                     const src = img.getAttribute('src');
-                    if (src && !src.startsWith('data:') && !/icon|logo|avatar|pixel/i.test(src)) images.add(src);
+                    if (src && !src.startsWith('data:') && !/icon|logo|avatar|pixel/i.test(src)) images.add(normalizeImageUrl(src));
                 });
             });
 
@@ -1718,24 +1736,6 @@
 
         const UNIT_OPTIONS = ['count', 'cup', 'cups', 'tbsp', 'tsp', 'oz', 'lbs', 'g', 'ml', 'kg', 'bunch', 'can', 'cloves', 'bag', 'bottle', 'box', 'package'];
         const SECTION_OPTIONS = ['Produce', 'Cooking', 'Bread', 'Cheese section', 'Dairy', 'Nuts', 'Frozen', 'Snacks', 'Other'];
-
-        // Unit conversion: all expressed in tsp (volume) or grams (weight)
-        const TO_TSP = { tsp: 1, tbsp: 3, cup: 48, cups: 48, ml: 0.2029 };
-        const TO_G = { g: 1, kg: 1000, oz: 28.35, lbs: 453.6, lb: 453.6 };
-
-        function convertQty(qty, fromUnit, toUnit) {
-            if (fromUnit === toUnit) return qty;
-            // Same-type volume conversion
-            if (TO_TSP[fromUnit] && TO_TSP[toUnit]) {
-                return Math.round((qty * TO_TSP[fromUnit] / TO_TSP[toUnit]) * 100) / 100;
-            }
-            // Same-type weight conversion
-            if (TO_G[fromUnit] && TO_G[toUnit]) {
-                return Math.round((qty * TO_G[fromUnit] / TO_G[toUnit]) * 100) / 100;
-            }
-            // Cross-type (volume/weight) — can't convert without density, return as-is
-            return qty;
-        }
 
         function cleanupNewDef(slug, pending) {
             if (!(slug in pending.newIngredientDefs)) return;
@@ -1832,11 +1832,23 @@
                 }
 
                 // Extract candidate images from the page
-                const candidateImages = extractImagesFromHtml(fetchData.html);
-                // Put the recipe's own image first if it exists and isn't already in the list
-                if (recipeImage && !candidateImages.includes(recipeImage)) {
-                    candidateImages.unshift(recipeImage);
+                console.log('[import] fetchData.ogImage:', fetchData.ogImage);
+                console.log('[import] fetchData.browserImages:', fetchData.browserImages);
+                console.log('[import] fetchData.html length:', fetchData.html?.length);
+                const candidateImages = extractImagesFromHtml(fetchData.html, fetchData.ogImage);
+                console.log('[import] candidateImages after extraction:', candidateImages.length, candidateImages.slice(0, 3));
+                // Add headless-browser images (Puppeteer fallback for JS-heavy sites)
+                if (fetchData.browserImages && fetchData.browserImages.length) {
+                    fetchData.browserImages.forEach(img => {
+                        if (!candidateImages.includes(img)) candidateImages.push(img);
+                    });
                 }
+                // Put the recipe's own image first if it exists and isn't already in the list
+                if (recipeImage) {
+                    const normalized = normalizeImageUrl(recipeImage);
+                    if (!candidateImages.includes(normalized)) candidateImages.unshift(normalized);
+                }
+                console.log('[import] final candidateImages:', candidateImages.length, candidateImages.slice(0, 3));
 
                 const recipeId = slugify(recipeName);
 
@@ -2168,9 +2180,9 @@
 
                     function selectExisting(item) {
                         const oldSlug = ing.id;
-                        const converted = convertQty(ing.qty, oldUnits, item.units);
+                        const converted = UnitConversion.convertQty(ing.qty, oldUnits, item.units, item.slug);
                         ing.id = item.slug;
-                        ing.qty = converted;
+                        ing.qty = converted !== null ? converted : ing.qty;
                         cleanupNewDef(oldSlug, pending);
                         renderDisplay();
                     }
