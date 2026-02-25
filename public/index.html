@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DIY Meal Planner</title>
+    <title>DIY Meal Kit</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="/js/auth.js"></script>
@@ -234,7 +234,7 @@
 <body class="min-h-screen bg-slate-50">
     <div class="container mx-auto px-4 py-8 max-w-6xl pb-36">
         <div class="flex items-center justify-between flex-wrap gap-2 mb-2">
-            <h1 class="text-4xl font-bold tracking-tight text-slate-900">DIY Meal Planner</h1>
+            <h1 class="text-4xl font-bold tracking-tight text-slate-900">DIY Meal Kit</h1>
             <div class="flex items-center gap-3">
                 <div data-auth="guest" style="display:none">
                     <a href="/login.html" class="text-sm text-green-600 hover:text-green-700 font-medium">Log in</a>
@@ -297,7 +297,7 @@
 
         <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-4">
             <div class="container mx-auto max-w-6xl flex gap-3">
-                <div data-auth="loggedin" style="display:none" class="flex-shrink-0">
+                <div class="flex-shrink-0">
                     <button id="share-plan-button"
                             class="h-full bg-white hover:bg-slate-50 text-green-700 font-semibold py-4 px-5 rounded-lg border-2 border-green-600 hover:border-green-700 transition-colors duration-200 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
                             disabled>
@@ -1539,7 +1539,7 @@
         }
 
 
-        importButton.addEventListener('click', openImportModal);
+        importButton.addEventListener('click', Auth.requireLogin(openImportModal, 'Create an account to import and save your own recipes'));
         importCancel.addEventListener('click', closeImportModal);
         importOverlay.addEventListener('click', closeImportModal);
 
@@ -1799,6 +1799,9 @@
                     });
                     const parsed = await parseRes.json();
                     if (!parseRes.ok) throw new Error(parsed.error || 'Failed to parse ingredients');
+                    if (!parsed.ingredients || parsed.ingredients.length === 0) {
+                        throw new Error('No ingredients found on this page. Please make sure the URL points to a specific recipe.');
+                    }
 
                     const authorSuffix = extracted.author ? ` by ${extracted.author}` : '';
                     recipeName = extracted.name + authorSuffix;
@@ -1821,6 +1824,9 @@
                     });
                     const result = await extractRes.json();
                     if (!extractRes.ok) throw new Error(result.error || 'Failed to extract recipe');
+                    if (!result.ingredients || result.ingredients.length === 0) {
+                        throw new Error('No ingredients found on this page. Please make sure the URL points to a specific recipe.');
+                    }
 
                     const authorSuffix = result.author ? ` by ${result.author}` : '';
                     recipeName = result.name + authorSuffix;

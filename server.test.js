@@ -146,3 +146,58 @@ describe('AI endpoints require auth', () => {
     expect([401, 403]).toContain(res.status);
   });
 });
+
+// ── Non-recipe URL detection ──────────────────────────────────────────
+
+describe('Non-recipe URL detection', () => {
+  const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+  const indexSource = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8');
+
+  test('extract-recipe AI prompt instructs detection of non-recipe pages', () => {
+    expect(serverSource).toContain('not_a_recipe');
+    expect(serverSource).toContain('determine if this page actually contains a recipe');
+  });
+
+  test('server returns 422 when AI detects a non-recipe page', () => {
+    expect(serverSource).toContain("parsed.not_a_recipe");
+    expect(serverSource).toContain("doesn\\'t appear to contain a recipe");
+  });
+
+  test('server returns 422 when no ingredients are found', () => {
+    expect(serverSource).toContain('!parsed.ingredients || parsed.ingredients.length === 0');
+    expect(serverSource).toContain('No ingredients found on this page');
+  });
+
+  test('client validates ingredients exist after JSON-LD parse', () => {
+    expect(indexSource).toContain('!parsed.ingredients || parsed.ingredients.length === 0');
+    expect(indexSource).toContain('No ingredients found on this page');
+  });
+
+  test('client validates ingredients exist after AI extraction', () => {
+    expect(indexSource).toContain('!result.ingredients || result.ingredients.length === 0');
+  });
+});
+
+// ── Add Recipe auth gate ──────────────────────────────────────────────
+
+describe('Add Recipe requires auth (guest gate)', () => {
+  const indexSource = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8');
+
+  test('import button click is wrapped with Auth.requireLogin', () => {
+    expect(indexSource).toContain("importButton.addEventListener('click', Auth.requireLogin(openImportModal");
+  });
+
+  test('POST /api/save-recipe rejects unauthenticated requests', async () => {
+    const res = await request(app)
+      .post('/api/save-recipe')
+      .send({ recipe: { name: 'Test' }, newIngredientDefs: {} });
+    expect([401, 403]).toContain(res.status);
+  });
+
+  test('POST /api/fetch-url rejects unauthenticated requests', async () => {
+    const res = await request(app)
+      .post('/api/fetch-url')
+      .send({ url: 'https://example.com' });
+    expect([401, 403]).toContain(res.status);
+  });
+});

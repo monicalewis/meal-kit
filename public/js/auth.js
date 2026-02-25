@@ -177,9 +177,6 @@ const Auth = {
           <button id="auth-reg-submit" style="width:100%;padding:10px;background:#16a34a;color:white;border:none;border-radius:8px;font-size:0.875rem;font-weight:600;cursor:pointer;">Create Account</button>
         </div>
 
-        <div style="text-align:center;margin-top:16px;">
-          <a href="#" id="auth-modal-guest" style="color:#94a3b8;font-size:0.75rem;text-decoration:none;">Continue as guest</a>
-        </div>
       </div>
     `;
 
@@ -219,8 +216,6 @@ const Auth = {
     };
     overlay.addEventListener('click', closeModal);
     modal.querySelector('#auth-modal-close').addEventListener('click', closeModal);
-    modal.querySelector('#auth-modal-guest').addEventListener('click', (e) => { e.preventDefault(); closeModal(); });
-
     // Login submit
     modal.querySelector('#auth-login-submit').addEventListener('click', async () => {
       const email = modal.querySelector('#auth-login-email').value.trim();
