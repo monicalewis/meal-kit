@@ -3,16 +3,15 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const vm = require('vm');
-const Anthropic = require('@anthropic-ai/sdk');
-const { google } = require('googleapis');
-
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json({ limit: '5mb' }));
 app.use(express.static(path.join(__dirname)));
 
-const anthropic = new Anthropic();
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const gemini = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
 // --- Database setup (optional — falls back to file if DATABASE_URL not set) ---
 let pool = null;
@@ -134,21 +133,16 @@ Return ONLY valid JSON in this exact format, no other text:
 }`;
 
   try {
-    const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 1024,
-      messages: [{ role: 'user', content: prompt }]
-    });
-
-    const text = message.content[0].text;
+    const result = await gemini.generateContent(prompt);
+    const text = result.response.text();
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
-      return res.status(500).json({ error: 'Could not parse Claude response as JSON' });
+      return res.status(500).json({ error: 'Could not parse AI response as JSON' });
     }
     res.json(JSON.parse(jsonMatch[0]));
   } catch (err) {
-    console.error('Claude API error:', err.message);
-    res.status(500).json({ error: `Claude API error: ${err.message}` });
+    console.error('Gemini API error:', err.message);
+    res.status(500).json({ error: `Gemini API error: ${err.message}` });
   }
 });
 
@@ -202,21 +196,16 @@ Return ONLY valid JSON in this exact format, no other text:
 }`;
 
   try {
-    const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 1024,
-      messages: [{ role: 'user', content: prompt }]
-    });
-
-    const text = message.content[0].text;
+    const result = await gemini.generateContent(prompt);
+    const text = result.response.text();
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
-      return res.status(500).json({ error: 'Could not parse Claude response as JSON' });
+      return res.status(500).json({ error: 'Could not parse AI response as JSON' });
     }
     res.json(JSON.parse(jsonMatch[0]));
   } catch (err) {
-    console.error('Claude API error:', err.message);
-    res.status(500).json({ error: `Claude API error: ${err.message}` });
+    console.error('Gemini API error:', err.message);
+    res.status(500).json({ error: `Gemini API error: ${err.message}` });
   }
 });
 
@@ -242,13 +231,8 @@ Return ONLY valid JSON in this exact format, no other text:
 }`;
 
   try {
-    const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 512,
-      messages: [{ role: 'user', content: prompt }]
-    });
-
-    const text = message.content[0].text;
+    const result = await gemini.generateContent(prompt);
+    const text = result.response.text();
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       return res.status(500).json({ error: 'Could not parse conversion response' });
@@ -274,6 +258,20 @@ app.post('/api/save-recipe', async (req, res) => {
       Object.assign(recipeData.ingredientDefs, newIngredientDefs);
     }
 
+    // Safety net: create stub defs for any ingredient IDs that have no definition
+    if (recipe.ingredients) {
+      recipe.ingredients.forEach(ing => {
+        if (!recipeData.ingredientDefs[ing.id]) {
+          console.warn(`Creating stub ingredientDef for orphaned ID: ${ing.id}`);
+          recipeData.ingredientDefs[ing.id] = {
+            name: ing.id.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+            units: 'count',
+            section: 'Other'
+          };
+        }
+      });
+    }
+
     // Check for duplicate recipe ID
     const existingIdx = recipeData.recipes.findIndex(r => r.id === recipe.id);
     if (existingIdx >= 0) {
@@ -290,151 +288,50 @@ app.post('/api/save-recipe', async (req, res) => {
   }
 });
 
-// --- Google Calendar Integration ---
-// In-memory token store (keyed by simple session ID)
-const calendarTokens = {};
-
-function getOAuth2Client() {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const redirectUri = process.env.GOOGLE_REDIRECT_URI || `http://localhost:${PORT}/api/events/auth/callback`;
-  if (!clientId || !clientSecret) return null;
-  return new google.auth.OAuth2(clientId, clientSecret, redirectUri);
-}
-
-// Simple session ID from cookie
-function getSessionId(req, res) {
-  let sid = req.headers.cookie?.match(/cal_session=([^;]+)/)?.[1];
-  if (!sid) {
-    sid = Math.random().toString(36).slice(2) + Date.now().toString(36);
-    res.setHeader('Set-Cookie', `cal_session=${sid}; Path=/; HttpOnly; SameSite=Lax`);
-  }
-  return sid;
-}
-
-// GET /api/events/auth - Start Google OAuth2 flow
-app.get('/api/events/auth', (req, res) => {
-  const oauth2Client = getOAuth2Client();
-  if (!oauth2Client) {
-    return res.status(500).json({ error: 'Google OAuth credentials not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env' });
-  }
-  const sid = getSessionId(req, res);
-  const url = oauth2Client.generateAuthUrl({
-    access_type: 'offline',
-    scope: ['https://www.googleapis.com/auth/calendar.events'],
-    state: sid,
-    prompt: 'consent'
-  });
-  res.redirect(url);
-});
-
-// GET /api/events/auth/callback - Handle OAuth2 callback
-app.get('/api/events/auth/callback', async (req, res) => {
-  const { code, state } = req.query;
-  if (!code) return res.status(400).send('Missing authorization code');
-
-  const oauth2Client = getOAuth2Client();
-  if (!oauth2Client) return res.status(500).send('OAuth not configured');
+// --- POST /api/archive-recipe ---
+// Toggles the hidden flag on a recipe (archive/restore)
+app.post('/api/archive-recipe', async (req, res) => {
+  const { recipeId, hidden } = req.body;
+  if (!recipeId) return res.status(400).json({ error: 'recipeId is required' });
 
   try {
-    const { tokens } = await oauth2Client.getToken(code);
-    const sid = state || getSessionId(req, res);
-    calendarTokens[sid] = tokens;
-    // Set the cookie to match the state parameter
-    res.setHeader('Set-Cookie', `cal_session=${sid}; Path=/; HttpOnly; SameSite=Lax`);
-    res.send(`
-      <!DOCTYPE html>
-      <html><head><title>Connected</title></head>
-      <body style="font-family:system-ui;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
-        <div style="text-align:center">
-          <h2 style="color:#22c55e">Google Calendar Connected!</h2>
-          <p>This window will close automatically...</p>
-          <script>
-            if (window.opener) { window.opener.postMessage('calendar-connected', '*'); }
-            setTimeout(() => window.close(), 1500);
-          </script>
-        </div>
-      </body></html>
-    `);
+    const recipeData = await getRecipeData();
+    const recipe = recipeData.recipes.find(r => r.id === recipeId);
+    if (!recipe) return res.status(404).json({ error: 'Recipe not found' });
+
+    recipe.hidden = !!hidden;
+    await saveRecipeData(recipeData);
+    res.json({ success: true });
   } catch (err) {
-    console.error('OAuth callback error:', err.message);
-    res.status(500).send('Failed to exchange authorization code: ' + err.message);
+    console.error('Archive error:', err.message);
+    res.status(500).json({ error: `Failed to archive recipe: ${err.message}` });
   }
 });
 
-// GET /api/events/auth/status - Check if user is authenticated
-app.get('/api/events/auth/status', (req, res) => {
-  const sid = req.headers.cookie?.match(/cal_session=([^;]+)/)?.[1];
-  const connected = !!(sid && calendarTokens[sid]);
-  res.json({ connected });
-});
-
-// POST /api/events/create - Create a Google Calendar event
-app.post('/api/events/create', async (req, res) => {
-  const sid = req.headers.cookie?.match(/cal_session=([^;]+)/)?.[1];
-  const tokens = sid && calendarTokens[sid];
-  if (!tokens) {
-    return res.status(401).json({ error: 'Not authenticated with Google Calendar. Please connect first.' });
-  }
-
-  const { title, date, startTime, endTime, location, description, recurrenceType, recurrenceDays, recurrenceEndDate } = req.body;
-  if (!title || !date) {
-    return res.status(400).json({ error: 'title and date are required' });
-  }
-
-  const oauth2Client = getOAuth2Client();
-  if (!oauth2Client) return res.status(500).json({ error: 'OAuth not configured' });
-
-  oauth2Client.setCredentials(tokens);
-  // Refresh tokens if needed
-  oauth2Client.on('tokens', (newTokens) => {
-    calendarTokens[sid] = { ...tokens, ...newTokens };
-  });
-
-  const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+// --- DELETE /api/recipes/:id ---
+// Permanently removes a recipe and cleans up orphaned ingredientDefs
+app.delete('/api/recipes/:id', async (req, res) => {
+  const recipeId = req.params.id;
 
   try {
-    let event;
-    if (startTime) {
-      // Timed event
-      const startDateTime = new Date(`${date}T${startTime}`);
-      const endDateTime = endTime ? new Date(`${date}T${endTime}`) : new Date(startDateTime.getTime() + 60 * 60 * 1000); // default 1hr
-      event = {
-        summary: title,
-        location: location || '',
-        description: description || '',
-        start: { dateTime: startDateTime.toISOString(), timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
-        end: { dateTime: endDateTime.toISOString(), timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
-      };
-    } else {
-      // All-day event
-      event = {
-        summary: title,
-        location: location || '',
-        description: description || '',
-        start: { date },
-        end: { date },
-      };
+    const recipeData = await getRecipeData();
+    const idx = recipeData.recipes.findIndex(r => r.id === recipeId);
+    if (idx < 0) return res.status(404).json({ error: 'Recipe not found' });
+
+    recipeData.recipes.splice(idx, 1);
+
+    // Clean up orphaned ingredientDefs
+    const usedIds = new Set();
+    recipeData.recipes.forEach(r => r.ingredients.forEach(i => usedIds.add(i.id)));
+    for (const defId of Object.keys(recipeData.ingredientDefs)) {
+      if (!usedIds.has(defId)) delete recipeData.ingredientDefs[defId];
     }
 
-    // Build RRULE for recurring events
-    if (recurrenceType && recurrenceType !== 'none') {
-      let rrule = `RRULE:FREQ=${recurrenceType}`;
-      if (recurrenceDays && recurrenceDays.length > 0 && recurrenceType === 'WEEKLY') {
-        rrule += `;BYDAY=${recurrenceDays.join(',')}`;
-      }
-      if (recurrenceEndDate) {
-        const untilDate = recurrenceEndDate.replace(/-/g, '') + 'T235959Z';
-        rrule += `;UNTIL=${untilDate}`;
-      }
-      event.recurrence = [rrule];
-    }
-
-    const result = await calendar.events.insert({ calendarId: 'primary', requestBody: event });
-    res.json({ success: true, eventId: result.data.id, htmlLink: result.data.htmlLink });
+    await saveRecipeData(recipeData);
+    res.json({ success: true });
   } catch (err) {
-    console.error('Calendar create error:', err.message);
-    res.status(500).json({ error: `Failed to create event: ${err.message}` });
+    console.error('Delete error:', err.message);
+    res.status(500).json({ error: `Failed to delete recipe: ${err.message}` });
   }
 });
 

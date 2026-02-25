@@ -47,6 +47,131 @@
             -webkit-font-smoothing: antialiased;
             font-feature-settings: "rlig" 1, "calt" 1;
         }
+
+        .card-menu {
+            position: absolute;
+            top: 0.75rem;
+            left: 0.75rem;
+            z-index: 10;
+        }
+        .card-menu-btn {
+            width: 2rem;
+            height: 2rem;
+            border-radius: 9999px;
+            background: rgba(255,255,255,0.9);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.2s;
+            border: none;
+            font-size: 1rem;
+            color: #475569;
+        }
+        .group:hover .card-menu-btn {
+            opacity: 1;
+        }
+        .card-menu-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            margin-top: 4px;
+            background: white;
+            border: 1px solid hsl(var(--border));
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            min-width: 140px;
+            z-index: 20;
+            overflow: hidden;
+        }
+        .card-menu-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .card-menu-item:hover {
+            background-color: hsl(var(--accent));
+        }
+        .card-menu-item.destructive {
+            color: #dc2626;
+        }
+        .card-menu-item.destructive:hover {
+            background-color: #fef2f2;
+        }
+        .card-archived {
+            opacity: 0.5;
+        }
+        .card-archived-badge {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0,0,0,0.6);
+            color: white;
+            text-align: center;
+            padding: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .ing-row-new {
+            border-left: 3px solid #eab308;
+            cursor: pointer;
+        }
+        .ing-row-new:hover {
+            background-color: #fefce8;
+        }
+        .ing-row-editing {
+            background-color: #fef9c3;
+            border-left: 3px solid #eab308;
+            padding: 8px;
+            border-radius: 0.5rem;
+        }
+        .combobox-dropdown {
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 100%;
+            margin-top: 2px;
+            background: white;
+            border: 1px solid hsl(var(--border));
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            max-height: 12rem;
+            overflow-y: auto;
+            z-index: 100;
+        }
+        .combobox-item {
+            padding: 6px 10px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .combobox-item:hover,
+        .combobox-item.highlighted {
+            background-color: hsl(var(--accent));
+        }
+        .combobox-item .item-units {
+            color: hsl(var(--muted-foreground));
+            font-size: 0.7rem;
+        }
+        .combobox-new-option {
+            padding: 6px 10px;
+            cursor: pointer;
+            border-top: 1px solid hsl(var(--border));
+            color: hsl(var(--muted-foreground));
+            font-style: italic;
+        }
+        .combobox-new-option:hover {
+            background-color: #fef9c3;
+        }
     </style>
 </head>
 <body class="min-h-screen bg-slate-50">
@@ -54,15 +179,21 @@
         <h1 class="text-4xl font-bold tracking-tight text-slate-900 mb-8">Meal Planner</h1>
 
         <div class="space-y-6">
-            <div class="flex items-center justify-between">
+            <div class="flex items-center justify-between flex-wrap gap-2">
                 <h2 class="text-lg font-semibold text-slate-700 uppercase tracking-wider">Choose your recipes:</h2>
-                <button id="import-recipe-button"
-                        class="bg-white hover:bg-slate-50 text-slate-700 font-medium py-2 px-4 rounded-lg border border-slate-300 hover:border-green-500 transition-colors duration-200 flex items-center gap-2 text-sm">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                    </svg>
-                    Import from URL
-                </button>
+                <div class="flex items-center gap-3">
+                    <label id="show-archived-toggle" class="flex items-center gap-1.5 cursor-pointer text-xs text-slate-500 select-none">
+                        <input type="checkbox" id="show-archived-checkbox" class="rounded border-slate-300 text-green-600 focus:ring-green-500 h-3.5 w-3.5">
+                        Show archived
+                    </label>
+                    <button id="import-recipe-button"
+                            class="bg-white hover:bg-slate-50 text-slate-700 font-medium py-2 px-4 rounded-lg border border-slate-300 hover:border-green-500 transition-colors duration-200 flex items-center gap-2 text-sm">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                        </svg>
+                        Import from URL
+                    </button>
+                </div>
             </div>
             
             <div id="recipe-list" class="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
@@ -84,6 +215,19 @@
         </div>
     </div>
 
+    <!-- Delete Confirmation Modal -->
+    <div id="delete-overlay" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 hidden"></div>
+    <div id="delete-modal" class="fixed inset-x-4 top-[30%] max-w-sm mx-auto bg-white rounded-2xl shadow-2xl z-50 hidden">
+        <div class="p-6 space-y-4">
+            <h3 class="text-lg font-bold text-slate-900">Delete Recipe</h3>
+            <p class="text-sm text-slate-600">Permanently delete <strong id="delete-recipe-name"></strong>? This cannot be undone.</p>
+            <div class="flex gap-3 justify-end">
+                <button id="delete-cancel" class="px-4 py-2 text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">Cancel</button>
+                <button id="delete-confirm" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors font-medium">Delete</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // --- Global State ---
         // recipeData is loaded asynchronously from /api/recipes
@@ -94,47 +238,114 @@
         const recipeListDiv = document.getElementById('recipe-list');
         const generateButton = document.getElementById('generate-list-button');
 
-        // --- Get Selectable Recipes (exclude staples) ---
+        // --- Get Selectable Recipes (exclude staples, respect archive toggle) ---
+        let showArchived = false;
+
         function getSelectableRecipes() {
             if (!recipeData || !recipeData.recipes) return [];
-            
+
             return recipeData.recipes
                 .filter(recipe => {
                     const name = recipe.name.toLowerCase();
-                    return name !== 'everyday staples' && 
-                           name !== 'infrequent staples' &&
-                           name !== 'everday staples';  // typo in original
+                    if (name === 'everyday staples' || name === 'infrequent staples' || name === 'everday staples') return false;
+                    if (recipe.hidden && !showArchived) return false;
+                    return true;
                 })
                 .sort((a, b) => a.name.localeCompare(b.name));
         }
 
         // --- Create Recipe Card ---
         function createRecipeCard(recipe) {
+            const isArchived = recipe.hidden === true;
             const card = document.createElement('div');
-            card.className = 'group relative bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-200 border-2 border-transparent hover:border-green-500 overflow-hidden';
-            
+            card.className = 'group relative bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-200 border-2 border-transparent hover:border-green-500 overflow-hidden' + (isArchived ? ' card-archived' : '');
+
             // Image container with aspect ratio
             const imgContainer = document.createElement('div');
             imgContainer.className = 'relative aspect-[4/3] overflow-hidden';
-            
+
             const img = document.createElement('img');
             img.className = 'w-full h-full object-cover transition-transform duration-300 group-hover:scale-105';
             img.src = recipe.image || DEFAULT_IMAGE;
             img.alt = recipe.name;
-            // Handle broken images
             img.onerror = () => { img.src = DEFAULT_IMAGE; };
             imgContainer.appendChild(img);
-            
-            // Checkbox button
+
+            // Archived badge overlay
+            if (isArchived) {
+                const archivedBadge = document.createElement('div');
+                archivedBadge.className = 'card-archived-badge';
+                archivedBadge.textContent = 'Archived';
+                imgContainer.appendChild(archivedBadge);
+            }
+
+            // Three-dot menu (top-left)
+            const menuWrapper = document.createElement('div');
+            menuWrapper.className = 'card-menu';
+
+            const menuBtn = document.createElement('button');
+            menuBtn.className = 'card-menu-btn';
+            menuBtn.innerHTML = '\u22EF';
+            menuBtn.title = 'Recipe options';
+
+            const menuDropdown = document.createElement('div');
+            menuDropdown.className = 'card-menu-dropdown hidden';
+
+            if (isArchived) {
+                const restoreItem = document.createElement('div');
+                restoreItem.className = 'card-menu-item';
+                restoreItem.innerHTML = '\u21A9 Restore';
+                restoreItem.addEventListener('click', e => {
+                    e.stopPropagation();
+                    menuDropdown.classList.add('hidden');
+                    archiveRecipe(recipe.id, recipe.name, false);
+                });
+                menuDropdown.appendChild(restoreItem);
+            } else {
+                const archiveItem = document.createElement('div');
+                archiveItem.className = 'card-menu-item';
+                archiveItem.innerHTML = '\uD83D\uDCE6 Archive';
+                archiveItem.addEventListener('click', e => {
+                    e.stopPropagation();
+                    menuDropdown.classList.add('hidden');
+                    archiveRecipe(recipe.id, recipe.name, true);
+                });
+                menuDropdown.appendChild(archiveItem);
+            }
+
+            const deleteItem = document.createElement('div');
+            deleteItem.className = 'card-menu-item destructive';
+            deleteItem.innerHTML = '\uD83D\uDDD1 Delete';
+            deleteItem.addEventListener('click', e => {
+                e.stopPropagation();
+                menuDropdown.classList.add('hidden');
+                confirmDeleteRecipe(recipe.id, recipe.name);
+            });
+            menuDropdown.appendChild(deleteItem);
+
+            menuBtn.addEventListener('click', e => {
+                e.stopPropagation();
+                // Close any other open menus
+                document.querySelectorAll('.card-menu-dropdown').forEach(d => {
+                    if (d !== menuDropdown) d.classList.add('hidden');
+                });
+                menuDropdown.classList.toggle('hidden');
+            });
+
+            menuWrapper.appendChild(menuBtn);
+            menuWrapper.appendChild(menuDropdown);
+
+            // Checkbox button (only for non-archived)
             const checkboxWrapper = document.createElement('label');
             checkboxWrapper.className = 'absolute top-3 right-3 z-10';
-            
+
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
             checkbox.name = 'recipe';
             checkbox.value = recipe.id;
             checkbox.className = 'peer sr-only';
-            
+            if (isArchived) checkbox.disabled = true;
+
             const checkboxButton = document.createElement('div');
             checkboxButton.className = 'w-10 h-10 rounded-full bg-white/90 shadow-md flex items-center justify-center text-green-600 opacity-0 group-hover:opacity-100 peer-checked:opacity-100 peer-checked:bg-green-600 peer-checked:text-white transition-all duration-200';
             checkboxButton.innerHTML = `
@@ -142,18 +353,17 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                 </svg>
             `;
-            
+
             checkboxWrapper.appendChild(checkbox);
             checkboxWrapper.appendChild(checkboxButton);
-            
+
             // Content
             const content = document.createElement('div');
             content.className = 'p-4';
-            
+
             const title = document.createElement('div');
             title.className = 'font-semibold text-slate-900';
-            
-            // Split "Recipe by Source" into two lines
+
             const byIndex = recipe.name.toLowerCase().indexOf(' by ');
             if (byIndex !== -1) {
                 const main = recipe.name.slice(0, byIndex);
@@ -162,21 +372,24 @@
             } else {
                 title.textContent = recipe.name;
             }
-            
+
             content.appendChild(title);
-            
+
             // Assemble card
             card.appendChild(imgContainer);
-            card.appendChild(checkboxWrapper);
+            card.appendChild(menuWrapper);
+            if (!isArchived) card.appendChild(checkboxWrapper);
             card.appendChild(content);
-            
-            // Make card clickable
+
+            // Make card clickable (only for non-archived)
             card.addEventListener('click', (e) => {
+                if (isArchived) return;
+                if (e.target.closest('.card-menu')) return;
                 if (e.target === checkbox || e.target === checkboxButton) return;
                 checkbox.checked = !checkbox.checked;
                 checkbox.dispatchEvent(new Event('change'));
             });
-            
+
             // Handle checkbox changes
             checkbox.addEventListener('change', () => {
                 if (checkbox.checked) {
@@ -186,7 +399,7 @@
                 }
                 updateButtonState();
             });
-            
+
             return card;
         }
 
@@ -234,6 +447,7 @@
         // --- Build Shopping List Data (for passing to shopping-list.html) ---
         function buildShoppingListData(selectedRecipeIds) {
             const shoppingList = [];
+            const missingDefs = [];
             
             selectedRecipeIds.forEach(recipeId => {
                 const recipe = recipeData.recipes.find(r => r.id === recipeId);
@@ -242,10 +456,18 @@
                 recipe.ingredients.forEach(ing => {
                     const def = recipeData.ingredientDefs[ing.id];
                     if (!def) {
-                        console.warn(`Missing ingredient definition: ${ing.id}`);
+                        missingDefs.push(ing.id);
+                        // Still include it with fallback values so it's not silently lost
+                        shoppingList.push({
+                            recipeName: recipe.name,
+                            ingredient: ing.id.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+                            quantity: ing.qty,
+                            units: 'count',
+                            section: 'Other'
+                        });
                         return;
                     }
-                    
+
                     // Convert to the flat format expected by shopping-list.html
                     shoppingList.push({
                         recipeName: recipe.name,
@@ -257,6 +479,11 @@
                 });
             });
             
+            if (missingDefs.length > 0) {
+                console.warn('Missing ingredient definitions:', missingDefs);
+                showToast(`${missingDefs.length} ingredient(s) had missing data — included with defaults`, true);
+            }
+
             return shoppingList;
         }
 
@@ -315,6 +542,112 @@
             }
         }
 
+        // --- Toast helper ---
+        function showToast(message, isError) {
+            const toast = document.createElement('div');
+            toast.className = `fixed bottom-20 left-1/2 transform -translate-x-1/2 ${isError ? 'bg-red-500' : 'bg-green-600'} text-white px-6 py-3 rounded-lg shadow-lg z-50 transition-opacity duration-500`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 500); }, 3000);
+        }
+
+        // --- Archive / Delete / Restore ---
+        async function archiveRecipe(recipeId, recipeName, hide) {
+            try {
+                const res = await fetch('/api/archive-recipe', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ recipeId, hidden: hide })
+                });
+                if (!res.ok) throw new Error('Failed to archive recipe');
+
+                // Update local data
+                const recipe = recipeData.recipes.find(r => r.id === recipeId);
+                if (recipe) recipe.hidden = hide;
+                populateRecipeCards();
+
+                if (hide) {
+                    // Show undo toast
+                    const toast = document.createElement('div');
+                    toast.className = 'fixed bottom-20 left-1/2 transform -translate-x-1/2 bg-slate-800 text-white px-6 py-3 rounded-lg shadow-lg z-50 flex items-center gap-3';
+                    toast.innerHTML = `<span>Archived "${recipeName}"</span>`;
+                    const undoBtn = document.createElement('button');
+                    undoBtn.className = 'text-green-400 hover:text-green-300 font-medium underline';
+                    undoBtn.textContent = 'Undo';
+                    undoBtn.addEventListener('click', () => {
+                        toast.remove();
+                        archiveRecipe(recipeId, recipeName, false);
+                    });
+                    toast.appendChild(undoBtn);
+                    document.body.appendChild(toast);
+                    setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.5s'; setTimeout(() => toast.remove(), 500); }, 5000);
+                } else {
+                    showToast(`"${recipeName}" restored`);
+                }
+            } catch (err) {
+                showToast(err.message, true);
+            }
+        }
+
+        let pendingDeleteId = null;
+        let pendingDeleteName = null;
+        const deleteOverlay = document.getElementById('delete-overlay');
+        const deleteModal = document.getElementById('delete-modal');
+        const deleteNameEl = document.getElementById('delete-recipe-name');
+        const deleteCancelBtn = document.getElementById('delete-cancel');
+        const deleteConfirmBtn = document.getElementById('delete-confirm');
+
+        function confirmDeleteRecipe(recipeId, recipeName) {
+            pendingDeleteId = recipeId;
+            pendingDeleteName = recipeName;
+            deleteNameEl.textContent = recipeName;
+            deleteOverlay.classList.remove('hidden');
+            deleteModal.classList.remove('hidden');
+        }
+
+        function closeDeleteModal() {
+            deleteOverlay.classList.add('hidden');
+            deleteModal.classList.add('hidden');
+            pendingDeleteId = null;
+            pendingDeleteName = null;
+        }
+
+        deleteCancelBtn.addEventListener('click', closeDeleteModal);
+        deleteOverlay.addEventListener('click', closeDeleteModal);
+
+        deleteConfirmBtn.addEventListener('click', async () => {
+            if (!pendingDeleteId) return;
+            deleteConfirmBtn.disabled = true;
+            try {
+                const res = await fetch(`/api/recipes/${encodeURIComponent(pendingDeleteId)}`, { method: 'DELETE' });
+                if (!res.ok) throw new Error('Failed to delete recipe');
+
+                // Remove from local data
+                recipeData.recipes = recipeData.recipes.filter(r => r.id !== pendingDeleteId);
+                closeDeleteModal();
+                populateRecipeCards();
+                showToast(`"${pendingDeleteName}" deleted`);
+            } catch (err) {
+                showToast(err.message, true);
+            } finally {
+                deleteConfirmBtn.disabled = false;
+            }
+        });
+
+        // --- "Show archived" toggle ---
+        const showArchivedCheckbox = document.getElementById('show-archived-checkbox');
+        showArchivedCheckbox.addEventListener('change', () => {
+            showArchived = showArchivedCheckbox.checked;
+            populateRecipeCards();
+        });
+
+        // Close card menus on outside click
+        document.addEventListener('click', e => {
+            if (!e.target.closest('.card-menu')) {
+                document.querySelectorAll('.card-menu-dropdown').forEach(d => d.classList.add('hidden'));
+            }
+        });
+
         // Start the app — fetch recipe data then initialize
         async function initApp() {
             recipeListDiv.innerHTML = `
@@ -368,7 +701,7 @@
                 </div>
                 <!-- Editable ingredients -->
                 <div>
-                    <h5 class="text-sm font-medium text-slate-700 mb-2">Ingredients <span class="font-normal text-slate-400">(edit qty or remove)</span>:</h5>
+                    <h5 class="text-sm font-medium text-slate-700 mb-2">Ingredients <span class="font-normal text-slate-400">(click new items to edit)</span>:</h5>
                     <div id="preview-ingredients" class="space-y-1 text-sm"></div>
                 </div>
                 <div id="preview-new-ingredients-section" class="hidden">
@@ -432,16 +765,6 @@
             importError.classList.remove('hidden');
         }
 
-        function showToast(message, isError) {
-            const toast = document.createElement('div');
-            toast.className = `fixed bottom-20 left-1/2 transform -translate-x-1/2 ${isError ? 'bg-red-500' : 'bg-green-600'} text-white px-6 py-3 rounded-lg shadow-lg z-50 transition-opacity duration-500`;
-            toast.textContent = message;
-            document.body.appendChild(toast);
-            setTimeout(() => {
-                toast.style.opacity = '0';
-                setTimeout(() => toast.remove(), 500);
-            }, 3000);
-        }
 
         importButton.addEventListener('click', openImportModal);
         importCancel.addEventListener('click', closeImportModal);
@@ -534,6 +857,33 @@
                 .replace(/\s+/g, '-')
                 .replace(/-+/g, '-')
                 .replace(/^-|-$/g, '');
+        }
+
+        const UNIT_OPTIONS = ['count', 'cup', 'cups', 'tbsp', 'tsp', 'oz', 'lbs', 'g', 'ml', 'kg', 'bunch', 'can', 'cloves', 'bag', 'bottle', 'box', 'package'];
+        const SECTION_OPTIONS = ['Produce', 'Cooking', 'Bread', 'Cheese section', 'Dairy', 'Nuts', 'Frozen', 'Snacks', 'Other'];
+
+        // Unit conversion: all expressed in tsp (volume) or grams (weight)
+        const TO_TSP = { tsp: 1, tbsp: 3, cup: 48, cups: 48, ml: 0.2029 };
+        const TO_G = { g: 1, kg: 1000, oz: 28.35, lbs: 453.6, lb: 453.6 };
+
+        function convertQty(qty, fromUnit, toUnit) {
+            if (fromUnit === toUnit) return qty;
+            // Same-type volume conversion
+            if (TO_TSP[fromUnit] && TO_TSP[toUnit]) {
+                return Math.round((qty * TO_TSP[fromUnit] / TO_TSP[toUnit]) * 100) / 100;
+            }
+            // Same-type weight conversion
+            if (TO_G[fromUnit] && TO_G[toUnit]) {
+                return Math.round((qty * TO_G[fromUnit] / TO_G[toUnit]) * 100) / 100;
+            }
+            // Cross-type (volume/weight) — can't convert without density, return as-is
+            return qty;
+        }
+
+        function cleanupNewDef(slug, pending) {
+            if (!(slug in pending.newIngredientDefs)) return;
+            const stillUsed = pending.recipe.ingredients.some(i => i.id === slug);
+            if (!stillUsed) delete pending.newIngredientDefs[slug];
         }
 
         // --- Fetch & Parse Flow ---
@@ -697,60 +1047,314 @@
             }
 
             // --- Editable ingredients ---
-            const allDefs = { ...recipeData.ingredientDefs, ...pending.newIngredientDefs };
-            const newSlugs = new Set(Object.keys(pending.newIngredientDefs));
+            const existingIngredientList = Object.entries(recipeData.ingredientDefs)
+                .map(([slug, def]) => ({ slug, name: def.name, units: def.units, section: def.section }))
+                .sort((a, b) => a.name.localeCompare(b.name));
 
-            function buildIngredientRow(ing, isNew) {
-                const def = allDefs[ing.id];
-                const div = document.createElement('div');
-                div.className = 'flex items-center gap-2 py-1 px-2 rounded ' + (isNew ? 'bg-yellow-50' : '');
+            function buildIngredientRow(ing) {
+                const isNew = () => ing.id in pending.newIngredientDefs;
+                const getDef = () => isNew()
+                    ? pending.newIngredientDefs[ing.id]
+                    : recipeData.ingredientDefs[ing.id];
 
-                const name = document.createElement('span');
-                name.className = 'flex-1 text-slate-700 truncate';
-                name.textContent = (def ? def.name : ing.id) + (isNew ? ' (new)' : '');
+                const container = document.createElement('div');
+                let editing = false;
 
-                const qtyInput = document.createElement('input');
-                qtyInput.type = 'number';
-                qtyInput.step = '0.01';
-                qtyInput.min = '0';
-                qtyInput.value = ing.qty;
-                qtyInput.className = 'w-16 px-1 py-0.5 text-right border border-slate-300 rounded text-sm focus:ring-1 focus:ring-green-500 focus:border-green-500 outline-none';
-                qtyInput.addEventListener('change', () => {
-                    ing.qty = parseFloat(qtyInput.value) || 0;
-                });
+                // ---- Display mode (default) ----
+                function renderDisplay() {
+                    container.innerHTML = '';
+                    editing = false;
+                    const def = getDef();
+                    const row = document.createElement('div');
+                    row.className = 'flex items-center gap-2 py-1 px-2 rounded text-sm' + (isNew() ? ' ing-row-new' : '');
 
-                const units = document.createElement('span');
-                units.className = 'text-slate-400 text-xs w-10';
-                units.textContent = def ? def.units : '';
+                    const name = document.createElement('span');
+                    name.className = 'flex-1 text-slate-700 truncate';
+                    name.textContent = def ? def.name : ing.id;
 
-                const removeBtn = document.createElement('button');
-                removeBtn.className = 'text-slate-300 hover:text-red-500 transition-colors p-0.5';
-                removeBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>';
-                removeBtn.addEventListener('click', () => {
-                    pending.recipe.ingredients = pending.recipe.ingredients.filter(i => i !== ing);
-                    div.remove();
-                });
+                    if (isNew()) {
+                        const badge = document.createElement('span');
+                        badge.className = 'text-xs text-yellow-600 ml-1';
+                        badge.textContent = '(new)';
+                        name.appendChild(badge);
 
-                div.appendChild(name);
-                div.appendChild(qtyInput);
-                div.appendChild(units);
-                div.appendChild(removeBtn);
-                return div;
+                        const pencil = document.createElement('span');
+                        pencil.className = 'text-slate-400 text-xs ml-1';
+                        pencil.textContent = '\u270E';
+                        name.appendChild(pencil);
+                    }
+
+                    const qtyInput = document.createElement('input');
+                    qtyInput.type = 'number';
+                    qtyInput.step = '0.01';
+                    qtyInput.min = '0';
+                    qtyInput.value = ing.qty;
+                    qtyInput.className = 'w-16 px-1 py-0.5 text-right border border-slate-300 rounded text-sm focus:ring-1 focus:ring-green-500 focus:border-green-500 outline-none';
+                    qtyInput.addEventListener('change', () => {
+                        ing.qty = parseFloat(qtyInput.value) || 0;
+                    });
+
+                    const units = document.createElement('span');
+                    units.className = 'text-slate-400 text-xs w-10';
+                    units.textContent = def ? def.units : '';
+
+                    const removeBtn = document.createElement('button');
+                    removeBtn.className = 'text-slate-300 hover:text-red-500 transition-colors p-0.5';
+                    removeBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>';
+                    removeBtn.addEventListener('click', e => {
+                        e.stopPropagation();
+                        const oldSlug = ing.id;
+                        pending.recipe.ingredients = pending.recipe.ingredients.filter(i => i !== ing);
+                        cleanupNewDef(oldSlug, pending);
+                        container.remove();
+                    });
+
+                    row.appendChild(name);
+                    row.appendChild(qtyInput);
+                    row.appendChild(units);
+                    row.appendChild(removeBtn);
+
+                    if (isNew()) {
+                        row.addEventListener('click', e => {
+                            if (e.target === qtyInput || e.target === removeBtn || removeBtn.contains(e.target)) return;
+                            renderEdit();
+                        });
+                    }
+
+                    container.appendChild(row);
+                }
+
+                // ---- Edit mode (for new ingredients, on click) ----
+                function renderEdit() {
+                    container.innerHTML = '';
+                    editing = true;
+                    const def = getDef();
+                    const oldUnits = def?.units || 'count';
+
+                    const editDiv = document.createElement('div');
+                    editDiv.className = 'ing-row-editing space-y-2';
+
+                    // Top row: combobox + done button
+                    const topRow = document.createElement('div');
+                    topRow.className = 'flex items-center gap-2';
+
+                    const comboWrapper = document.createElement('div');
+                    comboWrapper.className = 'relative flex-1';
+                    comboWrapper.style.minWidth = '0';
+
+                    const comboInput = document.createElement('input');
+                    comboInput.type = 'text';
+                    comboInput.value = def?.name || ing.id;
+                    comboInput.placeholder = 'Search ingredients...';
+                    comboInput.className = 'w-full px-2 py-1 border border-slate-300 rounded text-sm focus:ring-1 focus:ring-green-500 focus:border-green-500 outline-none';
+
+                    const dropdown = document.createElement('div');
+                    dropdown.className = 'combobox-dropdown hidden';
+
+                    comboWrapper.appendChild(comboInput);
+                    comboWrapper.appendChild(dropdown);
+
+                    const doneBtn = document.createElement('button');
+                    doneBtn.className = 'px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded font-medium';
+                    doneBtn.textContent = 'Done';
+                    doneBtn.addEventListener('click', () => renderDisplay());
+
+                    topRow.appendChild(comboWrapper);
+                    topRow.appendChild(doneBtn);
+
+                    // Bottom row: unit, section, qty, remove
+                    const bottomRow = document.createElement('div');
+                    bottomRow.className = 'flex items-center gap-2';
+
+                    const unitLabel = document.createElement('span');
+                    unitLabel.className = 'text-xs text-slate-500';
+                    unitLabel.textContent = 'Unit:';
+
+                    const unitSelect = document.createElement('select');
+                    unitSelect.className = 'px-1 py-0.5 border border-slate-300 rounded text-xs';
+                    UNIT_OPTIONS.forEach(u => {
+                        const opt = document.createElement('option');
+                        opt.value = u; opt.textContent = u;
+                        unitSelect.appendChild(opt);
+                    });
+                    unitSelect.value = def?.units || 'count';
+                    unitSelect.addEventListener('change', () => {
+                        if (isNew()) pending.newIngredientDefs[ing.id].units = unitSelect.value;
+                    });
+
+                    const secLabel = document.createElement('span');
+                    secLabel.className = 'text-xs text-slate-500 ml-1';
+                    secLabel.textContent = 'Aisle:';
+
+                    const sectionSelect = document.createElement('select');
+                    sectionSelect.className = 'px-1 py-0.5 border border-slate-300 rounded text-xs';
+                    SECTION_OPTIONS.forEach(s => {
+                        const opt = document.createElement('option');
+                        opt.value = s; opt.textContent = s;
+                        sectionSelect.appendChild(opt);
+                    });
+                    sectionSelect.value = def?.section || 'Other';
+                    sectionSelect.addEventListener('change', () => {
+                        if (isNew()) pending.newIngredientDefs[ing.id].section = sectionSelect.value;
+                    });
+
+                    const spacer = document.createElement('div');
+                    spacer.className = 'flex-1';
+
+                    const qtyInput = document.createElement('input');
+                    qtyInput.type = 'number';
+                    qtyInput.step = '0.01';
+                    qtyInput.min = '0';
+                    qtyInput.value = ing.qty;
+                    qtyInput.className = 'w-16 px-1 py-0.5 text-right border border-slate-300 rounded text-sm focus:ring-1 focus:ring-green-500 focus:border-green-500 outline-none';
+                    qtyInput.addEventListener('change', () => {
+                        ing.qty = parseFloat(qtyInput.value) || 0;
+                    });
+
+                    const unitsSpan = document.createElement('span');
+                    unitsSpan.className = 'text-slate-400 text-xs w-10';
+                    unitsSpan.textContent = def?.units || '';
+
+                    const removeBtn = document.createElement('button');
+                    removeBtn.className = 'text-slate-300 hover:text-red-500 transition-colors p-0.5';
+                    removeBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>';
+                    removeBtn.addEventListener('click', () => {
+                        const oldSlug = ing.id;
+                        pending.recipe.ingredients = pending.recipe.ingredients.filter(i => i !== ing);
+                        cleanupNewDef(oldSlug, pending);
+                        container.remove();
+                    });
+
+                    bottomRow.appendChild(unitLabel);
+                    bottomRow.appendChild(unitSelect);
+                    bottomRow.appendChild(secLabel);
+                    bottomRow.appendChild(sectionSelect);
+                    bottomRow.appendChild(spacer);
+                    bottomRow.appendChild(qtyInput);
+                    bottomRow.appendChild(unitsSpan);
+                    bottomRow.appendChild(removeBtn);
+
+                    editDiv.appendChild(topRow);
+                    editDiv.appendChild(bottomRow);
+                    container.appendChild(editDiv);
+
+                    // Focus the combobox
+                    setTimeout(() => { comboInput.focus(); comboInput.select(); }, 50);
+
+                    // --- Combobox behavior ---
+                    let highlightedIdx = -1;
+
+                    function renderDropdown(filter) {
+                        dropdown.innerHTML = '';
+                        highlightedIdx = -1;
+                        const query = filter.toLowerCase().trim();
+                        const matches = query
+                            ? existingIngredientList.filter(item => item.name.toLowerCase().includes(query))
+                            : existingIngredientList;
+                        const visible = matches.slice(0, 20);
+
+                        visible.forEach(item => {
+                            const d = document.createElement('div');
+                            d.className = 'combobox-item';
+                            d.innerHTML = `<span>${item.name}</span><span class="item-units">${item.units}</span>`;
+                            d.addEventListener('mousedown', e => {
+                                e.preventDefault();
+                                selectExisting(item);
+                            });
+                            dropdown.appendChild(d);
+                        });
+
+                        if (query && !existingIngredientList.some(i => i.name.toLowerCase() === query)) {
+                            const createDiv = document.createElement('div');
+                            createDiv.className = 'combobox-new-option';
+                            createDiv.textContent = `Create "${filter.trim()}" as new ingredient`;
+                            createDiv.addEventListener('mousedown', e => {
+                                e.preventDefault();
+                                createNew(filter.trim());
+                            });
+                            dropdown.appendChild(createDiv);
+                        }
+
+                        dropdown.classList.toggle('hidden', dropdown.children.length === 0);
+                    }
+
+                    function selectExisting(item) {
+                        const oldSlug = ing.id;
+                        const converted = convertQty(ing.qty, oldUnits, item.units);
+                        ing.id = item.slug;
+                        ing.qty = converted;
+                        cleanupNewDef(oldSlug, pending);
+                        renderDisplay();
+                    }
+
+                    function createNew(name) {
+                        const oldSlug = ing.id;
+                        const newSlug = slugify(name);
+
+                        if (recipeData.ingredientDefs[newSlug]) {
+                            const existing = existingIngredientList.find(i => i.slug === newSlug);
+                            if (existing) { selectExisting(existing); return; }
+                        }
+
+                        cleanupNewDef(oldSlug, pending);
+                        pending.newIngredientDefs[newSlug] = {
+                            name: name,
+                            units: unitSelect.value || 'count',
+                            section: sectionSelect.value || 'Other'
+                        };
+                        ing.id = newSlug;
+                        comboInput.value = name;
+                        dropdown.classList.add('hidden');
+                    }
+
+                    comboInput.addEventListener('focus', () => renderDropdown(comboInput.value));
+                    comboInput.addEventListener('input', () => renderDropdown(comboInput.value));
+                    comboInput.addEventListener('blur', () => {
+                        setTimeout(() => {
+                            dropdown.classList.add('hidden');
+                            const currentDef = getDef();
+                            if (currentDef) comboInput.value = currentDef.name;
+                        }, 150);
+                    });
+
+                    comboInput.addEventListener('keydown', e => {
+                        const items = dropdown.querySelectorAll('.combobox-item, .combobox-new-option');
+                        if (e.key === 'ArrowDown') {
+                            e.preventDefault();
+                            highlightedIdx = Math.min(highlightedIdx + 1, items.length - 1);
+                            items.forEach((el, i) => {
+                                el.classList.toggle('highlighted', i === highlightedIdx);
+                                if (i === highlightedIdx) el.scrollIntoView({ block: 'nearest' });
+                            });
+                        } else if (e.key === 'ArrowUp') {
+                            e.preventDefault();
+                            highlightedIdx = Math.max(highlightedIdx - 1, 0);
+                            items.forEach((el, i) => {
+                                el.classList.toggle('highlighted', i === highlightedIdx);
+                                if (i === highlightedIdx) el.scrollIntoView({ block: 'nearest' });
+                            });
+                        } else if (e.key === 'Enter') {
+                            e.preventDefault();
+                            if (highlightedIdx >= 0 && items[highlightedIdx]) {
+                                items[highlightedIdx].dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+                            }
+                        } else if (e.key === 'Escape') {
+                            dropdown.classList.add('hidden');
+                            renderDisplay();
+                        }
+                    });
+                }
+
+                renderDisplay();
+                return container;
             }
 
+            // Render all ingredients in a single list
             previewIngredients.innerHTML = '';
-            pending.recipe.ingredients
-                .filter(ing => !newSlugs.has(ing.id))
-                .forEach(ing => previewIngredients.appendChild(buildIngredientRow(ing, false)));
-
-            const newIngs = pending.recipe.ingredients.filter(ing => newSlugs.has(ing.id));
-            if (newIngs.length > 0) {
-                previewNewSection.classList.remove('hidden');
-                previewNewIngredients.innerHTML = '';
-                newIngs.forEach(ing => previewNewIngredients.appendChild(buildIngredientRow(ing, true)));
-            } else {
-                previewNewSection.classList.add('hidden');
-            }
+            pending.recipe.ingredients.forEach(ing => {
+                previewIngredients.appendChild(buildIngredientRow(ing));
+            });
+            previewNewSection.classList.add('hidden');
 
             importPreview.classList.remove('hidden');
             importFetchBtn.classList.add('hidden');
