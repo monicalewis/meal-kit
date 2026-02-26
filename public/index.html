@@ -1499,9 +1499,8 @@
                 importSectionPhoto.classList.remove('hidden');
                 importFetchBtn.classList.add('hidden');
                 // Track painted door interest
-                fetch('/api/activity/log', {
+                Auth.fetch('/api/activity/log', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ action: 'photo_import_interest', details: {} })
                 }).catch(() => {});
             }
