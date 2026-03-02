@@ -19,7 +19,8 @@
     "groq-sdk": "^0.15.0",
     "helmet": "^8.1.0",
     "pg": "^8.18.0",
-    "puppeteer": "^24.37.5"
+    "puppeteer": "^24.37.5",
+    "resend": "^6.9.2"
   },
   "devDependencies": {
     "jest": "^30.2.0",

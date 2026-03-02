@@ -881,20 +881,6 @@ const recipeData = {
       ]
     },
     {
-      "id": "grazing-platter",
-      "name": "Grazing platter by MoniLew",
-      "image": "https://www.chefnotrequired.com/wp-content/uploads/2019/12/grazing-board-blog-hero.jpg",
-      "ingredients": [
-        { "id": "cheddar-cheese", "qty": 1 },
-        { "id": "hummus", "qty": 8 },
-        { "id": "pita", "qty": 1 },
-        { "id": "crackers", "qty": 1 },
-        { "id": "apples", "qty": 1 },
-        { "id": "grape-tomatoes", "qty": 1 },
-        { "id": "grapes", "qty": 1 }
-      ]
-    },
-    {
       "id": "haricots-verts-with-minty-tahini-by-ottolenghi",
       "name": "Haricots verts with minty tahini by Ottolenghi",
       "url": "https://www.bonappetit.com/recipe/haricots-verts-and-freekeh-with-minty-tahini-dressing",
@@ -911,35 +897,6 @@ const recipeData = {
         { "id": "garlic", "qty": 1 },
         { "id": "lemon", "qty": 1 },
         { "id": "maple-syrup", "qty": 0.5 }
-      ]
-    },
-    {
-      "id": "kale-salad",
-      "name": "Kale salad by MoniLew",
-      "image": "https://i0.wp.com/smittenkitchen.com/wp-content/uploads//2013/08/kale-salad-with-pecorino-and-walnuts.jpg?fit=750%2C500&ssl=1",
-      "totalTime": "10 min",
-      "ingredients": [
-        { "id": "feta---goat-cheese", "qty": 1 },
-        { "id": "hazelnuts", "qty": 1 },
-        { "id": "olive-oil", "qty": 1 },
-        { "id": "avocado", "qty": 1 },
-        { "id": "garlic", "qty": 1 },
-        { "id": "kale", "qty": 1 },
-        { "id": "pine-nuts", "qty": 1 }
-      ]
-    },
-    {
-      "id": "lunchbox",
-      "name": "Lunchbox by MoniLew",
-      "image": "https://holleygrainger.com/wp-content/uploads/2019/08/blt-skewer-lunchbox.jpg",
-      "ingredients": [
-        { "id": "string-cheese-[lunchbox]", "qty": 1 },
-        { "id": "tofu-[lunchbox]", "qty": 1 },
-        { "id": "cucumbers-[lunchbox]", "qty": 1 },
-        { "id": "berries-kiwi-goldenberries-[lunchbox]", "qty": 1 },
-        { "id": "seaweed-[lunchbox]", "qty": 1 },
-        { "id": "gogurts-[lunchbox]", "qty": 1 },
-        { "id": "sticky-apricots-[lunchbox]", "qty": 1 }
       ]
     },
     {
@@ -967,19 +924,6 @@ const recipeData = {
       ]
     },
     {
-      "id": "margherita-pizza",
-      "name": "Margherita pizza by MoniLew",
-      "image": "https://ooni.com/cdn/shop/articles/20220211142347-margherita-9920_ba86be55-674e-4f35-8094-2067ab41a671.jpg?v=1737104576&width=2048",
-      "activeTime": "10 min",
-      "totalTime": "20 min",
-      "ingredients": [
-        { "id": "pizza-dough", "qty": 1 },
-        { "id": "tomato-sauce", "qty": 1 },
-        { "id": "buratta", "qty": 1 },
-        { "id": "fresh-basil", "qty": 1 }
-      ]
-    },
-    {
       "id": "marry-me-beans",
       "name": "Marry Me Beans by NYT Cooking",
       "url": "https://cooking.nytimes.com/recipes/1025325-creamy-spicy-tomato-beans-and-greens",
@@ -1000,26 +944,6 @@ const recipeData = {
         { "id": "half-and-half", "qty": 1 },
         { "id": "parmesan", "qty": 0.6666666666666666 },
         { "id": "crusty-bread", "qty": 1 }
-      ]
-    },
-    {
-      "id": "minestrone-soup",
-      "name": "Minestrone soup by McCaitlin",
-      "image": "https://i0.wp.com/fortheloveofgourmet.com/wp-content/uploads/2025/01/IMG_2256-scaled.jpg?resize=1365%2C2048&ssl=1",
-      "activeTime": "10 min",
-      "totalTime": "25 min",
-      "ingredients": [
-        { "id": "parmesan", "qty": 1 },
-        { "id": "veggie-stock", "qty": 1 },
-        { "id": "dried-basil", "qty": 1 },
-        { "id": "garlic", "qty": 1 },
-        { "id": "yellow-onion", "qty": 1 },
-        { "id": "kidney-beans", "qty": 1 },
-        { "id": "white-beans", "qty": 1 },
-        { "id": "celery", "qty": 1 },
-        { "id": "carrots", "qty": 1 },
-        { "id": "panko", "qty": 1 },
-        { "id": "diced-tomatoes", "qty": 1 }
       ]
     },
     {
@@ -1072,25 +996,6 @@ const recipeData = {
         { "id": "grape-tomatoes", "qty": 9 },
         { "id": "white-onion", "qty": 0.5 },
         { "id": "fresh-basil", "qty": 1 }
-      ]
-    },
-    {
-      "id": "pantry-essentials",
-      "name": "Pantry essentials by MoniLew",
-      "image": "https://simply-delicious-food.com/wp-content/uploads/2020/03/53DE1AE8-4DB2-4821-A11E-39B69931503E-2.jpg",
-      "ingredients": [
-        { "id": "pouring-olive-oil-[essentials]", "qty": 1 },
-        { "id": "hazelnuts-pine-nuts-[essentials]", "qty": 1 },
-        { "id": "gummy-apricots-[essentials]", "qty": 1 },
-        { "id": "daddy-bread-bagels-green-bread...-[essentials]", "qty": 1 },
-        { "id": "cream-cheese-[essentials]", "qty": 1 },
-        { "id": "mangoes-peaches-honeycrisp-apples-[essentials]", "qty": 1 },
-        { "id": "sparkling-water-[essentials]", "qty": 1 },
-        { "id": "turtle-gummies-[essentials]", "qty": 1 },
-        { "id": "mini-ice-creams-[essentials]", "qty": 1 },
-        { "id": "cereal-[essentials]", "qty": 1 },
-        { "id": "milk-half-and-half-[essentials]", "qty": 1 },
-        { "id": "dumplings-impossible-nuggets-other-gems-[essentials]", "qty": 1 }
       ]
     },
     {
@@ -1202,20 +1107,6 @@ const recipeData = {
         { "id": "chickpeas", "qty": 15 },
         { "id": "garlic", "qty": 1 },
         { "id": "lemon", "qty": 1 }
-      ]
-    },
-    {
-      "id": "sausage-dogs",
-      "name": "Sausage dogs by MoniLew",
-      "image": "https://www.connoisseurusveg.com/wp-content/uploads/2023/08/portobello-mushroom-hot-dogs-fb-sq.jpg",
-      "totalTime": "10 min",
-      "ingredients": [
-        { "id": "cheddar-cheese", "qty": 1 },
-        { "id": "hot-dog-buns", "qty": 1 },
-        { "id": "veggie-sausage", "qty": 1 },
-        { "id": "mushrooms", "qty": 8 },
-        { "id": "hummus", "qty": 8 },
-        { "id": "onion", "qty": 1 }
       ]
     },
     {

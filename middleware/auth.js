@@ -3,7 +3,8 @@ function loadUser(req, res, next) {
   if (req.session && req.session.userId) {
     req.user = {
       id: req.session.userId,
-      role: req.session.role || 'user'
+      role: req.session.role || 'user',
+      emailVerified: req.session.emailVerified || false
     };
   } else {
     req.user = null;

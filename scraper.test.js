@@ -54,16 +54,30 @@ describe('scraper module', () => {
       expect(result.ogImage).toBe('https://cdn.example.com/photo.jpg');
     }, 30000);
 
-    test('returns null on invalid URL', async () => {
+    test('returns error object on invalid URL', async () => {
       const result = await fetchWithBrowser('not-a-real-url', { timeout: 5000 });
-      expect(result).toBeNull();
+      expect(result).toHaveProperty('error');
+      expect(result).toHaveProperty('detail');
+      expect(typeof result.detail).toBe('string');
+      expect(result.detail.length).toBeGreaterThan(0);
     }, 15000);
 
-    test('returns null on timeout', async () => {
-      // Use a very short timeout with a slow-loading page
+    test('returns error object on slow/unresponsive page', async () => {
       const result = await fetchWithBrowser('https://httpstat.us/200?sleep=30000', { timeout: 1000 });
-      expect(result).toBeNull();
+      expect(result).toHaveProperty('error');
+      expect(result).toHaveProperty('detail');
+      expect(typeof result.error).toBe('string');
+      expect(typeof result.detail).toBe('string');
+      // Should not have html (indicates failure, not success)
+      expect(result.html).toBeUndefined();
     }, 15000);
+
+    test('returns DNS_RESOLUTION_FAILED for nonexistent domain', async () => {
+      const result = await fetchWithBrowser('https://this-domain-does-not-exist-abc123xyz.com', { timeout: 10000 });
+      expect(result).toHaveProperty('error');
+      expect(result.error).toBe('DNS_RESOLUTION_FAILED');
+      expect(result.detail).toContain('domain name');
+    }, 20000);
 
     test('caps images at 12', async () => {
       const imgs = Array.from({ length: 20 }, (_, i) =>

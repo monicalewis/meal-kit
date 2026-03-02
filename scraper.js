@@ -1,24 +1,30 @@
 const puppeteer = require('puppeteer');
 
 let browser = null;
+let browserPromise = null;
 
 async function getBrowser() {
   if (browser && browser.connected) return browser;
-  browser = await puppeteer.launch({
-    headless: true,
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-gpu',
-      '--disable-extensions',
-      '--disable-background-networking',
-      '--disable-default-apps',
-      '--no-first-run'
-    ]
-  });
-  browser.on('disconnected', () => { browser = null; });
-  return browser;
+  if (!browserPromise) {
+    browserPromise = puppeteer.launch({
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--disable-extensions',
+        '--disable-background-networking',
+        '--disable-default-apps',
+        '--no-first-run'
+      ]
+    }).then(b => {
+      browser = b;
+      b.on('disconnected', () => { browser = null; browserPromise = null; });
+      return b;
+    }).catch(e => { browserPromise = null; throw e; });
+  }
+  return browserPromise;
 }
 
 function normalizeUrl(url) {
@@ -31,7 +37,7 @@ function normalizeUrl(url) {
 /**
  * Fetch a URL with a headless browser, wait for JS to render,
  * then extract images from the fully rendered DOM.
- * Returns { html, ogImage, images } or null on failure.
+ * Returns { html, ogImage, images } on success, or { error, detail } on failure.
  */
 async function fetchWithBrowser(url, { timeout = 20000 } = {}) {
   let page = null;
@@ -79,8 +85,8 @@ async function fetchWithBrowser(url, { timeout = 20000 } = {}) {
           for (const item of data) {
             const type = item['@type'];
             if (type === 'Recipe' || (Array.isArray(type) && type.includes('Recipe'))) {
-              const img = Array.isArray(item.image) ? item.image[0]
-                : (typeof item.image === 'object' ? item.image.url : item.image);
+              const rawImg = Array.isArray(item.image) ? item.image[0] : item.image;
+            const img = typeof rawImg === 'object' && rawImg !== null ? rawImg.url : rawImg;
               if (img) addImage(img);
             }
           }
@@ -136,7 +142,23 @@ async function fetchWithBrowser(url, { timeout = 20000 } = {}) {
     return { html, ogImage: result.ogImage, images: result.images };
   } catch (err) {
     if (page) await page.close().catch(() => {});
-    return null;
+    const msg = err.message || '';
+    if (msg.includes('net::ERR_NAME_NOT_RESOLVED')) {
+      return { error: 'DNS_RESOLUTION_FAILED', detail: 'Could not resolve the domain name. Check that the URL is spelled correctly.' };
+    }
+    if (msg.includes('net::ERR_CONNECTION_REFUSED')) {
+      return { error: 'CONNECTION_REFUSED', detail: 'The website refused the connection. The site may be down.' };
+    }
+    if (msg.includes('net::ERR_CERT') || msg.includes('net::ERR_SSL')) {
+      return { error: 'SSL_ERROR', detail: 'The website has an SSL/security certificate problem.' };
+    }
+    if (msg.includes('net::ERR_CONNECTION_TIMED_OUT') || msg.includes('Timeout') || msg.includes('Navigation timeout')) {
+      return { error: 'TIMEOUT', detail: 'The page took too long to load. The site may be slow or unresponsive.' };
+    }
+    if (msg.includes('net::ERR_ABORTED')) {
+      return { error: 'REQUEST_ABORTED', detail: 'The request was interrupted. The site may have redirected or blocked the request.' };
+    }
+    return { error: 'BROWSER_ERROR', detail: `Headless browser failed: ${msg.substring(0, 150)}` };
   }
 }
 

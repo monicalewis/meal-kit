@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DIY Meal Kit</title>
+    <link rel="icon" type="image/svg+xml" href="/images/logo.svg">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="/js/auth.js"></script>
@@ -134,6 +135,9 @@
             font-weight: 600;
             letter-spacing: 0.02em;
         }
+        .card-shared-badge {
+            background: rgba(13, 148, 136, 0.85);
+        }
         @keyframes recipe-pop-in {
             0% { opacity: 0; transform: scale(0.9); }
             50% { transform: scale(1.03); }
@@ -234,7 +238,7 @@
 <body class="min-h-screen bg-slate-50">
     <div class="container mx-auto px-4 py-8 max-w-6xl pb-36">
         <div class="flex items-center justify-between flex-wrap gap-2 mb-2">
-            <h1 class="text-4xl font-bold tracking-tight text-slate-900">DIY Meal Kit</h1>
+            <h1 class="text-4xl font-bold tracking-tight text-slate-900 flex items-center gap-3"><img src="/images/logo.svg" alt="DIY Meal Kit logo" class="h-10 w-auto">DIY Meal Kit</h1>
             <div class="flex items-center gap-3">
                 <div data-auth="guest" style="display:none">
                     <a href="/login.html" class="text-sm text-green-600 hover:text-green-700 font-medium">Log in</a>
@@ -294,6 +298,10 @@
                 </div>
             </div>
         </div>
+
+        <footer class="text-center text-sm text-slate-400 mt-12 mb-4">
+            Questions? <a href="mailto:hello@diyrecipekit.com" class="text-green-600 hover:text-green-700 underline">hello@diyrecipekit.com</a>
+        </footer>
 
         <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-4">
             <div class="container mx-auto max-w-6xl flex gap-3">
@@ -543,6 +551,14 @@
                 imgContainer.appendChild(ownBadge);
             }
 
+            // "Shared by" badge for recipes added from another user's shared plan
+            if (recipe.shared_by_name && !isArchived) {
+                const sharedBadge = document.createElement('div');
+                sharedBadge.className = 'card-own-badge card-shared-badge';
+                sharedBadge.textContent = 'Shared by ' + recipe.shared_by_name;
+                imgContainer.appendChild(sharedBadge);
+            }
+
             const menuWrapper = document.createElement('div');
             menuWrapper.className = 'card-menu';
 
@@ -553,6 +569,45 @@
 
             const menuDropdown = document.createElement('div');
             menuDropdown.className = 'card-menu-dropdown hidden';
+
+            // Favorite / Unfavorite item (only for non-archived, logged-in users)
+            if (!isArchived) {
+                const alreadyFavorited = favoritesData[recipe.id] && !favoritesData[recipe.id].removed;
+                const favoriteItem = document.createElement('div');
+                favoriteItem.className = 'card-menu-item';
+                const heartSvgFilled = '<svg xmlns="http://www.w3.org/2000/svg" style="display:inline;vertical-align:middle;width:1em;height:1em;margin-right:4px" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="0"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>';
+                const heartSvgOutline = '<svg xmlns="http://www.w3.org/2000/svg" style="display:inline;vertical-align:middle;width:1em;height:1em;margin-right:4px" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>';
+                favoriteItem.innerHTML = alreadyFavorited
+                    ? heartSvgFilled + 'Unfavorite'
+                    : heartSvgOutline + 'Favorite';
+                favoriteItem.addEventListener('click', async e => {
+                    e.stopPropagation();
+                    menuDropdown.classList.add('hidden');
+                    if (Auth.isGuest()) {
+                        Auth.showLoginPrompt('Log in to save favorites');
+                        return;
+                    }
+                    try {
+                        if (alreadyFavorited) {
+                            await Auth.fetch('/api/favorites/remove', {
+                                method: 'POST',
+                                body: JSON.stringify({ recipeId: recipe.id })
+                            });
+                            if (favoritesData[recipe.id]) favoritesData[recipe.id].removed = true;
+                        } else {
+                            await Auth.fetch('/api/favorites/record', {
+                                method: 'POST',
+                                body: JSON.stringify({ recipeIds: [recipe.id] })
+                            });
+                            favoritesData[recipe.id] = { lastSelected: new Date().toISOString(), removed: false };
+                        }
+                        populateRecipeCards();
+                    } catch (err) {
+                        showToast('Failed to update favorites', true);
+                    }
+                });
+                menuDropdown.appendChild(favoriteItem);
+            }
 
             if (isArchived) {
                 const restoreItem = document.createElement('div');
@@ -622,7 +677,10 @@
             const checkboxButton = document.createElement('div');
             checkboxButton.className = 'w-10 h-10 rounded-full bg-white/90 shadow-md flex items-center justify-center text-green-600 opacity-0 group-hover:opacity-100 peer-checked:opacity-100 peer-checked:bg-green-600 peer-checked:text-white transition-all duration-200';
             checkboxButton.innerHTML = `
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg data-icon="plus" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16M4 12h16" />
+                </svg>
+                <svg data-icon="check" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                 </svg>
             `;
@@ -641,7 +699,11 @@
             if (byIndex !== -1) {
                 const main = recipe.name.slice(0, byIndex);
                 const by = recipe.name.slice(byIndex);
-                title.innerHTML = `${main}<span class="block text-sm font-normal text-slate-500">${by}</span>`;
+                title.textContent = main;
+                const bySpan = document.createElement('span');
+                bySpan.className = 'block text-sm font-normal text-slate-500';
+                bySpan.textContent = by;
+                title.appendChild(bySpan);
             } else {
                 title.textContent = recipe.name;
             }
@@ -680,8 +742,12 @@
             checkbox.addEventListener('change', () => {
                 if (checkbox.checked) {
                     card.classList.add('ring-2', 'ring-green-500');
+                    checkboxButton.querySelector('[data-icon="plus"]').classList.add('hidden');
+                    checkboxButton.querySelector('[data-icon="check"]').classList.remove('hidden');
                 } else {
                     card.classList.remove('ring-2', 'ring-green-500');
+                    checkboxButton.querySelector('[data-icon="plus"]').classList.remove('hidden');
+                    checkboxButton.querySelector('[data-icon="check"]').classList.add('hidden');
                 }
                 updateButtonState();
                 saveSelectedRecipeIds();
@@ -1049,6 +1115,10 @@
         }
 
         document.getElementById('share-plan-button')?.addEventListener('click', Auth.requireLogin(async function() {
+            if (!Auth.isVerified()) {
+                showToast('Please verify your email before sharing. Check your inbox for a verification link.', true);
+                return;
+            }
             const selectedRecipeIds = Array.from(document.querySelectorAll('input[name="recipe"]:checked'))
                 .map(cb => cb.value);
             if (selectedRecipeIds.length === 0) return;
@@ -1100,7 +1170,7 @@
                     // Show undo toast
                     const toast = document.createElement('div');
                     toast.className = 'fixed bottom-20 left-1/2 transform -translate-x-1/2 bg-slate-800 text-white px-6 py-3 rounded-lg shadow-lg z-50 flex items-center gap-3';
-                    toast.innerHTML = `<span>"${recipeName}" hidden</span>`;
+                    toast.textContent = `"${recipeName}" hidden`;
                     const undoBtn = document.createElement('button');
                     undoBtn.className = 'text-green-400 hover:text-green-300 font-medium underline';
                     undoBtn.textContent = 'Undo';
@@ -1355,6 +1425,56 @@
             `;
             // Wait for auth to initialize
             await new Promise(resolve => Auth.onReady(resolve));
+
+            // Handle ?verified= query param (redirected from email verification link)
+            const verifiedParam = new URLSearchParams(window.location.search).get('verified');
+            if (verifiedParam) {
+                history.replaceState({}, '', '/');
+                if (verifiedParam === '1') {
+                    showToast('Email verified! You can now share meal plans.');
+                } else if (verifiedParam === 'invalid') {
+                    showToast('This verification link is invalid or has expired. Please request a new one.', true);
+                }
+            }
+
+            // Show verification banner for logged-in but unverified users
+            if (Auth.isUser() && !Auth.isVerified()) {
+                const banner = document.createElement('div');
+                banner.id = 'verify-banner';
+                banner.className = 'fixed top-0 left-0 right-0 z-50 bg-amber-50 border-b border-amber-200 px-4 py-3 flex items-center justify-between gap-3 text-sm text-amber-900';
+                banner.innerHTML = `
+                    <span>Please verify your email address to unlock sharing. Check your inbox, or
+                        <button id="resend-verify-btn" class="font-semibold underline hover:no-underline ml-1">resend the email</button>.
+                    </span>
+                    <button id="dismiss-verify-btn" class="text-amber-600 hover:text-amber-900 text-lg leading-none flex-shrink-0">&times;</button>
+                `;
+                document.body.prepend(banner);
+                document.getElementById('resend-verify-btn').addEventListener('click', async () => {
+                    const btn = document.getElementById('resend-verify-btn');
+                    btn.disabled = true;
+                    btn.textContent = 'Sending...';
+                    try {
+                        const res = await Auth.fetch('/api/auth/resend-verification', { method: 'POST' });
+                        if (res.ok) {
+                            showToast('Verification email sent! Check your inbox.');
+                            document.getElementById('verify-banner')?.remove();
+                        } else {
+                            const data = await res.json();
+                            showToast(data.error || 'Failed to send verification email', true);
+                            btn.disabled = false;
+                            btn.textContent = 'resend the email';
+                        }
+                    } catch {
+                        showToast('Failed to send verification email', true);
+                        btn.disabled = false;
+                        btn.textContent = 'resend the email';
+                    }
+                });
+                document.getElementById('dismiss-verify-btn').addEventListener('click', () => {
+                    document.getElementById('verify-banner')?.remove();
+                });
+            }
+
             try {
                 const res = await fetch('/api/recipes', { credentials: 'same-origin' });
                 if (!res.ok) throw new Error('Failed to load recipes');
@@ -1581,10 +1701,11 @@
                     for (const item of data) {
                         const type = item['@type'];
                         if (type === 'Recipe' || (Array.isArray(type) && type.includes('Recipe'))) {
+                            const rawImg = Array.isArray(item.image) ? item.image[0] : item.image;
+                            const itemImage = normalizeImageUrl(typeof rawImg === 'object' && rawImg !== null ? rawImg.url : rawImg);
                             return {
                                 name: item.name || 'Untitled Recipe',
-                                image: Array.isArray(item.image) ? item.image[0] :
-                                       (typeof item.image === 'object' ? item.image.url : item.image),
+                                image: itemImage,
                                 ingredients: item.recipeIngredient || [],
                                 url: sourceUrl,
                                 author: typeof item.author === 'object' ? item.author.name : item.author,
@@ -1600,12 +1721,48 @@
             return null; // No JSON-LD found — will use AI fallback
         }
 
-        // Extract visible text from HTML for AI fallback
+        // Extract visible text from HTML for AI fallback, prioritizing recipe content
         function extractPageText(html) {
             const parser = new DOMParser();
             const doc = parser.parseFromString(html, 'text/html');
-            doc.querySelectorAll('script, style, nav, footer, header').forEach(el => el.remove());
-            return doc.body.textContent.replace(/\s+/g, ' ').trim();
+            doc.querySelectorAll('script, style, nav, footer, header, .comments, #comments').forEach(el => el.remove());
+            const fullText = doc.body.textContent.replace(/\s+/g, ' ').trim();
+
+            const measurementPattern = /\b(\d[\d\/\.\s-]*\s*(cups?|tablespoons?|tbsp|teaspoons?|tsp|ounces?|oz|pounds?|lbs?|grams?|g\b|kg\b|ml\b|liters?|l\b|cloves?|sticks?|cans?|jars?|bags?|bunches?|heads?|slices?|sprigs?|pieces?|packages?))\b/gi;
+            const measurements = [...fullText.matchAll(measurementPattern)];
+
+            // Find the densest cluster of measurements — most reliable indicator of the actual
+            // ingredient list (avoids false positives from recipe mentions in intro prose)
+            let recipeStart = -1;
+            if (measurements.length >= 3) {
+                const CLUSTER_WINDOW = 1500;
+                let maxCount = 0;
+                for (let i = 0; i < measurements.length; i++) {
+                    const windowEnd = measurements[i].index + CLUSTER_WINDOW;
+                    let count = 0;
+                    for (let j = i; j < measurements.length && measurements[j].index <= windowEnd; j++) count++;
+                    if (count > maxCount) {
+                        maxCount = count;
+                        recipeStart = measurements[i].index;
+                    }
+                }
+            }
+
+            // Fall back to first recipe keyword if no measurement cluster found
+            if (recipeStart === -1) {
+                const recipeIndicators = /\b(ingredients|instructions|directions|recipe|serves\s+\d|yield|prep\s+time|cook\s+time)\b/gi;
+                const indicatorMatch = recipeIndicators.exec(fullText);
+                if (indicatorMatch) recipeStart = indicatorMatch.index;
+            }
+
+            if (recipeStart > 500) {
+                // Back up a bit to capture the recipe title/heading
+                const contextStart = Math.max(0, recipeStart - 300);
+                return fullText.substring(contextStart, contextStart + 7000);
+            }
+
+            // No recipe section detected or it's near the start — return from beginning
+            return fullText.substring(0, 7000);
         }
 
         // Normalize protocol-relative and http URLs to absolute https
@@ -1744,11 +1901,6 @@
 
         // --- Fetch & Parse Flow ---
         importFetchBtn.addEventListener('click', async () => {
-            if (Auth.isGuest()) {
-                Auth.showLoginPrompt('Create an account to import and save your own recipes');
-                return;
-            }
-
             const url = importUrlInput.value.trim();
             if (!url) {
                 showImportError('Please enter a recipe URL.');
@@ -1879,8 +2031,6 @@
             } catch (err) {
                 if (err instanceof TypeError && err.message === 'Failed to fetch') {
                     showImportError('Could not reach the server. Please make sure you are connected and try again.');
-                } else if (err.message === 'Authentication required') {
-                    Auth.showLoginPrompt('Create an account to import and save your own recipes');
                 } else {
                     showImportError(err.message);
                 }
@@ -2161,7 +2311,13 @@
                         visible.forEach(item => {
                             const d = document.createElement('div');
                             d.className = 'combobox-item';
-                            d.innerHTML = `<span>${item.name}</span><span class="item-units">${item.units}</span>`;
+                            const nameSpan = document.createElement('span');
+                            nameSpan.textContent = item.name;
+                            const unitsSpan = document.createElement('span');
+                            unitsSpan.className = 'item-units';
+                            unitsSpan.textContent = item.units;
+                            d.appendChild(nameSpan);
+                            d.appendChild(unitsSpan);
                             d.addEventListener('mousedown', e => {
                                 e.preventDefault();
                                 selectExisting(item);
@@ -2294,7 +2450,12 @@
                     Object.assign(recipeData.ingredientDefs, savedIngredientDefs);
                 }
                 savedRecipe.owner = String(Auth.user?.id);
-                recipeData.recipes.push(savedRecipe);
+                const existingIdx = recipeData.recipes.findIndex(r => r.id === savedRecipe.id);
+                if (existingIdx >= 0) {
+                    recipeData.recipes[existingIdx] = savedRecipe;
+                } else {
+                    recipeData.recipes.push(savedRecipe);
+                }
 
                 closeImportModal();
                 showToast(`"${savedRecipe.name}" added successfully!`);

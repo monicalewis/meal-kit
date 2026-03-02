@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard - DIY Meal Kit</title>
+    <link rel="icon" type="image/svg+xml" href="/images/logo.svg">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -17,7 +18,7 @@
     <nav class="bg-white border-b border-slate-200 px-4 py-3">
         <div class="container mx-auto max-w-6xl flex items-center justify-between">
             <div class="flex items-center gap-3">
-                <span class="text-lg font-bold text-slate-800">DIY Meal Kit</span>
+                <img src="/images/logo.svg" alt="DIY Meal Kit logo" class="h-7 w-auto"><span class="text-lg font-bold text-slate-800">DIY Meal Kit</span>
                 <span class="text-xs font-medium bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">Admin</span>
             </div>
             <div class="flex items-center gap-4">
@@ -124,6 +125,18 @@
                 <div class="px-5 py-3 border-t border-slate-100 text-center">
                     <button id="activity-load-more" class="text-xs text-green-600 hover:text-green-700 font-medium">Load more</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recipe list modal -->
+    <div id="recipes-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+        <div class="bg-white rounded-xl shadow-lg border border-slate-200 w-full max-w-md mx-4 max-h-[70vh] flex flex-col">
+            <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                <h3 class="font-semibold text-slate-800" id="recipes-modal-title">Recipes</h3>
+                <button onclick="closeRecipesModal()" class="text-slate-400 hover:text-slate-600 text-lg cursor-pointer">&times;</button>
+            </div>
+            <div id="recipes-modal-body" class="px-5 py-3 overflow-y-auto divide-y divide-slate-100">
             </div>
         </div>
     </div>
@@ -253,7 +266,11 @@
                         <span class="text-xs font-medium px-2 py-0.5 rounded-full ${u.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'}">${escapeHtml(u.role)}</span>
                     </td>
                     <td class="px-5 py-3 text-slate-500 text-xs">${formatDate(u.created_at)}</td>
-                    <td class="px-5 py-3 text-slate-700 font-medium">${u.recipe_count}</td>
+                    <td class="px-5 py-3 text-slate-700 font-medium">
+                        ${parseInt(u.recipe_count) > 0
+                            ? `<button class="text-blue-600 hover:text-blue-800 underline cursor-pointer" onclick="showUserRecipes(${u.id}, '${escapeHtml(u.display_name || u.email)}')">${u.recipe_count}</button>`
+                            : u.recipe_count}
+                    </td>
                     <td class="px-5 py-3 text-slate-500 text-xs">${timeAgo(u.last_active)}</td>
                 `;
                 tbody.appendChild(tr);
@@ -309,6 +326,46 @@
             activityFilter = e.target.value;
             activityPage = 1;
             loadActivity(1);
+        });
+
+        // --- User Recipes Modal ---
+        async function showUserRecipes(userId, userName) {
+            const modal = document.getElementById('recipes-modal');
+            const body = document.getElementById('recipes-modal-body');
+            document.getElementById('recipes-modal-title').textContent = `Recipes by ${userName}`;
+            body.innerHTML = '<div class="py-4 text-center text-slate-400 text-sm">Loading...</div>';
+            modal.classList.remove('hidden');
+
+            const data = await adminFetch(`/api/admin/users/${userId}/recipes`);
+            if (!data) { closeRecipesModal(); return; }
+
+            if (data.recipes.length === 0) {
+                body.innerHTML = '<div class="py-4 text-center text-slate-400 text-sm">No recipes found</div>';
+                return;
+            }
+
+            body.innerHTML = '';
+            data.recipes.forEach(r => {
+                const div = document.createElement('div');
+                div.className = 'py-2 flex items-center justify-between';
+                const name = document.createElement('span');
+                name.className = 'text-sm text-slate-700';
+                name.textContent = r.name || r.recipe_id;
+                const date = document.createElement('span');
+                date.className = 'text-xs text-slate-400 flex-shrink-0 ml-3';
+                date.textContent = formatDate(r.updated_at);
+                div.appendChild(name);
+                div.appendChild(date);
+                body.appendChild(div);
+            });
+        }
+
+        function closeRecipesModal() {
+            document.getElementById('recipes-modal').classList.add('hidden');
+        }
+
+        document.getElementById('recipes-modal').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) closeRecipesModal();
         });
 
         // Nav logout button

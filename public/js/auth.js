@@ -7,7 +7,7 @@ const Auth = {
 
   async init() {
     try {
-      const res = await fetch('/api/auth/me');
+      const res = await fetch('/api/auth/me', { credentials: 'same-origin' });
       const data = await res.json();
       this.user = data.authenticated ? data.user : null;
     } catch {
@@ -32,6 +32,7 @@ const Auth = {
   isGuest() { return !this.user; },
   isUser() { return !!this.user; },
   isAdmin() { return this.user && this.user.role === 'admin'; },
+  isVerified() { return this.user && this.user.emailVerified; },
 
   // Show/hide elements based on data-auth attribute
   updateUI() {
@@ -154,6 +155,7 @@ const Auth = {
           </div>
           <div id="auth-login-error" style="color:#dc2626;font-size:0.75rem;margin-bottom:8px;display:none;"></div>
           <button id="auth-login-submit" style="width:100%;padding:10px;background:#16a34a;color:white;border:none;border-radius:8px;font-size:0.875rem;font-weight:600;cursor:pointer;">Log In</button>
+          <p style="text-align:center;margin-top:12px;"><a id="auth-forgot-password" href="/reset-password.html" style="font-size:0.75rem;color:#64748b;text-decoration:none;">Forgot your password?</a></p>
         </div>
 
         <div id="auth-form-register" style="display:none;">
@@ -240,6 +242,9 @@ const Auth = {
         const data = await res.json();
         if (!res.ok) {
           errorEl.textContent = data.error || 'Login failed';
+          if (res.status === 423) {
+            errorEl.textContent = data.error || 'Account is temporarily locked. Please try again later.';
+          }
           errorEl.style.display = '';
           return;
         }

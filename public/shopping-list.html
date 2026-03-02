@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Shopping List</title>
+    <link rel="icon" type="image/svg+xml" href="/images/logo.svg">
     <style>
         /* Import modern, organic fonts */
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Source+Serif+Pro:wght@400;600;700&display=swap');
@@ -236,6 +237,83 @@
 
         .ingredient-item input[type="checkbox"]:checked {
             opacity: 0.7;
+        }
+
+        /* Pantry badge — shown inline next to the ingredient name */
+        .pantry-badge {
+            font-size: 0.72em;
+            font-weight: 500;
+            color: #6B7280;
+            background: #F3F4F6;
+            border: 1px solid #E5E7EB;
+            border-radius: 4px;
+            padding: 1px 6px;
+            letter-spacing: 0.01em;
+            pointer-events: none;
+            margin-left: 8px;
+            vertical-align: middle;
+            white-space: nowrap;
+        }
+
+        /* Recipe source tags — shown inline after ingredient name */
+        .recipe-tag {
+            font-size: 0.70em;
+            font-weight: 500;
+            color: #6B7280;
+            background: #F3F4F6;
+            border: 1px solid #E5E7EB;
+            border-radius: 4px;
+            padding: 1px 6px;
+            margin-left: 4px;
+            vertical-align: middle;
+            white-space: nowrap;
+            max-width: 150px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: inline-block;
+            pointer-events: none;
+        }
+
+        /* Save-to-pantry prompt — appears below a checked pantry candidate */
+        .pantry-prompt-row {
+            display: none;
+            padding: 8px 8px 8px 44px;
+            background: #FFFBEB;
+            border-bottom: 1px solid var(--border-color);
+            align-items: center;
+            gap: 10px;
+            font-size: 0.88em;
+            color: var(--secondary-color);
+        }
+
+        .pantry-prompt-row.active {
+            display: flex;
+        }
+
+        .pantry-save-btn {
+            background: none;
+            border: 1px solid var(--primary-color);
+            color: var(--primary-color);
+            border-radius: 6px;
+            padding: 3px 10px;
+            cursor: pointer;
+            font-size: 0.85em;
+            font-family: inherit;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .pantry-save-btn:hover { background: #E8F5E9; }
+
+        .pantry-dismiss-btn {
+            background: none;
+            border: none;
+            color: var(--secondary-color);
+            cursor: pointer;
+            font-size: 0.85em;
+            font-family: inherit;
+            text-decoration: underline;
+            flex-shrink: 0;
         }
 
         /* Share Button */
@@ -604,7 +682,8 @@
         <h3>Share Shopping List</h3>
         <textarea id="share-text" readonly></textarea>
         <div class="share-dialog-buttons">
-            <button class="copy-button" id="copy-button">Copy to Clipboard</button>
+            <button class="copy-button" id="copy-link-button" style="display:none">Copy Link</button>
+            <button class="copy-button" id="copy-button">Copy Full List</button>
             <button class="close-button" id="close-dialog">Close</button>
         </div>
     </div>
@@ -672,11 +751,13 @@
                         displayQty = totalTsp / UI[displayUnit].toBase;
                     }
                     const first = entries[0].item;
+                    const mergedRecipes = new Set(entries.flatMap(e => [...(e.item.recipes || [])]));
                     merged[`${name}|${displayUnit}`] = {
                         quantity: displayQty,
                         units: displayUnit,
                         section: first.section,
-                        originalName: first.originalName
+                        originalName: first.originalName,
+                        recipes: mergedRecipes
                     };
                 } else if (types.has('volume') && types.has('weight')) {
                     // Mixed volume + weight — convert weight to volume using density
@@ -695,11 +776,13 @@
                     const displayUnit = UnitConversion.bestVolumeUnit(totalTsp);
                     const displayQty = totalTsp / UI[displayUnit].toBase;
                     const first = entries[0].item;
+                    const mergedRecipes2 = new Set(entries.flatMap(e => [...(e.item.recipes || [])]));
                     merged[`${name}|${displayUnit}`] = {
                         quantity: displayQty,
                         units: displayUnit,
                         section: first.section,
-                        originalName: first.originalName
+                        originalName: first.originalName,
+                        recipes: mergedRecipes2
                     };
                 } else {
                     // Other mixed types — keep separate
@@ -712,6 +795,39 @@
         // Build recipe URL lookup (populated after async fetch)
         const recipeUrls = {};
         const recipeById = {};
+
+        // --- Pantry state ---
+        // Slugs that qualify for the "save to pantry?" prompt after being checked.
+        const PANTRY_CANDIDATES = new Set([
+            'salt', 'olive-oil', 'flour', 'butter', 'eggs',
+            'garlic', 'cumin', 'oregano', 'paprika', 'dried-basil',
+            'maple-syrup', 'balsamic-vinegar', 'basmati-rice', 'pasta', 'spaghetti',
+            // Nuts & seeds
+            'almonds', 'walnuts', 'pistachios', 'hazelnuts', 'pine-nuts',
+            'cashews', 'pecans', 'macadamia-nuts', 'brazil-nuts', 'peanuts',
+            'chestnuts', 'pumpkin-seeds', 'sunflower-seeds', 'sesame-seeds',
+            'flaxseeds', 'chia-seeds', 'coconut-flakes', 'shredded-coconut',
+            // Frozen staples
+            'frozen-peas', 'frozen-corn', 'frozen-edamame',
+            // Oils
+            'olive-oil', 'peanut-oil', 'vegetable-oil', 'canola-oil', 'coconut-oil',
+            'sesame-oil', 'avocado-oil', 'sunflower-oil', 'grapeseed-oil',
+            // Vinegars
+            'balsamic-vinegar', 'red-wine-vinegar', 'white-wine-vinegar',
+            'apple-cider-vinegar', 'rice-vinegar', 'white-vinegar', 'sherry-vinegar',
+            // Rice & grains
+            'basmati-rice', 'white-rice', 'brown-rice', 'jasmine-rice', 'wild-rice',
+            'arborio-rice', 'quinoa', 'farro', 'barley', 'bulgur', 'couscous',
+            'oats', 'rolled-oats', 'polenta', 'cornmeal',
+            // Pasta & noodles
+            'pasta', 'spaghetti', 'penne', 'rigatoni', 'fettuccine', 'linguine',
+            'orzo', 'lasagna-noodles', 'egg-noodles', 'rice-noodles', 'ramen-noodles',
+            // Dairy staples
+            'butter', 'half-and-half', 'whole-milk', 'skim-milk', 'heavy-cream',
+            'sour-cream', 'cream-cheese'
+        ]);
+        let pantryItems = new Set();  // slugs currently saved to pantry
+        const nameToSlug = {};        // ingredient name (lowercase) → slug, built from ingredientDefs
 
         // DOM References
         const recipeLinksDiv = document.getElementById('selected-recipe-links');
@@ -780,12 +896,14 @@
 
                     if (shoppingList[combinedKey]) {
                         shoppingList[combinedKey].quantity += numQuantity;
+                        shoppingList[combinedKey].recipes.add(item.recipeName);
                     } else {
                         shoppingList[combinedKey] = {
                             quantity: numQuantity,
                             units: units || '',
                             section: normalizedSection || 'Uncategorized',
-                            originalName: ingredient
+                            originalName: ingredient,
+                            recipes: new Set([item.recipeName])
                         };
                     }
                 }
@@ -845,9 +963,13 @@
                     headerLi.textContent = section;
                     shoppingListUl.appendChild(headerLi);
 
-                    items.sort(([, itemA], [, itemB]) => 
+                    items.sort(([, itemA], [, itemB]) =>
                         itemA.originalName.localeCompare(itemB.originalName)
                     ).forEach(([combinedKey, item], index) => {
+                        const slug = nameToSlug[item.originalName.toLowerCase()];
+                        const isInPantry = !!(slug && pantryItems.has(slug));
+                        const isPantryCandidate = !!(slug && PANTRY_CANDIDATES.has(slug));
+
                         const listItem = document.createElement('li');
                         listItem.classList.add('ingredient-item');
 
@@ -857,11 +979,30 @@
                         const checkboxId = `item-${safeKey}-${index}`;
                         checkbox.id = checkboxId;
                         checkbox.classList.add('shopping-list-checkbox');
+                        if (isInPantry) checkbox.checked = true;
 
                         const label = document.createElement('label');
                         label.htmlFor = checkboxId;
                         label.classList.add('ingredient-name');
                         label.textContent = item.originalName;
+                        if (isInPantry) {
+                            const badge = document.createElement('span');
+                            badge.classList.add('pantry-badge');
+                            badge.textContent = 'already in pantry';
+                            label.appendChild(badge);
+                        }
+                        if (selectedRecipes.length > 1 && item.recipes && item.recipes.size > 0) {
+                            item.recipes.forEach(recipeName => {
+                                const shortName = recipeName.replace(/\s+by\s+.+$/i, '');
+                                const tag = document.createElement('span');
+                                tag.classList.add('recipe-tag');
+                                tag.title = recipeName;
+                                tag.textContent = shortName.length > 22
+                                    ? shortName.substring(0, 20) + '\u2026'
+                                    : shortName;
+                                label.appendChild(tag);
+                            });
+                        }
 
                         const qtySpan = document.createElement('span');
                         qtySpan.classList.add('ingredient-qty');
@@ -879,6 +1020,50 @@
                         listItem.appendChild(qtySpan);
                         listItem.appendChild(unitSpan);
                         shoppingListUl.appendChild(listItem);
+
+                        // Pantry prompt row — inserted after the item, shown on first check
+                        let promptRow = null;
+                        if (isPantryCandidate) {
+                            promptRow = document.createElement('li');
+                            promptRow.classList.add('pantry-prompt-row');
+                            promptRow.innerHTML =
+                                '<span>Save to pantry? It won\'t appear on future shopping lists by default.</span>' +
+                                '<button class="pantry-save-btn">Yes, I always have this</button>' +
+                                '<button class="pantry-dismiss-btn">No thanks</button>';
+                            shoppingListUl.appendChild(promptRow);
+
+                            promptRow.querySelector('.pantry-save-btn').addEventListener('click', async () => {
+                                await addToPantry(slug);
+                                if (!label.querySelector('.pantry-badge')) {
+                                    const badge = document.createElement('span');
+                                    badge.classList.add('pantry-badge');
+                                    badge.textContent = 'already in pantry';
+                                    label.appendChild(badge);
+                                }
+                                promptRow.classList.remove('active');
+                            });
+
+                            promptRow.querySelector('.pantry-dismiss-btn').addEventListener('click', () => {
+                                promptRow.classList.remove('active');
+                            });
+
+                            // Show prompt when user checks this item (only if not already in pantry)
+                            checkbox.addEventListener('change', async () => {
+                                if (checkbox.checked) {
+                                    if (!pantryItems.has(slug)) {
+                                        promptRow.classList.add('active');
+                                    }
+                                } else {
+                                    // Uncheck: remove from pantry if it was saved there
+                                    if (pantryItems.has(slug)) {
+                                        await removeFromPantry(slug);
+                                        const badge = label.querySelector('.pantry-badge');
+                                        if (badge) badge.remove();
+                                    }
+                                    promptRow.classList.remove('active');
+                                }
+                            });
+                        }
                     });
                 });
             }
@@ -938,6 +1123,51 @@
             });
         }
 
+        // --- Pantry helpers ---
+        async function loadPantry() {
+            if (typeof Auth !== 'undefined' && Auth.isUser()) {
+                try {
+                    const res = await Auth.fetch('/api/pantry', { credentials: 'same-origin' });
+                    if (res.ok) {
+                        const data = await res.json();
+                        pantryItems = new Set(data.items);
+                    }
+                } catch (err) {
+                    console.error('Error loading pantry:', err);
+                }
+            } else {
+                // Guest: persist in localStorage
+                const saved = JSON.parse(localStorage.getItem('pantryItems') || '[]');
+                pantryItems = new Set(saved);
+            }
+        }
+
+        async function addToPantry(slug) {
+            pantryItems.add(slug);
+            if (typeof Auth !== 'undefined' && Auth.isUser()) {
+                try {
+                    await Auth.fetch(`/api/pantry/${slug}`, { method: 'PUT' });
+                } catch (err) {
+                    console.error('Error adding to pantry:', err);
+                }
+            } else {
+                localStorage.setItem('pantryItems', JSON.stringify([...pantryItems]));
+            }
+        }
+
+        async function removeFromPantry(slug) {
+            pantryItems.delete(slug);
+            if (typeof Auth !== 'undefined' && Auth.isUser()) {
+                try {
+                    await Auth.fetch(`/api/pantry/${slug}`, { method: 'DELETE' });
+                } catch (err) {
+                    console.error('Error removing from pantry:', err);
+                }
+            } else {
+                localStorage.setItem('pantryItems', JSON.stringify([...pantryItems]));
+            }
+        }
+
         // Load data when page loads — fetch recipe data first for URL lookup
         async function initShoppingList() {
             try {
@@ -950,6 +1180,10 @@
                             .map(def => ({ name: def.name, section: def.section }))
                             .concat(extraGroceries)
                             .sort((a, b) => a.name.localeCompare(b.name));
+                        // Build reverse map: ingredient name (lowercase) → slug
+                        Object.entries(recipeData.ingredientDefs).forEach(([slug, def]) => {
+                            nameToSlug[def.name.toLowerCase()] = slug;
+                        });
                     }
                     recipeData.recipes.forEach(recipe => {
                         if (recipe.url) recipeUrls[recipe.name] = recipe.url;
@@ -959,6 +1193,7 @@
             } catch (err) {
                 console.error('Error fetching recipe data:', err);
             }
+            await loadPantry();
             await loadShoppingList();
         }
         window.addEventListener('load', initShoppingList);
@@ -1056,6 +1291,7 @@
         const overlay = document.getElementById('overlay');
         const closeDialog = document.getElementById('close-dialog');
         const copyButton = document.getElementById('copy-button');
+        const copyLinkButton = document.getElementById('copy-link-button');
         const shareText = document.getElementById('share-text');
         const toast = document.getElementById('toast');
 
@@ -1093,22 +1329,28 @@
 
             if (navigator.share) {
                 try {
-                    await navigator.share({
-                        title: '',
-                        text: text
-                    });
+                    const shareData = cachedPlanUrl
+                        ? { text: "Hey! Check out what I'm cooking this week:", url: cachedPlanUrl }
+                        : { text: text };
+                    await navigator.share(shareData);
                 } catch (err) {
                     if (err.name !== 'AbortError') {
-                        showShareDialog(text);
+                        showShareDialog(text, cachedPlanUrl);
                     }
                 }
             } else {
-                showShareDialog(text);
+                showShareDialog(text, cachedPlanUrl);
             }
         });
 
-        function showShareDialog(text) {
+        function showShareDialog(text, planUrl) {
             shareText.value = text;
+            if (planUrl) {
+                copyLinkButton.style.display = '';
+                copyLinkButton.dataset.linkText = "Hey! Check out what I'm cooking this week:\n" + planUrl;
+            } else {
+                copyLinkButton.style.display = 'none';
+            }
             shareDialog.classList.add('active');
             overlay.classList.add('active');
         }
@@ -1120,6 +1362,15 @@
 
         closeDialog.addEventListener('click', hideShareDialog);
         overlay.addEventListener('click', hideShareDialog);
+
+        copyLinkButton.addEventListener('click', async () => {
+            try {
+                await navigator.clipboard.writeText(copyLinkButton.dataset.linkText);
+                showToast('Link copied to clipboard!');
+            } catch (err) {
+                console.error('Failed to copy link: ', err);
+            }
+        });
 
         copyButton.addEventListener('click', async () => {
             try {

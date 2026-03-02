@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>This Week's Meals</title>
+    <link rel="icon" type="image/svg+xml" href="/images/logo.svg">
     <meta property="og:title" content="This Week's Meals">
     <meta property="og:description" content="Check out this week's meal plan!">
     <meta property="og:type" content="website">
@@ -194,6 +195,25 @@
             .card-body { padding: 0.75rem; }
             .card-title { font-size: 0.95rem; }
         }
+
+        .btn-add {
+            display: block;
+            width: calc(100% - 2rem);
+            margin: 0 1rem 1rem;
+            padding: 8px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-family: 'Source Serif Pro', serif;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-add:hover:not(:disabled) { background: #1B5E20; }
+        .btn-add:disabled { background: #9ca3af; cursor: default; }
+        .btn-add.added { background: #059669; }
     </style>
 </head>
 <body>
@@ -221,8 +241,13 @@
         <a href="/" class="cta-link">Plan your own meals &rarr;</a>
     </div>
 
+    <script src="/js/auth.js"></script>
     <script>
         const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=400&q=80';
+
+        // Resolved once the plan has been fetched and rendered
+        let shareId = null;
+        let planData = null;
 
         function escapeHtml(str) {
             const div = document.createElement('div');
@@ -230,9 +255,39 @@
             return div.innerHTML;
         }
 
+        async function handleAdd(btn, recipeId) {
+            if (!Auth.isUser()) {
+                sessionStorage.setItem('pendingAdd', recipeId);
+                Auth.showLoginPrompt('Sign in to add this recipe to your collection');
+                return;
+            }
+            btn.disabled = true;
+            btn.textContent = 'Adding...';
+            try {
+                const csrfToken = document.cookie.match(/csrf_token=([^;]+)/)?.[1] || '';
+                const res = await fetch('/api/meal-plans/' + shareId + '/add-recipe', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ recipeId })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    btn.textContent = data.added ? 'Added \u2713' : 'Already in collection';
+                    btn.classList.add('added');
+                } else {
+                    btn.textContent = 'Add to my collection';
+                    btn.disabled = false;
+                }
+            } catch {
+                btn.textContent = 'Add to my collection';
+                btn.disabled = false;
+            }
+        }
+
         async function loadPlan() {
             const pathParts = window.location.pathname.split('/plan/');
-            const shareId = pathParts[1];
+            shareId = pathParts[1];
             if (!shareId || !/^[A-Za-z0-9_-]{12}$/.test(shareId)) {
                 showError();
                 return;
@@ -241,8 +296,8 @@
             try {
                 const res = await fetch('/api/meal-plans/' + encodeURIComponent(shareId));
                 if (!res.ok) { showError(); return; }
-                const data = await res.json();
-                renderPlan(data);
+                planData = await res.json();
+                renderPlan(planData);
             } catch {
                 showError();
             }
@@ -263,23 +318,24 @@
             parts.push(dateStr);
             byEl.innerHTML = parts.join(' &middot; ');
 
-            // Update page title
             if (data.createdBy) {
                 document.title = data.createdBy + "'s Meal Plan";
             }
 
-            // Recipe cards
             const grid = document.getElementById('recipe-grid');
             data.recipes.forEach(recipe => {
-                const card = document.createElement('a');
+                const card = document.createElement('div');
                 card.className = 'recipe-card';
+
+                // Wrap image in a link if the recipe has a URL
+                const cardLink = document.createElement('a');
                 if (recipe.url) {
-                    card.href = recipe.url;
-                    card.target = '_blank';
-                    card.rel = 'noopener noreferrer';
+                    cardLink.href = recipe.url;
+                    cardLink.target = '_blank';
+                    cardLink.rel = 'noopener noreferrer';
                 } else {
-                    card.removeAttribute('href');
-                    card.style.cursor = 'default';
+                    cardLink.style.cursor = 'default';
+                    cardLink.addEventListener('click', e => e.preventDefault());
                 }
 
                 const img = document.createElement('img');
@@ -290,6 +346,7 @@
                 const imageDiv = document.createElement('div');
                 imageDiv.className = 'card-image';
                 imageDiv.appendChild(img);
+                cardLink.appendChild(imageDiv);
 
                 const title = document.createElement('h3');
                 title.className = 'card-title';
@@ -308,10 +365,36 @@
                     timeEl.textContent = timeParts.join(' \u00B7 ');
                     body.appendChild(timeEl);
                 }
+                cardLink.appendChild(body);
+                card.appendChild(cardLink);
 
-                card.appendChild(imageDiv);
-                card.appendChild(body);
+                // "Add to my collection" button
+                const addBtn = document.createElement('button');
+                addBtn.className = 'btn-add';
+                addBtn.dataset.recipeId = recipe.id;
+                addBtn.textContent = 'Add to my collection';
+                addBtn.addEventListener('click', () => handleAdd(addBtn, recipe.id));
+                card.appendChild(addBtn);
+
                 grid.appendChild(card);
+            });
+
+            // After rendering, handle auth state
+            Auth.onReady(user => {
+                // Hide add buttons if viewing your own shared plan
+                if (user && data.sharerId && user.id === data.sharerId) {
+                    document.querySelectorAll('.btn-add').forEach(b => b.style.display = 'none');
+                }
+
+                // Auto-trigger a pending add (set before login redirect)
+                if (user) {
+                    const pendingId = sessionStorage.getItem('pendingAdd');
+                    if (pendingId) {
+                        sessionStorage.removeItem('pendingAdd');
+                        const btn = document.querySelector('.btn-add[data-recipe-id="' + CSS.escape(pendingId) + '"]');
+                        if (btn) handleAdd(btn, pendingId);
+                    }
+                }
             });
         }
 
@@ -320,6 +403,7 @@
             document.getElementById('error-state').classList.remove('hidden');
         }
 
+        Auth.init();
         loadPlan();
     </script>
 </body>

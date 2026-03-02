@@ -15,6 +15,10 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash VARCHAR(255) NOT NULL,
   display_name  VARCHAR(100),
   role          VARCHAR(20) NOT NULL DEFAULT 'user',
+  failed_login_attempts INTEGER NOT NULL DEFAULT 0,
+  locked_until  TIMESTAMPTZ,
+  email_unsubscribed BOOLEAN NOT NULL DEFAULT false,
+  email_verified_at  TIMESTAMPTZ,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -35,9 +39,11 @@ CREATE TABLE IF NOT EXISTS user_recipes (
   user_id         INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   recipe_id       VARCHAR(255) NOT NULL,
   recipe_data     JSONB NOT NULL,
-  ingredient_defs JSONB NOT NULL DEFAULT '{}',
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  ingredient_defs   JSONB NOT NULL DEFAULT '{}',
+  shared_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  shared_by_name    TEXT,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(user_id, recipe_id)
 );
 CREATE INDEX IF NOT EXISTS idx_user_recipes_user ON user_recipes (user_id);
@@ -85,11 +91,74 @@ CREATE TABLE IF NOT EXISTS shared_meal_plans (
   expires_at       TIMESTAMPTZ NOT NULL DEFAULT NOW() + INTERVAL '30 days'
 );
 CREATE INDEX IF NOT EXISTS idx_shared_plans_share_id ON shared_meal_plans (share_id);
+
+-- Email verification tokens
+CREATE TABLE IF NOT EXISTS email_verification_tokens (
+  id         SERIAL PRIMARY KEY,
+  user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token_hash VARCHAR(64) NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  used       BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_email_verify_tokens_hash ON email_verification_tokens (token_hash);
+
+-- Password reset tokens
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+  id         SERIAL PRIMARY KEY,
+  user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token_hash VARCHAR(64) NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  used       BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_reset_tokens_hash ON password_reset_tokens (token_hash);
+
+-- Per-user pantry: ingredients they always have at home
+CREATE TABLE IF NOT EXISTS user_pantry (
+  user_id         INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  ingredient_slug VARCHAR(100) NOT NULL,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (user_id, ingredient_slug)
+);
+CREATE INDEX IF NOT EXISTS idx_user_pantry_user ON user_pantry (user_id);
 `;
 
 async function migrate() {
   console.log('Running database migration...');
   await pool.query(DDL);
+
+  // Add lockout columns to existing users tables
+  await pool.query(`
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_login_attempts INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until TIMESTAMPTZ;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS email_unsubscribed BOOLEAN NOT NULL DEFAULT false;
+  `);
+
+  // Add shared-recipe attribution columns to user_recipes
+  await pool.query(`
+    ALTER TABLE user_recipes ADD COLUMN IF NOT EXISTS shared_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
+    ALTER TABLE user_recipes ADD COLUMN IF NOT EXISTS shared_by_name TEXT;
+  `);
+
+  // Add email verification to users
+  await pool.query(`
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified_at TIMESTAMPTZ;
+  `);
+
+  // Email verification tokens table
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS email_verification_tokens (
+      id         SERIAL PRIMARY KEY,
+      user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      token_hash VARCHAR(64) NOT NULL,
+      expires_at TIMESTAMPTZ NOT NULL,
+      used       BOOLEAN NOT NULL DEFAULT false,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_email_verify_tokens_hash ON email_verification_tokens (token_hash);
+  `);
+
   console.log('Migration complete — all tables created.');
 }
 

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 548 640">
+  <!-- Front panel -->
+  <rect x="80" y="158" width="270" height="382" fill="#6B9ED2"/>
+  <!-- Side panel (wide, grocery bag) -->
+  <polygon points="350,158 508,38 508,360 350,540" fill="#3A6EA5"/>
+</svg>
