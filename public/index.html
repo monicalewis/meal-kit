@@ -301,6 +301,7 @@
 
         <footer class="text-center text-sm text-slate-400 mt-12 mb-4">
             Questions? <a href="mailto:hello@diyrecipekit.com" class="text-green-600 hover:text-green-700 underline">hello@diyrecipekit.com</a>
+            <div id="app-version" class="mt-1"></div>
         </footer>
 
         <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-4">
@@ -1486,6 +1487,10 @@
             }
 
             init();
+
+            fetch('/api/version').then(r => r.json()).then(data => {
+                document.getElementById('app-version').textContent = 'v' + data.version;
+            }).catch(() => {});
         }
         initApp();
     </script>
@@ -1561,6 +1566,7 @@
                 <!-- Editable ingredients -->
                 <div>
                     <h5 class="text-sm font-medium text-slate-700 mb-2">Ingredients <span class="font-normal text-slate-400">(click new items to edit)</span>:</h5>
+                    <p class="text-xs text-amber-600 mb-2">Ingredients identified with AI, please review as there may be mistakes.</p>
                     <div id="preview-ingredients" class="space-y-1 text-sm"></div>
                 </div>
                 <div id="preview-new-ingredients-section" class="hidden">
@@ -1721,11 +1727,21 @@
             return null; // No JSON-LD found — will use AI fallback
         }
 
+        // Extract og:title or <title> from HTML — used as a reliable recipe name anchor
+        function extractPageTitle(html) {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const og = doc.querySelector('meta[property="og:title"]');
+            if (og && og.content) return og.content.trim();
+            const title = doc.querySelector('title');
+            return title ? title.textContent.trim() : '';
+        }
+
         // Extract visible text from HTML for AI fallback, prioritizing recipe content
         function extractPageText(html) {
             const parser = new DOMParser();
             const doc = parser.parseFromString(html, 'text/html');
-            doc.querySelectorAll('script, style, nav, footer, header, .comments, #comments').forEach(el => el.remove());
+            doc.querySelectorAll('script, style, nav, footer, header, aside, .comments, #comments, [class*="sidebar"], [class*="widget"], [class*="related"], [class*="popular"], [class*="recent"]').forEach(el => el.remove());
             const fullText = doc.body.textContent.replace(/\s+/g, ' ').trim();
 
             const measurementPattern = /\b(\d[\d\/\.\s-]*\s*(cups?|tablespoons?|tbsp|teaspoons?|tsp|ounces?|oz|pounds?|lbs?|grams?|g\b|kg\b|ml\b|liters?|l\b|cloves?|sticks?|cans?|jars?|bags?|bunches?|heads?|slices?|sprigs?|pieces?|packages?))\b/gi;
@@ -1931,6 +1947,23 @@
                 const fetchData = await fetchRes.json();
                 if (!fetchRes.ok) throw new Error(fetchData.error || 'Failed to fetch recipe page');
 
+                // Cache hit: another user already imported this URL — skip parsing entirely
+                if (fetchData.cached) {
+                    importStatusText.textContent = 'Recipe found!';
+                    const cached = fetchData.recipe;
+                    if (fetchData.ingredientDefs) {
+                        Object.assign(recipeData.ingredientDefs, fetchData.ingredientDefs);
+                    }
+                    pendingRecipe = {
+                        recipe: { ...cached, url },
+                        newIngredientDefs: fetchData.ingredientDefs || {},
+                        candidateImages: cached.image ? [cached.image] : []
+                    };
+                    showImportPreview(pendingRecipe);
+                    importStatus.classList.add('hidden');
+                    return;
+                }
+
                 // Step 2: Try JSON-LD extraction first
                 importStatusText.textContent = 'Extracting recipe data...';
                 const extracted = extractRecipeFromHtml(fetchData.html, url);
@@ -1965,10 +1998,12 @@
                     // Fallback: send page text to Claude for full extraction
                     importStatusText.textContent = 'Extracting recipe with AI...';
                     const pageText = extractPageText(fetchData.html);
+                    const pageTitle = extractPageTitle(fetchData.html);
                     const extractRes = await Auth.fetch('/api/extract-recipe', {
                         method: 'POST',
                         body: JSON.stringify({
                             pageText,
+                            pageTitle,
                             sourceUrl: url,
                             existingDefs: recipeData.ingredientDefs
                         })

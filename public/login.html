@@ -133,20 +133,31 @@
             const password = document.getElementById('login-password').value;
 
             try {
+                const csrfToken = getCsrf();
+                console.log('[login.html:login] Submitting — CSRF token present:', !!csrfToken);
                 const res = await fetch('/api/auth/login', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrf() },
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
                     credentials: 'same-origin',
                     body: JSON.stringify({ email, password })
                 });
                 const data = await res.json();
                 if (!res.ok) {
-                    errorEl.textContent = data.error || 'Login failed';
+                    console.error('[login.html:login] Failed —', res.status, data);
+                    if (res.status === 429) {
+                        errorEl.textContent = 'Too many attempts. Please wait a few minutes and try again.';
+                    } else if (res.status >= 500) {
+                        errorEl.textContent = data.error || 'Server error. Please try again.';
+                    } else {
+                        errorEl.textContent = data.error || 'Login failed.';
+                    }
                     errorEl.classList.remove('hidden');
                     return;
                 }
+                console.log('[login.html:login] Success');
                 window.location.href = '/';
-            } catch {
+            } catch (err) {
+                console.error('[login.html:login] Network error:', err);
                 errorEl.textContent = 'Connection error. Please try again.';
                 errorEl.classList.remove('hidden');
             }
@@ -180,20 +191,31 @@
             }
 
             try {
+                const csrfToken = getCsrf();
+                console.log('[login.html:register] Submitting — CSRF token present:', !!csrfToken);
                 const res = await fetch('/api/auth/register', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrf() },
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
                     credentials: 'same-origin',
                     body: JSON.stringify({ email, password, displayName: displayName || undefined })
                 });
                 const data = await res.json();
                 if (!res.ok) {
-                    errorEl.textContent = data.error || 'Registration failed';
+                    console.error('[login.html:register] Failed —', res.status, data);
+                    if (res.status === 429) {
+                        errorEl.textContent = 'Too many attempts. Please wait a few minutes and try again.';
+                    } else if (res.status >= 500) {
+                        errorEl.textContent = data.error || 'Server error. Please try again.';
+                    } else {
+                        errorEl.textContent = data.error || 'Registration failed.';
+                    }
                     errorEl.classList.remove('hidden');
                     return;
                 }
+                console.log('[login.html:register] Success');
                 window.location.href = '/';
-            } catch {
+            } catch (err) {
+                console.error('[login.html:register] Network error:', err);
                 errorEl.textContent = 'Connection error. Please try again.';
                 errorEl.classList.remove('hidden');
             }

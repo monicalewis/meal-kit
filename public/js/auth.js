@@ -233,6 +233,7 @@ const Auth = {
 
       try {
         const csrfToken = document.cookie.match(/csrf_token=([^;]+)/)?.[1] || '';
+        console.log('[auth:login] Submitting — CSRF token present:', !!csrfToken);
         const res = await fetch('/api/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
@@ -241,17 +242,25 @@ const Auth = {
         });
         const data = await res.json();
         if (!res.ok) {
-          errorEl.textContent = data.error || 'Login failed';
-          if (res.status === 423) {
+          console.error('[auth:login] Failed —', res.status, data);
+          if (res.status === 429) {
+            errorEl.textContent = 'Too many attempts. Please wait a few minutes and try again.';
+          } else if (res.status === 423) {
             errorEl.textContent = data.error || 'Account is temporarily locked. Please try again later.';
+          } else if (res.status >= 500) {
+            errorEl.textContent = data.error || 'Server error. Please try again.';
+          } else {
+            errorEl.textContent = data.error || 'Login failed.';
           }
           errorEl.style.display = '';
           return;
         }
+        console.log('[auth:login] Success — user id:', data.user?.id);
         this.user = data.user;
         closeModal();
         window.location.reload();
       } catch (err) {
+        console.error('[auth:login] Network error:', err);
         errorEl.textContent = 'Connection error. Please try again.';
         errorEl.style.display = '';
       }
@@ -289,6 +298,7 @@ const Auth = {
 
       try {
         const csrfToken = document.cookie.match(/csrf_token=([^;]+)/)?.[1] || '';
+        console.log('[auth:register] Submitting — CSRF token present:', !!csrfToken);
         const res = await fetch('/api/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
@@ -297,14 +307,23 @@ const Auth = {
         });
         const data = await res.json();
         if (!res.ok) {
-          errorEl.textContent = data.error || 'Registration failed';
+          console.error('[auth:register] Failed —', res.status, data);
+          if (res.status === 429) {
+            errorEl.textContent = 'Too many attempts. Please wait a few minutes and try again.';
+          } else if (res.status >= 500) {
+            errorEl.textContent = data.error || 'Server error. Please try again.';
+          } else {
+            errorEl.textContent = data.error || 'Registration failed.';
+          }
           errorEl.style.display = '';
           return;
         }
+        console.log('[auth:register] Success — user id:', data.user?.id);
         this.user = data.user;
         closeModal();
         window.location.reload();
       } catch (err) {
+        console.error('[auth:register] Network error:', err);
         errorEl.textContent = 'Connection error. Please try again.';
         errorEl.style.display = '';
       }

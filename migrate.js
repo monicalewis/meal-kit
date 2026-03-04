@@ -122,6 +122,32 @@ CREATE TABLE IF NOT EXISTS user_pantry (
   PRIMARY KEY (user_id, ingredient_slug)
 );
 CREATE INDEX IF NOT EXISTS idx_user_pantry_user ON user_pantry (user_id);
+
+-- Recipe import event log
+CREATE TABLE IF NOT EXISTS recipe_import_log (
+  id          SERIAL PRIMARY KEY,
+  user_id     INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  action      VARCHAR(50) NOT NULL,
+  url         TEXT,
+  recipe_name TEXT,
+  recipe_id   VARCHAR(255),
+  error       TEXT,
+  ip_address  INET,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_recipe_import_log_user    ON recipe_import_log (user_id);
+CREATE INDEX IF NOT EXISTS idx_recipe_import_log_action  ON recipe_import_log (action);
+CREATE INDEX IF NOT EXISTS idx_recipe_import_log_created ON recipe_import_log (created_at);
+
+-- Shared parse cache: one canonical record per URL so the same URL is never AI-parsed twice
+CREATE TABLE IF NOT EXISTS recipe_url_cache (
+  id              SERIAL PRIMARY KEY,
+  normalized_url  TEXT NOT NULL UNIQUE,
+  recipe_data     JSONB NOT NULL,
+  ingredient_defs JSONB NOT NULL DEFAULT '{}',
+  cached_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_recipe_url_cache_url ON recipe_url_cache (normalized_url);
 `;
 
 async function migrate() {
@@ -157,6 +183,11 @@ async function migrate() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
     CREATE INDEX IF NOT EXISTS idx_email_verify_tokens_hash ON email_verification_tokens (token_hash);
+  `);
+
+  // Link user_recipes to the URL parse cache
+  await pool.query(`
+    ALTER TABLE user_recipes ADD COLUMN IF NOT EXISTS url_cache_id INTEGER REFERENCES recipe_url_cache(id) ON DELETE SET NULL;
   `);
 
   console.log('Migration complete — all tables created.');

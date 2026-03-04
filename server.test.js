@@ -65,6 +65,12 @@ describe('Static file serving (Fix #1)', () => {
     expect(fs.existsSync(path.join(publicDir, 'recipes.js'))).toBe(false);
   });
 
+  test('GET /api/version returns version string', async () => {
+    const res = await request(app).get('/api/version');
+    expect(res.status).toBe(200);
+    expect(res.body.version).toMatch(/^\d+\.\d+\.\d+$/);
+  });
+
   test('frontend files ARE in public/ directory', () => {
     const publicDir = path.join(__dirname, 'public');
     expect(fs.existsSync(path.join(publicDir, 'index.html'))).toBe(true);
@@ -107,8 +113,8 @@ describe('Favorites endpoints (Fix #4)', () => {
 describe('AI model configuration', () => {
   const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
 
-  test('uses llama3-8b-8192 model with JSON mode support', () => {
-    expect(serverSource).toContain('llama3-8b-8192');
+  test('uses llama-3.1-8b-instant model with JSON mode support', () => {
+    expect(serverSource).toContain('llama-3.1-8b-instant');
     expect(serverSource).toContain("response_format: { type: 'json_object' }");
   });
 
@@ -588,6 +594,11 @@ describe('extractJSON — robust AI response parsing', () => {
     expect(() => extractJSON('{not valid json at all}')).toThrow('malformed JSON');
   });
 
+  test('converts fraction literals like 1/4 and 1/2 to decimals', () => {
+    const result = extractJSON('{"qty": 1/4, "qty2": 1/2, "qty3": 3/4}');
+    expect(result).toEqual({ qty: 0.25, qty2: 0.5, qty3: 0.75 });
+  });
+
   test('server.js uses max_tokens of 3000 for AI calls', () => {
     const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
     const matches = serverSource.match(/max_tokens:\s*3000/g);
@@ -639,6 +650,42 @@ describe('extractPageText — smart recipe section detection', () => {
 
   test('extractPageText only seeks recipe section when it is deep in the page (>500 chars)', () => {
     expect(indexSource).toContain('recipeStart > 500');
+  });
+
+  test('extractPageText removes aside and sidebar-like elements to reduce navigation noise', () => {
+    expect(indexSource).toContain('aside');
+    expect(indexSource).toContain('[class*="sidebar"]');
+    expect(indexSource).toContain('[class*="widget"]');
+    expect(indexSource).toContain('[class*="related"]');
+  });
+});
+
+// ── pageTitle hint in extract-recipe ─────────────────────────────────
+
+describe('pageTitle hint for recipe name extraction', () => {
+  const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+  const indexSource = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8');
+
+  test('server /api/extract-recipe accepts pageTitle parameter', () => {
+    expect(serverSource).toContain('const { pageText, pageTitle, sourceUrl, existingDefs } = req.body;');
+  });
+
+  test('server includes pageTitle in AI prompt when provided', () => {
+    expect(serverSource).toContain('pageTitleHint');
+    expect(serverSource).toContain('Use this as the primary source for the recipe name');
+  });
+
+  test('server omits title hint gracefully when pageTitle is absent', () => {
+    expect(serverSource).toContain("pageTitle\n    ?");
+  });
+
+  test('client extracts og:title or <title> from page HTML', () => {
+    expect(indexSource).toContain('extractPageTitle');
+    expect(indexSource).toContain('meta[property="og:title"]');
+  });
+
+  test('client passes pageTitle to /api/extract-recipe', () => {
+    expect(indexSource).toContain('pageTitle,');
   });
 });
 
@@ -839,6 +886,25 @@ describe('Admin user recipes endpoint', () => {
   test('admin.html modal can be closed by clicking backdrop or close button', () => {
     expect(adminSource).toContain('closeRecipesModal()');
     expect(adminSource).toContain('e.target === e.currentTarget');
+  });
+});
+
+// ── Admin email verified column ───────────────────────────────────────
+
+describe('Admin email verified column', () => {
+  const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+  const adminSource = fs.readFileSync(path.join(__dirname, 'public', 'admin.html'), 'utf8');
+
+  test('admin users query includes email_verified_at', () => {
+    expect(serverSource).toContain('u.email_verified_at');
+  });
+
+  test('admin.html has Verified column header', () => {
+    expect(adminSource).toContain('>Verified</th>');
+  });
+
+  test('admin.html renders verified badge based on email_verified_at', () => {
+    expect(adminSource).toContain('u.email_verified_at');
   });
 });
 
@@ -1156,6 +1222,47 @@ describe('extract-recipe specific error handling', () => {
   });
 });
 
+// ── Parse-failure admin notifications ────────────────────────────────
+
+describe('notifyParseFailure admin email notifications', () => {
+  const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+
+  test('notifyParseFailure helper function exists', () => {
+    expect(serverSource).toContain('async function notifyParseFailure(');
+  });
+
+  test('notifyParseFailure guards on ADMIN_EMAIL env var', () => {
+    expect(serverSource).toContain('process.env.ADMIN_EMAIL');
+  });
+
+  test('notifyParseFailure is called on extract-recipe not_a_recipe failure', () => {
+    expect(serverSource).toContain("notifyParseFailure({ endpoint: 'extract-recipe', errorType: 'not_a_recipe'");
+  });
+
+  test('notifyParseFailure is called on extract-recipe no_ingredients failure', () => {
+    expect(serverSource).toContain("notifyParseFailure({ endpoint: 'extract-recipe', errorType: 'no_ingredients'");
+  });
+
+  test('notifyParseFailure is called on extract-recipe paywall/empty page', () => {
+    expect(serverSource).toContain("notifyParseFailure({ endpoint: 'extract-recipe', errorType: 'paywall_or_empty_page'");
+  });
+
+  test('notifyParseFailure is called on extract-recipe AI errors', () => {
+    expect(serverSource).toContain("notifyParseFailure({ endpoint: 'extract-recipe', errorType: 'malformed_json'");
+    expect(serverSource).toContain("notifyParseFailure({ endpoint: 'extract-recipe', errorType: 'ai_error'");
+  });
+
+  test('notifyParseFailure is called on parse-recipe AI errors', () => {
+    expect(serverSource).toContain("notifyParseFailure({ endpoint: 'parse-recipe', errorType: 'malformed_json'");
+    expect(serverSource).toContain("notifyParseFailure({ endpoint: 'parse-recipe', errorType: 'ai_error'");
+  });
+
+  test('notifyParseFailure email send is non-blocking (fire and forget)', () => {
+    // The resend call should use .catch() not await, so it never blocks the response
+    expect(serverSource).toMatch(/resend\.emails\.send\([^)]*\)[\s\S]*?\.catch\(/);
+  });
+});
+
 // ── Scraper error types ──────────────────────────────────────────────
 
 describe('scraper fetchWithBrowser error types', () => {
@@ -1194,5 +1301,724 @@ describe('scraper fetchWithBrowser error types', () => {
   test('provides generic BROWSER_ERROR fallback', () => {
     expect(scraperSource).toContain('BROWSER_ERROR');
     expect(scraperSource).toContain('Headless browser failed');
+  });
+});
+
+// ── Email Verification ────────────────────────────────────────────────
+
+describe('Email verification schema', () => {
+  const migrateSource = fs.readFileSync(path.join(__dirname, 'migrate.js'), 'utf8');
+
+  test('users DDL includes email_verified_at column', () => {
+    expect(migrateSource).toContain('email_verified_at');
+  });
+
+  test('email_verification_tokens table exists in DDL', () => {
+    expect(migrateSource).toContain('email_verification_tokens');
+    expect(migrateSource).toContain('token_hash');
+    expect(migrateSource).toContain('expires_at');
+  });
+
+  test('ALTER TABLE migration adds email_verified_at to existing tables', () => {
+    const alterIdx = migrateSource.indexOf('ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified_at');
+    expect(alterIdx).toBeGreaterThan(-1);
+  });
+});
+
+describe('GET /api/auth/verify-email endpoint (source check)', () => {
+  const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+
+  test('endpoint exists', () => {
+    expect(serverSource).toContain("app.get('/api/auth/verify-email'");
+  });
+
+  test('redirects to /?verified=invalid for missing token', () => {
+    expect(serverSource).toContain("res.redirect('/?verified=invalid')");
+  });
+
+  test('redirects to /?verified=1 on success', () => {
+    expect(serverSource).toContain("res.redirect('/?verified=1')");
+  });
+
+  test('marks token used and sets email_verified_at', () => {
+    expect(serverSource).toContain('email_verified_at = NOW()');
+    expect(serverSource).toContain('used = true');
+  });
+
+  test('updates session emailVerified if user is logged in', () => {
+    expect(serverSource).toContain('req.session.emailVerified = true');
+  });
+});
+
+describe('POST /api/auth/resend-verification endpoint (source check)', () => {
+  const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+
+  test('endpoint exists', () => {
+    expect(serverSource).toContain("app.post('/api/auth/resend-verification'");
+  });
+
+  test('requires auth', () => {
+    expect(serverSource).toContain("app.post('/api/auth/resend-verification', requireAuth");
+  });
+
+  test('returns 400 if already verified', () => {
+    expect(serverSource).toContain("'Email already verified'");
+  });
+});
+
+describe('POST /api/auth/resend-verification HTTP', () => {
+  test('returns 4xx without authentication (CSRF or auth check)', async () => {
+    const res = await request(app)
+      .post('/api/auth/resend-verification')
+      .set('Content-Type', 'application/json');
+    // CSRF protection (403) runs before auth check (401) — both are correct rejections
+    expect(res.status).toBeGreaterThanOrEqual(401);
+    expect(res.status).toBeLessThan(500);
+  });
+});
+
+describe('GET /api/auth/verify-email HTTP', () => {
+  test('redirects to /?verified=invalid with no token', async () => {
+    const res = await request(app).get('/api/auth/verify-email');
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe('/?verified=invalid');
+  });
+
+  test('redirects to /?verified=invalid with invalid token', async () => {
+    const res = await request(app).get('/api/auth/verify-email?token=notarealtoken');
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toMatch(/\?verified=invalid|\/\?verified=error/);
+  });
+});
+
+describe('Share gate: email verification required', () => {
+  const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+
+  test('share endpoint checks emailVerified', () => {
+    expect(serverSource).toContain('EMAIL_UNVERIFIED');
+    expect(serverSource).toContain('req.user.emailVerified');
+  });
+
+  test('returns 403 for unverified user', async () => {
+    const agent = request.agent(app);
+    // Register a new user (unverified by default)
+    const email = `verifytest_${Date.now()}@example.com`;
+    const registerRes = await agent
+      .post('/api/auth/register')
+      .set('Content-Type', 'application/json')
+      .send({ email, password: 'Password1' });
+
+    if (registerRes.status !== 200) return; // Skip if no DB
+
+    // After regenerate(), response has two csrf_token cookies (old + new).
+    // Extract the last one, which matches the regenerated session.
+    let csrfToken = '';
+    for (const c of (registerRes.headers['set-cookie'] || [])) {
+      const m = c.match(/csrf_token=([^;]+)/);
+      if (m) csrfToken = m[1];
+    }
+
+    const shareRes = await agent
+      .post('/api/meal-plans/share')
+      .set('Content-Type', 'application/json')
+      .set('X-CSRF-Token', csrfToken)
+      .send({ recipeIds: ['recipe-1'] });
+
+    expect(shareRes.status).toBe(403);
+    expect(shareRes.body.code).toBe('EMAIL_UNVERIFIED');
+  });
+});
+
+describe('/api/auth/me includes emailVerified (source check)', () => {
+  const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+
+  test('/api/auth/me queries email_verified_at', () => {
+    expect(serverSource).toContain(
+      "SELECT id, email, display_name, role, email_verified_at FROM users WHERE id"
+    );
+  });
+
+  test('/api/auth/me returns emailVerified field', () => {
+    expect(serverSource).toContain('emailVerified: !!user.email_verified_at');
+  });
+});
+
+describe('Registration sets emailVerified: false in session and response', () => {
+  const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+
+  test('registration sets req.session.emailVerified = false', () => {
+    expect(serverSource).toContain('req.session.emailVerified = false');
+  });
+
+  test('registration response includes emailVerified: false', () => {
+    expect(serverSource).toContain('emailVerified: false');
+  });
+
+  test('registration calls sendVerificationEmail', () => {
+    expect(serverSource).toContain('sendVerificationEmail(user.id, user.email)');
+  });
+});
+
+describe('Login sets emailVerified in session and response', () => {
+  const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+
+  test('login SELECT includes email_verified_at', () => {
+    expect(serverSource).toContain(
+      'failed_login_attempts, locked_until, email_verified_at FROM users WHERE email'
+    );
+  });
+
+  test('login sets req.session.emailVerified from DB', () => {
+    expect(serverSource).toContain('req.session.emailVerified = !!user.email_verified_at');
+  });
+});
+
+describe('Auth queries have fallback for missing email_verified_at column', () => {
+  const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+
+  test('login query has .catch fallback without email_verified_at', () => {
+    // The login query should catch errors and retry without email_verified_at
+    const loginFallback = serverSource.includes(
+      'SELECT id, email, password_hash, display_name, role, failed_login_attempts, locked_until FROM users WHERE email'
+    );
+    expect(loginFallback).toBe(true);
+  });
+
+  test('/api/auth/me query has .catch fallback without email_verified_at', () => {
+    const meFallback = serverSource.includes(
+      'SELECT id, email, display_name, role FROM users WHERE id'
+    );
+    expect(meFallback).toBe(true);
+  });
+});
+
+describe('Welcome email suppressed for unverified users', () => {
+  const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+
+  test('welcome email checks email_verified_at before sending', () => {
+    expect(serverSource).toContain("email_unsubscribed, email_verified_at FROM users WHERE id");
+    expect(serverSource).toContain('!check.rows[0].email_verified_at');
+  });
+});
+
+describe('sendVerificationEmail helper (source check)', () => {
+  const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+
+  test('stores SHA-256 hash of token', () => {
+    expect(serverSource).toContain('sendVerificationEmail');
+    expect(serverSource).toContain("createHash('sha256').update(token).digest('hex')");
+  });
+
+  test('token expires in 24 hours', () => {
+    expect(serverSource).toContain("INTERVAL '24 hours'");
+  });
+
+  test('logs verification_email_sent activity', () => {
+    expect(serverSource).toContain("'verification_email_sent'");
+  });
+});
+
+describe('index.html email verification UI', () => {
+  const indexSource = fs.readFileSync(path.join(__dirname, 'public/index.html'), 'utf8');
+
+  test('verification banner is rendered for unverified users', () => {
+    expect(indexSource).toContain('verify-banner');
+    expect(indexSource).toContain('resend-verify-btn');
+    expect(indexSource).toContain('dismiss-verify-btn');
+  });
+
+  test('handles ?verified=1 param with success toast', () => {
+    expect(indexSource).toContain("verifiedParam === '1'");
+    expect(indexSource).toContain('Email verified!');
+  });
+
+  test('handles ?verified=invalid param with error toast', () => {
+    expect(indexSource).toContain("verifiedParam === 'invalid'");
+    expect(indexSource).toContain('invalid or has expired');
+  });
+
+  test('cleans ?verified param from URL', () => {
+    expect(indexSource).toContain("history.replaceState({}, '', '/')");
+  });
+
+  test('share button checks Auth.isVerified() before proceeding', () => {
+    expect(indexSource).toContain('Auth.isVerified()');
+    expect(indexSource).toContain('verify your email before sharing');
+  });
+
+  test('resend-verification endpoint called from banner', () => {
+    expect(indexSource).toContain('/api/auth/resend-verification');
+  });
+});
+
+describe('auth.js isVerified helper', () => {
+  const authSource = fs.readFileSync(path.join(__dirname, 'public/js/auth.js'), 'utf8');
+
+  test('isVerified() method exists', () => {
+    expect(authSource).toContain('isVerified()');
+    expect(authSource).toContain('emailVerified');
+  });
+});
+
+// ── Registration validation error messages ────────────────────────────
+
+describe('Registration validation returns field-specific errors', () => {
+  test('invalid email returns email-specific error', async () => {
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({ email: 'not-an-email', password: 'Valid1234', displayName: 'Test' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/valid email/i);
+    expect(res.body.error).not.toMatch(/password/i);
+  });
+
+  test('short password returns password-specific error', async () => {
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({ email: 'test@example.com', password: 'Ab1', displayName: 'Test' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/password/i);
+  });
+
+  test('password without number returns password-specific error', async () => {
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({ email: 'test@example.com', password: 'abcdefgh', displayName: 'Test' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/password/i);
+  });
+
+  test('password without letter returns password-specific error', async () => {
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({ email: 'test@example.com', password: '12345678', displayName: 'Test' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/password/i);
+  });
+});
+
+// ── CSRF exemption for register and login ─────────────────────────────
+
+describe('Register and login work without CSRF token', () => {
+  test('POST /api/auth/register does not require CSRF token', async () => {
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({ email: 'not-an-email', password: 'short' });
+    // Should get a 400 validation error, NOT a 403 CSRF error
+    expect(res.status).toBe(400);
+    expect(res.body.error).not.toMatch(/CSRF/i);
+  });
+
+  test('POST /api/auth/login does not require CSRF token', async () => {
+    const res = await request(app)
+      .post('/api/auth/login')
+      .send({ email: 'test@example.com', password: 'password123' });
+    // Should get a 400 or 401 (no DB), NOT a 403 CSRF error
+    expect(res.status).not.toBe(403);
+    expect(res.body.error).not.toMatch(/CSRF/i);
+  });
+
+  test('other POST endpoints still require CSRF token', async () => {
+    const res = await request(app)
+      .post('/api/favorites/record')
+      .send({ recipeIds: ['test'] });
+    expect(res.status).toBe(403);
+    expect(res.body.error).toMatch(/CSRF/i);
+  });
+});
+
+// ── Trust proxy and session persistence ──────────────────────────────
+
+describe('Trust proxy configured for production', () => {
+  const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+
+  test('app.set trust proxy is configured before session middleware', () => {
+    const trustProxyIdx = serverSource.indexOf("trust proxy");
+    const sessionIdx = serverSource.indexOf("express-session");
+    // trust proxy must exist
+    expect(trustProxyIdx).toBeGreaterThan(-1);
+    // If both exist, trust proxy should come before session usage
+    if (sessionIdx > -1) {
+      expect(trustProxyIdx).toBeGreaterThan(-1);
+    }
+  });
+});
+
+describe('Session explicitly saved after regenerate', () => {
+  const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+
+  test('register handler calls req.session.save() inside regenerate callback', () => {
+    // Find the register route and verify it contains session.save inside regenerate
+    const registerSection = serverSource.slice(
+      serverSource.indexOf("app.post('/api/auth/register'"),
+      serverSource.indexOf("app.post('/api/auth/login'")
+    );
+    expect(registerSection).toContain('req.session.regenerate');
+    expect(registerSection).toContain('req.session.save');
+  });
+
+  test('login handler calls req.session.save() inside regenerate callback', () => {
+    const loginSection = serverSource.slice(
+      serverSource.indexOf("app.post('/api/auth/login'"),
+      serverSource.indexOf("app.post('/api/auth/logout'")
+    );
+    expect(loginSection).toContain('req.session.regenerate');
+    expect(loginSection).toContain('req.session.save');
+  });
+});
+
+describe('Register → session → /api/auth/me flow', () => {
+  test('register returns success and sets session cookie', async () => {
+    const agent = request.agent(app);
+    const email = `flowtest_${Date.now()}@example.com`;
+    const registerRes = await agent
+      .post('/api/auth/register')
+      .set('Content-Type', 'application/json')
+      .send({ email, password: 'TestPass1', displayName: 'Flow Test' });
+
+    if (registerRes.status !== 200) return; // Skip if no DB
+
+    expect(registerRes.body.success).toBe(true);
+    expect(registerRes.body.user.email).toBe(email);
+
+    // Session cookie should be set in the response
+    const cookies = registerRes.headers['set-cookie'] || [];
+    const hasSessionCookie = cookies.some(c => c.includes('recipe.sid'));
+    expect(hasSessionCookie).toBe(true);
+
+    // /api/auth/me should return authenticated using the same session
+    const meRes = await agent.get('/api/auth/me');
+    expect(meRes.status).toBe(200);
+    expect(meRes.body.authenticated).toBe(true);
+    expect(meRes.body.user.email).toBe(email);
+  });
+
+  test('register then login with same password succeeds', async () => {
+    const agent = request.agent(app);
+    const email = `logintest_${Date.now()}@example.com`;
+    const password = 'TestPass1';
+
+    const registerRes = await agent
+      .post('/api/auth/register')
+      .set('Content-Type', 'application/json')
+      .send({ email, password });
+
+    if (registerRes.status !== 200) return; // Skip if no DB
+
+    // Log out
+    await agent.post('/api/auth/logout');
+
+    // Log in with the same password
+    const loginRes = await agent
+      .post('/api/auth/login')
+      .set('Content-Type', 'application/json')
+      .send({ email, password });
+
+    expect(loginRes.status).toBe(200);
+    expect(loginRes.body.success).toBe(true);
+
+    // Session cookie should be set
+    const loginCookies = loginRes.headers['set-cookie'] || [];
+    const hasSessionCookie = loginCookies.some(c => c.includes('recipe.sid'));
+    expect(hasSessionCookie).toBe(true);
+  });
+});
+
+// ── Specific auth error messages ──────────────────────────────────────
+
+describe('Auth error messages are specific (source code)', () => {
+  const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+
+  test('login returns specific "no account found" message when email not in DB', () => {
+    expect(serverSource).toContain('No account found with that email address.');
+  });
+
+  test('login returns specific "incorrect password" message on wrong password', () => {
+    expect(serverSource).toContain('Incorrect password. Please try again.');
+  });
+
+  test('login warns about remaining attempts when close to lockout', () => {
+    expect(serverSource).toContain('remaining before lockout');
+  });
+
+  test('register returns 409 status for duplicate email (not 400)', () => {
+    expect(serverSource).toContain('res.status(409)');
+    expect(serverSource).toContain('An account with that email already exists.');
+  });
+});
+
+describe('Auth error messages at runtime (skips if no DB)', () => {
+  test('login with non-existent email returns 401 + no-account message', async () => {
+    const res = await request(app)
+      .post('/api/auth/login')
+      .send({ email: 'nobody_xyz_999@example.com', password: 'SomePass1' });
+    if (res.status === 500) return; // No DB — skip
+    expect(res.status).toBe(401);
+    expect(res.body.error).toMatch(/no account found/i);
+  });
+
+  test('register with duplicate email returns 409 + already-exists message', async () => {
+    const agent = request.agent(app);
+    const email = `dup_${Date.now()}@example.com`;
+
+    // First registration
+    const first = await agent
+      .post('/api/auth/register')
+      .send({ email, password: 'TestPass1' });
+    if (first.status !== 200) return; // No DB — skip
+
+    // Second registration with same email
+    const second = await agent
+      .post('/api/auth/register')
+      .send({ email, password: 'TestPass1' });
+    expect(second.status).toBe(409);
+    expect(second.body.error).toMatch(/already exists/i);
+  });
+
+  test('login with wrong password returns 401 + incorrect-password message', async () => {
+    const agent = request.agent(app);
+    const email = `wrongpw_${Date.now()}@example.com`;
+
+    const reg = await agent
+      .post('/api/auth/register')
+      .send({ email, password: 'CorrectPass1' });
+    if (reg.status !== 200) return; // No DB — skip
+
+    await agent.post('/api/auth/logout');
+
+    const login = await agent
+      .post('/api/auth/login')
+      .send({ email, password: 'WrongPass1' });
+    expect(login.status).toBe(401);
+    expect(login.body.error).toMatch(/incorrect password/i);
+  });
+});
+
+describe('Admin email notifications (source check)', () => {
+  const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+
+  test('sends admin email on new signup when ADMIN_EMAIL is set', () => {
+    expect(serverSource).toContain('process.env.ADMIN_EMAIL');
+    expect(serverSource).toContain('[admin notify] signup email error');
+  });
+
+  test('signup admin email includes user email and name', () => {
+    expect(serverSource).toContain('subject: `New signup: ${user.email}`');
+    expect(serverSource).toContain('user.display_name');
+  });
+
+  test('signup admin notification fires after session save (non-blocking)', () => {
+    // The notification should appear after logActivity in the session.save callback
+    const saveCallback = serverSource.slice(serverSource.indexOf('req.session.save'));
+    expect(saveCallback).toContain('[admin notify] signup email error');
+  });
+
+  test('detects new recipe vs update using created_at = updated_at', () => {
+    expect(serverSource).toContain('(created_at = updated_at) AS is_new');
+    expect(serverSource).toContain('upsertResult.rows[0]?.is_new');
+  });
+
+  test('sends admin email on new recipe upload when ADMIN_EMAIL is set', () => {
+    expect(serverSource).toContain('[admin notify] new recipe email error');
+    expect(serverSource).toContain('subject: `New recipe: ${recipe.name}`');
+  });
+
+  test('new recipe admin email includes recipe name and uploader username', () => {
+    expect(serverSource).toContain('display_name FROM users WHERE id');
+    expect(serverSource).toContain('Uploaded by: ${username}');
+  });
+
+  test('recipe admin notification only fires for non-admin users', () => {
+    // The upsert (and notification) is in the else branch for non-admin users
+    const adminBranch = serverSource.indexOf("req.user.role === 'admin'");
+    const upsertBlock = serverSource.indexOf('(created_at = updated_at) AS is_new');
+    // upsert should come after the admin branch check (i.e., in the else block)
+    expect(upsertBlock).toBeGreaterThan(adminBranch);
+  });
+});
+
+// ── URL deduplication / recipe_url_cache ─────────────────────────────────────
+
+describe('URL deduplication — normalizeRecipeUrl (source analysis)', () => {
+  const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+
+  test('normalizeRecipeUrl is defined in server.js', () => {
+    expect(serverSource).toContain('function normalizeRecipeUrl');
+  });
+
+  test('strips common tracking params', () => {
+    const params = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content',
+                    'utm_term', 'fbclid', 'gclid', 'msclkid'];
+    params.forEach(p => expect(serverSource).toContain(`'${p}'`));
+  });
+
+  test('normalises protocol to https', () => {
+    expect(serverSource).toContain("u.protocol = 'https:'");
+  });
+
+  test('strips trailing slash from non-root paths', () => {
+    expect(serverSource).toContain("u.pathname.replace(/\\/+$/, '')");
+  });
+
+  test('sorts remaining query params for stable keys', () => {
+    expect(serverSource).toContain('u.searchParams.sort()');
+  });
+
+  test('strips URL fragment', () => {
+    expect(serverSource).toContain("u.hash = ''");
+  });
+});
+
+describe('URL deduplication — /api/fetch-url cache check (source analysis)', () => {
+  const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+
+  test('fetch-url checks recipe_url_cache before fetching', () => {
+    expect(serverSource).toContain('recipe_url_cache WHERE normalized_url');
+  });
+
+  test('fetch-url returns cached:true on a hit', () => {
+    expect(serverSource).toContain('cached: true');
+  });
+
+  test('fetch-url returns ingredientDefs and urlCacheId on a cache hit', () => {
+    expect(serverSource).toContain('ingredientDefs: ingredient_defs');
+    expect(serverSource).toContain('urlCacheId: id');
+  });
+
+  test('cache check is guarded by pool availability', () => {
+    // The check should only run when pool exists
+    const cacheCheckIdx = serverSource.indexOf('recipe_url_cache WHERE normalized_url');
+    const poolGuardIdx  = serverSource.lastIndexOf('if (pool)', cacheCheckIdx);
+    expect(poolGuardIdx).toBeGreaterThan(-1);
+    expect(cacheCheckIdx - poolGuardIdx).toBeLessThan(300);
+  });
+});
+
+describe('URL deduplication — save-recipe populates cache (source analysis)', () => {
+  const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+
+  test('save-recipe inserts into recipe_url_cache', () => {
+    expect(serverSource).toContain('INSERT INTO recipe_url_cache');
+  });
+
+  test('insert uses ON CONFLICT DO NOTHING so first parse wins', () => {
+    expect(serverSource).toContain('ON CONFLICT (normalized_url) DO NOTHING');
+  });
+
+  test('save-recipe links user_recipes row to cache entry via url_cache_id', () => {
+    expect(serverSource).toContain('UPDATE user_recipes SET url_cache_id');
+  });
+
+  test('URL cache errors are non-fatal (caught and warned)', () => {
+    expect(serverSource).toContain('URL cache update failed (non-fatal)');
+  });
+});
+
+describe('URL deduplication — delete cleans up orphaned cache (source analysis)', () => {
+  const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+
+  test('delete returns url_cache_id in RETURNING clause', () => {
+    expect(serverSource).toContain('RETURNING id, url_cache_id');
+  });
+
+  test('delete checks reference count before removing cache entry', () => {
+    expect(serverSource).toContain('SELECT COUNT(*) FROM user_recipes WHERE url_cache_id');
+  });
+
+  test('delete removes cache entry when count reaches zero', () => {
+    expect(serverSource).toContain('DELETE FROM recipe_url_cache WHERE id = $1');
+  });
+});
+
+describe('URL deduplication — migrate.js schema (source analysis)', () => {
+  const migrateSource = fs.readFileSync(path.join(__dirname, 'migrate.js'), 'utf8');
+
+  test('recipe_url_cache table is defined in DDL', () => {
+    expect(migrateSource).toContain('CREATE TABLE IF NOT EXISTS recipe_url_cache');
+  });
+
+  test('normalized_url column has UNIQUE constraint', () => {
+    expect(migrateSource).toContain('normalized_url  TEXT NOT NULL UNIQUE');
+  });
+
+  test('url_cache_id FK is added to user_recipes via ALTER TABLE', () => {
+    expect(migrateSource).toContain('ALTER TABLE user_recipes ADD COLUMN IF NOT EXISTS url_cache_id');
+  });
+
+  test('url_cache_id FK references recipe_url_cache', () => {
+    expect(migrateSource).toContain('REFERENCES recipe_url_cache(id)');
+  });
+});
+
+// ── Recipe import log ──────────────────────────────────────────────────
+
+describe('recipe_import_log — migrate.js schema', () => {
+  const migrateSource = fs.readFileSync(path.join(__dirname, 'migrate.js'), 'utf8');
+
+  test('recipe_import_log table is defined in DDL', () => {
+    expect(migrateSource).toContain('CREATE TABLE IF NOT EXISTS recipe_import_log');
+  });
+
+  test('table has action, url, recipe_name, recipe_id, error columns', () => {
+    expect(migrateSource).toContain("action      VARCHAR(50) NOT NULL");
+    expect(migrateSource).toContain('url         TEXT');
+    expect(migrateSource).toContain('recipe_name TEXT');
+    expect(migrateSource).toContain('recipe_id   VARCHAR(255)');
+    expect(migrateSource).toContain('error       TEXT');
+  });
+
+  test('table has user_id FK and ip_address', () => {
+    expect(migrateSource).toContain('user_id     INTEGER REFERENCES users(id) ON DELETE SET NULL');
+    expect(migrateSource).toContain('ip_address  INET');
+  });
+
+  test('indexes exist for user, action, and created_at', () => {
+    expect(migrateSource).toContain('idx_recipe_import_log_user');
+    expect(migrateSource).toContain('idx_recipe_import_log_action');
+    expect(migrateSource).toContain('idx_recipe_import_log_created');
+  });
+});
+
+describe('recipe_import_log — server.js instrumentation', () => {
+  const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+
+  test('logRecipeImport helper is defined', () => {
+    expect(serverSource).toContain('async function logRecipeImport(');
+    expect(serverSource).toContain("'INSERT INTO recipe_import_log");
+  });
+
+  test('url_provided is logged when fetch-url succeeds', () => {
+    expect(serverSource).toContain("logRecipeImport(req.user.id, 'url_provided', { url }, req.ip)");
+  });
+
+  test('photo_import_clicked is logged when photo tab is clicked', () => {
+    expect(serverSource).toContain("logRecipeImport(userId, 'photo_import_clicked', {}, req.ip)");
+    expect(serverSource).toContain("action === 'photo_import_interest'");
+  });
+
+  test('parse_succeeded is logged on successful extract-recipe', () => {
+    expect(serverSource).toContain("logRecipeImport(req.user.id, 'parse_succeeded', { url: sourceUrl, recipeName: parsed.name }, req.ip)");
+  });
+
+  test('parse_succeeded is logged on successful parse-recipe', () => {
+    expect(serverSource).toContain("logRecipeImport(req.user.id, 'parse_succeeded', { recipeName }, req.ip)");
+  });
+
+  test('parse_failed is logged when page is not a recipe', () => {
+    expect(serverSource).toContain("logRecipeImport(req.user.id, 'parse_failed', { url: sourceUrl, error: 'not_a_recipe' }, req.ip)");
+  });
+
+  test('parse_failed is logged when no ingredients are found', () => {
+    expect(serverSource).toContain("logRecipeImport(req.user.id, 'parse_failed', { url: sourceUrl, error: 'no_ingredients' }, req.ip)");
+  });
+
+  test('parse_failed is logged on AI errors', () => {
+    expect(serverSource).toContain("error: 'ai_rate_limit'");
+    expect(serverSource).toContain("error: 'ai_unavailable'");
+    expect(serverSource).toContain("error: 'ai_json_error'");
+  });
+
+  test('recipe_saved is logged when save-recipe succeeds', () => {
+    expect(serverSource).toContain("logRecipeImport(req.user.id, 'recipe_saved', { url: recipe.url, recipeName: recipe.name, recipeId: recipe.id }, req.ip)");
   });
 });

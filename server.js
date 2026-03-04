@@ -1,4 +1,5 @@
 require('dotenv').config();
+const APP_VERSION = '1.0.0';
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
@@ -17,6 +18,9 @@ const { fetchWithBrowser } = require('./scraper');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// --- Trust proxy (required for secure cookies behind reverse proxies like Render/Heroku) ---
+app.set('trust proxy', 1);
 
 // --- Security headers ---
 app.use(helmet({
@@ -61,12 +65,14 @@ if (process.env.DATABASE_URL) {
 
 // --- Session setup ---
 if (pool) {
+  console.log('[server] DATABASE_URL present — using PostgreSQL session store (connect-pg-simple)');
   const PgSession = require('connect-pg-simple')(session);
   app.use(session({
     store: new PgSession({
       pool: pool,
       tableName: 'session',
-      createTableIfMissing: false
+      createTableIfMissing: false,
+      errorLog: (err) => console.error('[session:pg] Store error:', err)
     }),
     secret: process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex'),
     resave: false,
@@ -81,6 +87,7 @@ if (pool) {
   }));
 } else {
   // Fallback: memory-based sessions for local dev without DB
+  console.log('[server] No DATABASE_URL — using in-memory session store (sessions will not survive restart)');
   app.use(session({
     secret: process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex'),
     resave: false,
@@ -107,8 +114,12 @@ app.use((req, res, next) => {
 
 function csrfProtection(req, res, next) {
   if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
-  // Exempt logout from CSRF — logging someone out isn't a harmful action
-  if (req.path === '/api/auth/logout') return next();
+  // Exempt auth endpoints from CSRF — these are safe without it:
+  // - register/login: protected by SameSite:lax cookies + rate limiting,
+  //   and guest users may not have an established session yet (race condition
+  //   between initial page load and Auth.init() can cause token mismatch)
+  // - logout: logging someone out isn't a harmful action
+  if (['/api/auth/register', '/api/auth/login', '/api/auth/logout'].includes(req.path)) return next();
   const token = req.headers['x-csrf-token'];
   if (!token || !req.session || token !== req.session.csrfToken) {
     return res.status(403).json({ error: 'Invalid CSRF token' });
@@ -257,6 +268,29 @@ async function sendVerificationEmail(userId, userEmail) {
   logActivity(userId, 'verification_email_sent', { email: userEmail }, null);
 }
 
+// --- Admin parse-failure notification ---
+async function notifyParseFailure({ endpoint, errorType, userId, context }) {
+  if (!resend || !process.env.ADMIN_EMAIL) return;
+  const label = endpoint === 'extract-recipe' ? 'URL Import' : 'Manual Ingredient Parse';
+  const contextLines = Object.entries(context || {})
+    .map(([k, v]) => `<tr><td style="padding:4px 8px;color:#6b7280;">${k}</td><td style="padding:4px 8px;">${v ?? '—'}</td></tr>`)
+    .join('');
+  resend.emails.send({
+    from: process.env.RESEND_FROM || 'DIY Meal Kit <noreply@resend.dev>',
+    to: process.env.ADMIN_EMAIL,
+    subject: `[DIY Meal Kit] Recipe parse failed — ${label}`,
+    html: `
+      <h2 style="margin:0 0 8px;">Recipe Parse Failure</h2>
+      <p style="margin:0 0 16px;color:#374151;"><strong>Type:</strong> ${label}<br><strong>Error:</strong> ${errorType}</p>
+      <table style="border-collapse:collapse;font-size:14px;">
+        <tr><td style="padding:4px 8px;color:#6b7280;">User ID</td><td style="padding:4px 8px;">${userId ?? 'unknown'}</td></tr>
+        ${contextLines}
+        <tr><td style="padding:4px 8px;color:#6b7280;">Time</td><td style="padding:4px 8px;">${new Date().toISOString()}</td></tr>
+      </table>
+    `
+  }).catch(err => console.error('[notifyParseFailure] email error:', err.message));
+}
+
 // --- Activity logging helper ---
 async function logActivity(userId, action, details, ipAddress) {
   if (!pool) return;
@@ -267,6 +301,19 @@ async function logActivity(userId, action, details, ipAddress) {
     );
   } catch (err) {
     console.error('Activity log error:', err.message);
+  }
+}
+
+// --- Recipe import event log helper ---
+async function logRecipeImport(userId, action, { url, recipeName, recipeId, error } = {}, ipAddress) {
+  if (!pool) return;
+  try {
+    await pool.query(
+      'INSERT INTO recipe_import_log (user_id, action, url, recipe_name, recipe_id, error, ip_address) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+      [userId, action, url || null, recipeName || null, recipeId || null, error || null, ipAddress]
+    );
+  } catch (err) {
+    console.error('Recipe import log error:', err.message);
   }
 }
 
@@ -357,16 +404,23 @@ app.post('/api/auth/register', authLimiter, [
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    return res.status(400).json({ error: 'Invalid input. Password must be at least 8 characters with a letter and a number.' });
+    const fieldErrors = errors.array();
+    const failedFields = new Set(fieldErrors.map(e => e.path));
+    if (failedFields.has('email')) {
+      return res.status(400).json({ error: 'Please enter a valid email address.' });
+    }
+    return res.status(400).json({ error: 'Password must be at least 8 characters with a letter and a number.' });
   }
   if (!pool) return res.status(500).json({ error: 'Database not configured' });
 
   const { email, password, displayName } = req.body;
+  console.log(`[register] Attempt — email: ${email}, IP: ${req.ip}`);
   try {
     // Check if email exists (generic error to prevent enumeration)
     const existing = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
     if (existing.rows.length > 0) {
-      return res.status(400).json({ error: 'Registration failed. Please try a different email.' });
+      console.log(`[register] Email already registered: ${email}`);
+      return res.status(409).json({ error: 'An account with that email already exists. Did you mean to log in?' });
     }
 
     const hash = await bcrypt.hash(password, 12);
@@ -376,9 +430,13 @@ app.post('/api/auth/register', authLimiter, [
       [email, hash, displayName || null]
     );
     const user = result.rows[0];
+    console.log(`[register] User created — id: ${user.id}, email: ${user.email}`);
 
     req.session.regenerate((err) => {
-      if (err) return res.status(500).json({ error: 'Session error' });
+      if (err) {
+        console.error('[register] session.regenerate error:', err);
+        return res.status(500).json({ error: 'Session error' });
+      }
       req.session.userId = user.id;
       req.session.role = user.role;
       req.session.csrfToken = crypto.randomBytes(32).toString('hex');
@@ -386,41 +444,62 @@ app.post('/api/auth/register', authLimiter, [
         httpOnly: false, sameSite: 'lax', secure: process.env.NODE_ENV === 'production'
       });
       req.session.emailVerified = false;
-      logActivity(user.id, 'signup', { email: user.email }, req.ip);
-      res.json({ success: true, user: { id: user.id, email: user.email, displayName: user.display_name, role: user.role, emailVerified: false } });
 
-      // Send verification email (non-blocking)
-      sendVerificationEmail(user.id, user.email).catch(err =>
-        console.error('Verification email error:', err.message)
-      );
-
-      // Schedule welcome email 30 minutes after signup
-      const userId = user.id;
-      const userEmail = user.email;
-      const firstName = (user.display_name || user.email.split('@')[0]).split(' ')[0];
-      setTimeout(async () => {
-        if (!resend || !pool) return;
-        try {
-          const check = await pool.query('SELECT email_unsubscribed, email_verified_at FROM users WHERE id = $1', [userId]);
-          if (check.rows.length === 0 || !check.rows[0].email_verified_at) return;
-          if (check.rows[0].email_unsubscribed) return;
-          const baseUrl = process.env.BASE_URL || `http://localhost:${PORT}`;
-          const unsubToken = generateUnsubscribeToken(userId);
-          const unsubLink = `${baseUrl}/api/unsubscribe?id=${userId}&token=${unsubToken}`;
-          await resend.emails.send({
-            from: 'Monica at DIY Meal Kit <hello@diymealkit.com>',
-            to: userEmail,
-            subject: "How's DIY Meal Kit going?",
-            text: `Hi ${firstName},\n\nMy name is Monica, and I built DIY Meal Kit to make meal planning and grocery shopping easier for busy people. Thank you for trying it out! I wanted to check in on how it's going. If you had one idea that would make the service more valuable for you, what would that be? You can just reply to this email, although it's automatically sent, I review every response myself. :)\n\nHappy cooking!\nMonica\n\n---\nTo unsubscribe from these emails: ${unsubLink}`
-          });
-          logActivity(userId, 'welcome_email_sent', { email: userEmail }, null);
-        } catch (err) {
-          console.error('Welcome email error:', err.message);
+      // Explicitly save session before responding to ensure it's persisted
+      // before the client reloads (per express-session docs)
+      req.session.save((saveErr) => {
+        if (saveErr) {
+          console.error('[register] session.save error:', saveErr);
+          return res.status(500).json({ error: 'Session error' });
         }
-      }, parseInt(process.env.WELCOME_EMAIL_DELAY_MS ?? 30 * 60 * 1000)).unref();
+        console.log(`[register] Session saved — user id: ${user.id}, session id: ${req.sessionID}`);
+        logActivity(user.id, 'signup', { email: user.email }, req.ip);
+        res.json({ success: true, user: { id: user.id, email: user.email, displayName: user.display_name, role: user.role, emailVerified: false } });
+
+        // Send verification email (non-blocking)
+        sendVerificationEmail(user.id, user.email).catch(err =>
+          console.error('Verification email error:', err.message)
+        );
+
+        // Admin notification for new signup (non-blocking)
+        if (resend && process.env.ADMIN_EMAIL) {
+          resend.emails.send({
+            from: process.env.RESEND_FROM || 'DIY Meal Kit <noreply@resend.dev>',
+            to: process.env.ADMIN_EMAIL,
+            subject: `New signup: ${user.email}`,
+            text: `A new account was created.\n\nEmail: ${user.email}\nName: ${user.display_name || '(none)'}\nTime: ${new Date().toISOString()}`
+          }).then(() => console.log(`[admin notify] signup email sent for ${user.email}`))
+            .catch(err => console.error('[admin notify] signup email error:', err.message));
+        }
+
+        // Schedule welcome email 30 minutes after signup
+        const userId = user.id;
+        const userEmail = user.email;
+        const firstName = (user.display_name || user.email.split('@')[0]).split(' ')[0];
+        setTimeout(async () => {
+          if (!resend || !pool) return;
+          try {
+            const check = await pool.query('SELECT email_unsubscribed, email_verified_at FROM users WHERE id = $1', [userId]);
+            if (check.rows.length === 0 || !check.rows[0].email_verified_at) return;
+            if (check.rows[0].email_unsubscribed) return;
+            const baseUrl = process.env.BASE_URL || `http://localhost:${PORT}`;
+            const unsubToken = generateUnsubscribeToken(userId);
+            const unsubLink = `${baseUrl}/api/unsubscribe?id=${userId}&token=${unsubToken}`;
+            await resend.emails.send({
+              from: 'Monica at DIY Meal Kit <hello@diymealkit.com>',
+              to: userEmail,
+              subject: "How's DIY Meal Kit going?",
+              text: `Hi ${firstName},\n\nMy name is Monica, and I built DIY Meal Kit to make meal planning and grocery shopping easier for busy people. Thank you for trying it out! I wanted to check in on how it's going. If you had one idea that would make the service more valuable for you, what would that be? You can just reply to this email, although it's automatically sent, I review every response myself. :)\n\nHappy cooking!\nMonica\n\n---\nTo unsubscribe from these emails: ${unsubLink}`
+            });
+            logActivity(userId, 'welcome_email_sent', { email: userEmail }, null);
+          } catch (err) {
+            console.error('Welcome email error:', err.message);
+          }
+        }, parseInt(process.env.WELCOME_EMAIL_DELAY_MS ?? 30 * 60 * 1000)).unref();
+      });
     });
   } catch (err) {
-    console.error('Register error:', err.message);
+    console.error('[register] Unhandled error:', err);
     res.status(500).json({ error: 'Registration failed' });
   }
 });
@@ -436,28 +515,40 @@ app.post('/api/auth/login', authLimiter, [
   if (!pool) return res.status(500).json({ error: 'Database not configured' });
 
   const { email, password } = req.body;
+  console.log(`[login] Attempt — email: ${email}, IP: ${req.ip}`);
 
   try {
     const result = await pool.query(
       'SELECT id, email, password_hash, display_name, role, failed_login_attempts, locked_until, email_verified_at FROM users WHERE email = $1',
       [email]
-    );
+    ).catch(async (queryErr) => {
+      // Fallback if email_verified_at column doesn't exist yet (migration not run)
+      console.warn('[login] Primary query failed, falling back (missing column?):', queryErr.message);
+      return pool.query(
+        'SELECT id, email, password_hash, display_name, role, failed_login_attempts, locked_until FROM users WHERE email = $1',
+        [email]
+      );
+    });
     if (result.rows.length === 0) {
-      // Constant-time: still hash to prevent timing attacks
+      console.log(`[login] No user found for email: ${email}`);
+      // Constant-time: still hash to prevent response-timing enumeration
       await bcrypt.hash(password, 12);
-      logActivity(null, 'login_failed', { email, reason: 'invalid_credentials' }, req.ip);
-      return res.status(401).json({ error: 'Invalid email or password' });
+      logActivity(null, 'login_failed', { email, reason: 'no_account' }, req.ip);
+      return res.status(401).json({ error: 'No account found with that email address.' });
     }
 
     const user = result.rows[0];
+    console.log(`[login] User found — id: ${user.id}, failed_attempts: ${user.failed_login_attempts}, locked_until: ${user.locked_until}`);
 
     // Check account lockout
     if (user.locked_until && new Date(user.locked_until) > new Date()) {
+      console.log(`[login] Account locked until ${user.locked_until} for user id: ${user.id}`);
       logActivity(user.id, 'login_failed', { email, reason: 'account_locked' }, req.ip);
       return res.status(423).json({ error: 'Account is temporarily locked due to too many failed login attempts. Please try again later.', code: 'ACCOUNT_LOCKED' });
     }
 
     const valid = await bcrypt.compare(password, user.password_hash);
+    console.log(`[login] Password check for user id=${user.id}: ${valid ? 'pass' : 'fail'}`);
     if (!valid) {
       const attempts = user.failed_login_attempts + 1;
       if (attempts >= MAX_FAILED_ATTEMPTS) {
@@ -466,14 +557,18 @@ app.post('/api/auth/login', authLimiter, [
           [attempts, user.id]
         );
         logActivity(user.id, 'account_locked', { email, attempts }, req.ip);
+        return res.status(423).json({ error: 'Account locked after too many failed attempts. Please try again in 15 minutes.', code: 'ACCOUNT_LOCKED' });
       } else {
         await pool.query(
           'UPDATE users SET failed_login_attempts = $1, updated_at = NOW() WHERE id = $2',
           [attempts, user.id]
         );
       }
-      logActivity(null, 'login_failed', { email, reason: 'invalid_credentials' }, req.ip);
-      return res.status(401).json({ error: 'Invalid email or password' });
+      const remaining = MAX_FAILED_ATTEMPTS - attempts;
+      logActivity(null, 'login_failed', { email, reason: 'wrong_password' }, req.ip);
+      return res.status(401).json({
+        error: `Incorrect password. Please try again.${remaining <= 2 ? ` (${remaining} attempt${remaining === 1 ? '' : 's'} remaining before lockout)` : ''}`
+      });
     }
 
     // Successful login — reset lockout state
@@ -483,7 +578,10 @@ app.post('/api/auth/login', authLimiter, [
     );
 
     req.session.regenerate((err) => {
-      if (err) return res.status(500).json({ error: 'Session error' });
+      if (err) {
+        console.error('[login] session.regenerate error:', err);
+        return res.status(500).json({ error: 'Session error' });
+      }
       req.session.userId = user.id;
       req.session.role = user.role;
       req.session.csrfToken = crypto.randomBytes(32).toString('hex');
@@ -491,11 +589,21 @@ app.post('/api/auth/login', authLimiter, [
         httpOnly: false, sameSite: 'lax', secure: process.env.NODE_ENV === 'production'
       });
       req.session.emailVerified = !!user.email_verified_at;
-      logActivity(user.id, 'login', { email: user.email }, req.ip);
-      res.json({ success: true, user: { id: user.id, email: user.email, displayName: user.display_name, role: user.role, emailVerified: !!user.email_verified_at } });
+
+      // Explicitly save session before responding to ensure it's persisted
+      // before the client reloads (per express-session docs)
+      req.session.save((saveErr) => {
+        if (saveErr) {
+          console.error('[login] session.save error:', saveErr);
+          return res.status(500).json({ error: 'Session error' });
+        }
+        console.log(`[login] Session saved — user id: ${user.id}, session id: ${req.sessionID}`);
+        logActivity(user.id, 'login', { email: user.email }, req.ip);
+        res.json({ success: true, user: { id: user.id, email: user.email, displayName: user.display_name, role: user.role, emailVerified: !!user.email_verified_at } });
+      });
     });
   } catch (err) {
-    console.error('Login error:', err.message);
+    console.error('[login] Unhandled error:', err);
     res.status(500).json({ error: 'Login failed' });
   }
 });
@@ -510,12 +618,21 @@ app.post('/api/auth/logout', (req, res) => {
   });
 });
 
+app.get('/api/version', (req, res) => {
+  res.json({ version: APP_VERSION });
+});
+
 app.get('/api/auth/me', async (req, res) => {
   if (!req.user || !pool) {
     return res.json({ authenticated: false });
   }
   try {
-    const result = await pool.query('SELECT id, email, display_name, role, email_verified_at FROM users WHERE id = $1', [req.user.id]);
+    const result = await pool.query(
+      'SELECT id, email, display_name, role, email_verified_at FROM users WHERE id = $1', [req.user.id]
+    ).catch(async () => {
+      // Fallback if email_verified_at column doesn't exist yet (migration not run)
+      return pool.query('SELECT id, email, display_name, role FROM users WHERE id = $1', [req.user.id]);
+    });
     if (result.rows.length === 0) {
       return res.json({ authenticated: false });
     }
@@ -826,6 +943,9 @@ app.post('/api/activity/log', activityLimiter, (req, res) => {
   }
 
   logActivity(userId, action, enrichedDetails, req.ip);
+  if (action === 'photo_import_interest') {
+    logRecipeImport(userId, 'photo_import_clicked', {}, req.ip);
+  }
   res.json({ success: true });
 });
 
@@ -1006,6 +1126,21 @@ app.post('/api/fetch-url', requireAuth, async (req, res) => {
     return res.status(400).json({ error: 'Only http and https URLs are supported.' });
   }
 
+  // Check the URL parse cache — if another user already imported this URL, return
+  // the cached recipe immediately and skip the expensive HTTP fetch + AI parse.
+  if (pool) {
+    const normalized = normalizeRecipeUrl(url);
+    const cacheRow = await pool.query(
+      'SELECT id, recipe_data, ingredient_defs FROM recipe_url_cache WHERE normalized_url = $1',
+      [normalized]
+    );
+    if (cacheRow.rows.length > 0) {
+      const { id, recipe_data, ingredient_defs } = cacheRow.rows[0];
+      console.log('[fetch-url] Cache hit for:', normalized);
+      return res.json({ cached: true, recipe: recipe_data, ingredientDefs: ingredient_defs, urlCacheId: id });
+    }
+  }
+
   // Crawl-style UAs get pre-rendered HTML with og:image and full content from
   // JS-rendered sites (Shopify, Next.js, etc.), so try them first.
   const uaStrategies = [
@@ -1134,8 +1269,28 @@ app.post('/api/fetch-url', requireAuth, async (req, res) => {
 
   console.log('[fetch-url] Sending response: ogImage:', ogImage, 'browserImages:', browserImages.length, 'htmlSize:', html.length);
   logActivity(req.user.id, 'import_recipe', { url }, req.ip);
+  logRecipeImport(req.user.id, 'url_provided', { url }, req.ip);
   res.json({ html, ogImage, browserImages });
 });
+
+// ── URL normalization for recipe deduplication ─────────────────────────
+// Strips protocol differences, trailing slashes, and common tracking params
+// so that http/https variants and utm-tagged links all map to one cache key.
+function normalizeRecipeUrl(rawUrl) {
+  try {
+    const u = new URL(rawUrl);
+    u.protocol = 'https:';
+    u.hostname = u.hostname.toLowerCase();
+    if (u.pathname !== '/') u.pathname = u.pathname.replace(/\/+$/, '');
+    ['utm_source','utm_medium','utm_campaign','utm_content','utm_term','utm_id',
+     'fbclid','gclid','msclkid','ref','source','_ga'].forEach(p => u.searchParams.delete(p));
+    u.searchParams.sort();
+    u.hash = '';
+    return u.toString();
+  } catch (_) {
+    return rawUrl;
+  }
+}
 
 // ── Robust JSON extraction from AI responses ───────────────────────────
 function extractJSON(text) {
@@ -1176,9 +1331,10 @@ function extractJSON(text) {
     return JSON.parse(jsonStr);
   } catch (_) {}
 
-  // Attempt 2: remove comments and trailing commas
+  // Attempt 2: remove comments, trailing commas, and evaluate fraction literals (e.g. 1/4 → 0.25)
   jsonStr = jsonStr.replace(/\/\/[^\n]*/g, '');
   jsonStr = jsonStr.replace(/,\s*([}\]])/g, '$1');
+  jsonStr = jsonStr.replace(/\b(\d+)\/(\d+)\b/g, (_, n, d) => String(Number(n) / Number(d)));
   try {
     return JSON.parse(jsonStr);
   } catch (_) {}
@@ -1299,7 +1455,7 @@ Return ONLY valid JSON in this exact format, no other text:
     if (!groq) return res.status(500).json({ error: 'AI service not configured (GROQ_API_KEY missing)' });
     console.log('[parse-recipe] recipeName:', recipeName, '| ingredient count:', ingredients.length);
     const result = await groq.chat.completions.create({
-      model: 'llama3-8b-8192',
+      model: 'llama-3.1-8b-instant',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.2,
       max_tokens: 3000,
@@ -1317,27 +1473,40 @@ Return ONLY valid JSON in this exact format, no other text:
       );
     }
     logActivity(req.user.id, 'ai_parse_recipe', { recipe_name: recipeName }, req.ip);
+    logRecipeImport(req.user.id, 'parse_succeeded', { recipeName }, req.ip);
     res.json(parsed);
   } catch (err) {
     console.error('Groq API error:', err.message);
     const msg = err.message || '';
     if (err.status === 429 || msg.includes('rate_limit') || msg.includes('Rate limit')) {
+      notifyParseFailure({ endpoint: 'parse-recipe', errorType: 'rate_limit', userId: req.user.id, context: { recipe: recipeName } });
+      logRecipeImport(req.user.id, 'parse_failed', { recipeName, error: 'ai_rate_limit' }, req.ip);
       return res.status(503).json({ error: 'The AI service is temporarily overloaded. Please wait a minute and try again.' });
     }
     if (err.status === 503 || msg.includes('overloaded') || msg.includes('unavailable')) {
+      notifyParseFailure({ endpoint: 'parse-recipe', errorType: 'ai_unavailable', userId: req.user.id, context: { recipe: recipeName } });
+      logRecipeImport(req.user.id, 'parse_failed', { recipeName, error: 'ai_unavailable' }, req.ip);
       return res.status(503).json({ error: 'The AI service is temporarily unavailable. Please try again in a few minutes.' });
     }
     if (msg.includes('did not contain a JSON') || msg.includes('malformed JSON')) {
+      notifyParseFailure({ endpoint: 'parse-recipe', errorType: 'malformed_json', userId: req.user.id, context: { recipe: recipeName } });
+      logRecipeImport(req.user.id, 'parse_failed', { recipeName, error: 'ai_json_error' }, req.ip);
       return res.status(500).json({ error: 'The AI could not process these ingredients. Please try again — results may vary between attempts.' });
     }
+    notifyParseFailure({ endpoint: 'parse-recipe', errorType: 'ai_error', userId: req.user.id, context: { recipe: recipeName, error: msg } });
+    logRecipeImport(req.user.id, 'parse_failed', { recipeName, error: msg }, req.ip);
     res.status(500).json({ error: `AI processing error: ${msg}` });
   }
 });
 
 // POST /api/extract-recipe — requires auth
 app.post('/api/extract-recipe', requireAuth, aiLimiter, async (req, res) => {
-  const { pageText, sourceUrl, existingDefs } = req.body;
+  const { pageText, pageTitle, sourceUrl, existingDefs } = req.body;
   if (!pageText) return res.status(400).json({ error: 'pageText is required' });
+
+  const pageTitleHint = pageTitle
+    ? `The page title (og:title or <title>) is: "${pageTitle}". Use this as the primary source for the recipe name — strip any site name suffixes like " | Site Name" or " – Site Name".\n\n`
+    : '';
 
   const prompt = `You are a recipe extractor and ingredient parser for a meal planning app.
 
@@ -1346,7 +1515,7 @@ I have the text content of a web page. First, determine if this page actually co
 
 If the page DOES contain a recipe, extract it and parse its ingredients.
 
-Here are the existing ingredient IDs and names in the app (slug → display name):
+${pageTitleHint}Here are the existing ingredient IDs and names in the app (slug → display name):
 ${JSON.stringify(Object.fromEntries(Object.entries(existingDefs || {}).map(([id, def]) => [id, def.name])))}
 
 Here is the page text:
@@ -1356,7 +1525,7 @@ ${pageText.substring(0, 7000)}
 
 Your job:
 1. First, determine if this page contains a recipe. If not, return {"not_a_recipe": true}.
-2. Extract the recipe name and author/source from the page.
+2. Extract the recipe name and author/source from the page. If a page title hint was provided above, use it as the primary source for the recipe name.
 3. For the image field, ALWAYS return an empty string "". Do NOT guess or invent image URLs — they are extracted separately.
 4. Extract cooking times if mentioned: active/prep time and total time. Use short readable format like "15 min", "1 hr 30 min". Return null if not found.
 5. Identify all recipe ingredients from the page text.
@@ -1393,6 +1562,7 @@ Return ONLY valid JSON in this exact format, no other text:
 
   // Detect pages with too little text (paywalls, login walls, JS-only pages)
   if (pageText.trim().length < 200) {
+    notifyParseFailure({ endpoint: 'extract-recipe', errorType: 'paywall_or_empty_page', userId: req.user.id, context: { url: sourceUrl, pageTextLength: pageText.trim().length } });
     return res.status(422).json({ error: 'The page returned very little text. It may be behind a paywall, require login, or rely on JavaScript that could not be loaded.' });
   }
 
@@ -1400,7 +1570,7 @@ Return ONLY valid JSON in this exact format, no other text:
     if (!groq) return res.status(500).json({ error: 'AI service not configured (GROQ_API_KEY missing)' });
     console.log('[extract-recipe] pageText first 200 chars:', pageText.substring(0, 200));
     const result = await groq.chat.completions.create({
-      model: 'llama3-8b-8192',
+      model: 'llama-3.1-8b-instant',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.2,
       max_tokens: 3000,
@@ -1410,9 +1580,13 @@ Return ONLY valid JSON in this exact format, no other text:
     console.log('[extract-recipe] AI raw response (first 300 chars):', text.substring(0, 300));
     const parsed = extractJSON(text);
     if (parsed.not_a_recipe) {
+      logRecipeImport(req.user.id, 'parse_failed', { url: sourceUrl, error: 'not_a_recipe' }, req.ip);
+      notifyParseFailure({ endpoint: 'extract-recipe', errorType: 'not_a_recipe', userId: req.user.id, context: { url: sourceUrl } });
       return res.status(422).json({ error: 'This page doesn\'t appear to contain a recipe. Please try a URL from a recipe website.' });
     }
     if (!parsed.ingredients || parsed.ingredients.length === 0) {
+      logRecipeImport(req.user.id, 'parse_failed', { url: sourceUrl, error: 'no_ingredients' }, req.ip);
+      notifyParseFailure({ endpoint: 'extract-recipe', errorType: 'no_ingredients', userId: req.user.id, context: { url: sourceUrl } });
       return res.status(422).json({ error: 'No ingredients found on this page. Please make sure the URL points to a specific recipe.' });
     }
     normalizeNewDefs(parsed, existingDefs);
@@ -1425,19 +1599,28 @@ Return ONLY valid JSON in this exact format, no other text:
     }
     if (sourceUrl) parsed.url = sourceUrl;
     logActivity(req.user.id, 'ai_extract_recipe', { source_url: sourceUrl || null }, req.ip);
+    logRecipeImport(req.user.id, 'parse_succeeded', { url: sourceUrl, recipeName: parsed.name }, req.ip);
     res.json(parsed);
   } catch (err) {
     console.error('Groq API error:', err.message);
     const msg = err.message || '';
     if (err.status === 429 || msg.includes('rate_limit') || msg.includes('Rate limit')) {
+      notifyParseFailure({ endpoint: 'extract-recipe', errorType: 'rate_limit', userId: req.user.id, context: { url: sourceUrl } });
+      logRecipeImport(req.user.id, 'parse_failed', { url: sourceUrl, error: 'ai_rate_limit' }, req.ip);
       return res.status(503).json({ error: 'The AI service is temporarily overloaded. Please wait a minute and try again.' });
     }
     if (err.status === 503 || msg.includes('overloaded') || msg.includes('unavailable')) {
+      notifyParseFailure({ endpoint: 'extract-recipe', errorType: 'ai_unavailable', userId: req.user.id, context: { url: sourceUrl } });
+      logRecipeImport(req.user.id, 'parse_failed', { url: sourceUrl, error: 'ai_unavailable' }, req.ip);
       return res.status(503).json({ error: 'The AI service is temporarily unavailable. Please try again in a few minutes.' });
     }
     if (msg.includes('did not contain a JSON') || msg.includes('malformed JSON')) {
+      notifyParseFailure({ endpoint: 'extract-recipe', errorType: 'malformed_json', userId: req.user.id, context: { url: sourceUrl } });
+      logRecipeImport(req.user.id, 'parse_failed', { url: sourceUrl, error: 'ai_json_error' }, req.ip);
       return res.status(500).json({ error: 'The AI could not process this recipe page. Please try again — results may vary between attempts.' });
     }
+    notifyParseFailure({ endpoint: 'extract-recipe', errorType: 'ai_error', userId: req.user.id, context: { url: sourceUrl, error: msg } });
+    logRecipeImport(req.user.id, 'parse_failed', { url: sourceUrl, error: msg }, req.ip);
     res.status(500).json({ error: `AI processing error: ${msg}` });
   }
 });
@@ -1488,16 +1671,64 @@ app.post('/api/save-recipe', requireAuth, async (req, res) => {
         return res.status(403).json({ error: 'Recipe limit reached (100 max). Delete some recipes to add more.' });
       }
 
-      await pool.query(
+      const upsertResult = await pool.query(
         `INSERT INTO user_recipes (user_id, recipe_id, recipe_data, ingredient_defs)
          VALUES ($1, $2, $3, $4)
          ON CONFLICT (user_id, recipe_id) DO UPDATE
-         SET recipe_data = $3, ingredient_defs = $4, updated_at = NOW()`,
+         SET recipe_data = $3, ingredient_defs = $4, updated_at = NOW()
+         RETURNING (created_at = updated_at) AS is_new`,
         [req.user.id, recipe.id, JSON.stringify(recipe), JSON.stringify(newIngredientDefs || {})]
       );
+
+      if (upsertResult.rows[0]?.is_new && resend && process.env.ADMIN_EMAIL) {
+        pool.query('SELECT email, display_name FROM users WHERE id = $1', [req.user.id])
+          .then(userResult => {
+            const u = userResult.rows[0];
+            const username = u?.display_name || u?.email || `user #${req.user.id}`;
+            return resend.emails.send({
+              from: process.env.RESEND_FROM || 'DIY Meal Kit <noreply@resend.dev>',
+              to: process.env.ADMIN_EMAIL,
+              subject: `New recipe: ${recipe.name}`,
+              text: `A new recipe was uploaded.\n\nRecipe: ${recipe.name}\nUploaded by: ${username}\nTime: ${new Date().toISOString()}`
+            }).then(() => console.log(`[admin notify] new recipe email sent: "${recipe.name}" by ${username}`));
+          })
+          .catch(err => console.error('[admin notify] new recipe email error:', err.message));
+      }
+
+      // Populate the URL parse cache so future imports of the same URL skip AI parsing.
+      // ON CONFLICT DO NOTHING — first successful parse wins; admin can clear the cache
+      // row directly to force a re-parse.
+      if (recipe.url) {
+        const normalized = normalizeRecipeUrl(recipe.url);
+        try {
+          const insertCache = await pool.query(
+            `INSERT INTO recipe_url_cache (normalized_url, recipe_data, ingredient_defs)
+             VALUES ($1, $2, $3)
+             ON CONFLICT (normalized_url) DO NOTHING
+             RETURNING id`,
+            [normalized, JSON.stringify(recipe), JSON.stringify(newIngredientDefs || {})]
+          );
+          let cacheId = insertCache.rows[0]?.id;
+          if (!cacheId) {
+            const existing = await pool.query(
+              'SELECT id FROM recipe_url_cache WHERE normalized_url = $1', [normalized]
+            );
+            cacheId = existing.rows[0]?.id;
+          }
+          if (cacheId) {
+            await pool.query(
+              'UPDATE user_recipes SET url_cache_id = $1 WHERE user_id = $2 AND recipe_id = $3',
+              [cacheId, req.user.id, recipe.id]
+            );
+          }
+        } catch (cacheErr) {
+          console.warn('[save-recipe] URL cache update failed (non-fatal):', cacheErr.message);
+        }
+      }
     }
 
     logActivity(req.user.id, 'save_recipe', { recipe_id: recipe.id }, req.ip);
+    logRecipeImport(req.user.id, 'recipe_saved', { url: recipe.url, recipeName: recipe.name, recipeId: recipe.id }, req.ip);
     res.json({ success: true });
   } catch (err) {
     console.error('Save error:', err.message);
@@ -1584,11 +1815,23 @@ app.delete('/api/recipes/:id', requireAuth, async (req, res) => {
     } else if (pool) {
       // Check user_recipes
       const result = await pool.query(
-        'DELETE FROM user_recipes WHERE user_id = $1 AND recipe_id = $2 RETURNING id',
+        'DELETE FROM user_recipes WHERE user_id = $1 AND recipe_id = $2 RETURNING id, url_cache_id',
         [req.user.id, recipeId]
       );
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Recipe not found' });
+      }
+      // If this was the last user referencing the URL cache entry, delete it so
+      // the next import triggers a fresh parse instead of reusing stale data.
+      const { url_cache_id } = result.rows[0];
+      if (url_cache_id) {
+        const refCount = await pool.query(
+          'SELECT COUNT(*) FROM user_recipes WHERE url_cache_id = $1', [url_cache_id]
+        );
+        if (parseInt(refCount.rows[0].count) === 0) {
+          await pool.query('DELETE FROM recipe_url_cache WHERE id = $1', [url_cache_id]);
+          console.log('[delete] Removed orphaned URL cache entry:', url_cache_id);
+        }
       }
     } else {
       return res.status(404).json({ error: 'Recipe not found' });
@@ -1816,6 +2059,7 @@ app.get('/api/admin/users', requireAdmin, async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT u.id, u.email, u.display_name, u.role, u.created_at,
+             u.email_verified_at,
              COUNT(ur.id) as recipe_count,
              MAX(al.created_at) as last_active
       FROM users u
