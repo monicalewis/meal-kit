@@ -32,7 +32,6 @@ const Auth = {
   isGuest() { return !this.user; },
   isUser() { return !!this.user; },
   isAdmin() { return this.user && this.user.role === 'admin'; },
-  isVerified() { return this.user && this.user.emailVerified; },
 
   // Show/hide elements based on data-auth attribute
   updateUI() {
@@ -65,7 +64,7 @@ const Auth = {
     };
   },
 
-  // CSRF-aware fetch wrapper
+  // CSRF-aware fetch wrapper with automatic token refresh on mismatch
   async fetch(url, options = {}) {
     const csrfToken = document.cookie.match(/csrf_token=([^;]+)/)?.[1] || '';
     options.headers = {
@@ -74,7 +73,19 @@ const Auth = {
       ...(options.headers || {})
     };
     options.credentials = 'same-origin';
-    const res = await fetch(url, options);
+    let res = await fetch(url, options);
+
+    // CSRF token mismatch — the 403 response sets a fresh cookie, so retry once
+    if (res.status === 403) {
+      const data = await res.clone().json().catch(() => ({}));
+      if (data.error === 'Invalid CSRF token') {
+        const freshToken = document.cookie.match(/csrf_token=([^;]+)/)?.[1] || '';
+        if (freshToken && freshToken !== csrfToken) {
+          options.headers['X-CSRF-Token'] = freshToken;
+          res = await fetch(url, options);
+        }
+      }
+    }
 
     // If 401, show login prompt
     if (res.status === 401) {

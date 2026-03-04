@@ -132,15 +132,15 @@ app.use(csrfProtection);
 // --- Auth middleware ---
 app.use(loadUser);
 
-// --- Shared meal plan page (with dynamic OG tags) ---
-const planHtmlTemplate = fs.readFileSync(path.join(__dirname, 'public', 'plan.html'), 'utf-8');
+// --- Shared meal plan page (serves index.html with dynamic OG tags) ---
+const indexHtmlTemplate = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf-8');
 
 app.get('/plan/:shareId', async (req, res) => {
   const { shareId } = req.params;
 
   // For invalid IDs or when DB is unavailable, serve the template as-is (client-side will show error)
   if (!pool || !/^[A-Za-z0-9_-]{12}$/.test(shareId)) {
-    return res.send(planHtmlTemplate);
+    return res.send(indexHtmlTemplate);
   }
 
   try {
@@ -152,7 +152,7 @@ app.get('/plan/:shareId', async (req, res) => {
     );
 
     if (result.rows.length === 0) {
-      return res.send(planHtmlTemplate);
+      return res.send(indexHtmlTemplate);
     }
 
     const snapshot = result.rows[0].recipe_snapshot;
@@ -167,49 +167,32 @@ app.get('/plan/:shareId', async (req, res) => {
       : "Check out this week's meal plan!";
     const ogImage = (recipes.find(r => r.image) || {}).image || '';
 
-    // Replace placeholder meta tags in the template
-    let html = planHtmlTemplate;
-    html = html.replace(
-      '<meta property="og:title" content="This Week\'s Meals">',
-      `<meta property="og:title" content="${escapeAttr(ogTitle)}">`
-    );
-    html = html.replace(
-      '<meta property="og:description" content="Check out this week\'s meal plan!">',
-      `<meta property="og:description" content="${escapeAttr(ogDescription)}">`
-    );
-    if (ogImage) {
-      html = html.replace(
-        '<meta property="og:type" content="website">',
-        `<meta property="og:image" content="${escapeAttr(ogImage)}">\n    <meta property="og:type" content="website">`
-      );
-    }
-
-    // Twitter Card tags
-    html = html.replace(
-      '<meta name="twitter:title" content="This Week\'s Meals">',
-      `<meta name="twitter:title" content="${escapeAttr(ogTitle)}">`
-    );
-    html = html.replace(
-      '<meta name="twitter:description" content="Check out this week\'s meal plan!">',
+    // Inject OG meta tags before </head> (index.html doesn't have OG placeholders)
+    let html = indexHtmlTemplate;
+    const ogTags = [
+      `<meta property="og:title" content="${escapeAttr(ogTitle)}">`,
+      `<meta property="og:description" content="${escapeAttr(ogDescription)}">`,
+      `<meta property="og:type" content="website">`,
+      `<meta name="twitter:card" content="summary_large_image">`,
+      `<meta name="twitter:title" content="${escapeAttr(ogTitle)}">`,
       `<meta name="twitter:description" content="${escapeAttr(ogDescription)}">`
-    );
+    ];
     if (ogImage) {
-      html = html.replace(
-        '<meta name="twitter:card" content="summary_large_image">',
-        `<meta name="twitter:card" content="summary_large_image">\n    <meta name="twitter:image" content="${escapeAttr(ogImage)}">`
-      );
+      ogTags.push(`<meta property="og:image" content="${escapeAttr(ogImage)}">`);
+      ogTags.push(`<meta name="twitter:image" content="${escapeAttr(ogImage)}">`);
     }
+    html = html.replace('</head>', `    ${ogTags.join('\n    ')}\n</head>`);
 
-    // Also update the <title> tag
+    // Update the <title> tag
     html = html.replace(
-      '<title>This Week\'s Meals</title>',
-      `<title>${escapeAttr(ogTitle)}</title>`
+      '<title>DIY Meal Kit</title>',
+      `<title>${escapeAttr(ogTitle)} - DIY Meal Kit</title>`
     );
 
     res.send(html);
   } catch (err) {
     console.error('Plan page OG error:', err.message);
-    res.send(planHtmlTemplate);
+    res.send(indexHtmlTemplate);
   }
 });
 
@@ -236,36 +219,6 @@ function generateUnsubscribeToken(userId) {
   return crypto.createHmac('sha256', secret)
     .update(`unsubscribe:${userId}`)
     .digest('hex');
-}
-
-// --- Email verification helper ---
-async function sendVerificationEmail(userId, userEmail) {
-  const token = crypto.randomBytes(32).toString('hex');
-  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-  await pool.query(
-    `INSERT INTO email_verification_tokens (user_id, token_hash, expires_at)
-     VALUES ($1, $2, NOW() + INTERVAL '24 hours')`,
-    [userId, tokenHash]
-  );
-  const baseUrl = process.env.BASE_URL || `http://localhost:${PORT}`;
-  const verifyLink = `${baseUrl}/api/auth/verify-email?token=${token}`;
-  if (resend) {
-    await resend.emails.send({
-      from: process.env.RESEND_FROM || 'DIY Meal Kit <noreply@resend.dev>',
-      to: userEmail,
-      subject: 'Verify your email — DIY Meal Kit',
-      html: `
-        <h2>Verify your email</h2>
-        <p>Thanks for signing up! Please verify your email address to unlock sharing.</p>
-        <p><a href="${verifyLink}" style="display:inline-block;padding:12px 24px;background:#16a34a;color:white;text-decoration:none;border-radius:8px;font-weight:600;">Verify my email &rarr;</a></p>
-        <p>Or copy this link: ${verifyLink}</p>
-        <p>This link expires in 24 hours.</p>
-      `
-    });
-  } else {
-    console.log('[email verification] RESEND not configured. Verification link:', verifyLink);
-  }
-  logActivity(userId, 'verification_email_sent', { email: userEmail }, null);
 }
 
 // --- Admin parse-failure notification ---
@@ -443,8 +396,6 @@ app.post('/api/auth/register', authLimiter, [
       res.cookie('csrf_token', req.session.csrfToken, {
         httpOnly: false, sameSite: 'lax', secure: process.env.NODE_ENV === 'production'
       });
-      req.session.emailVerified = false;
-
       // Explicitly save session before responding to ensure it's persisted
       // before the client reloads (per express-session docs)
       req.session.save((saveErr) => {
@@ -454,12 +405,7 @@ app.post('/api/auth/register', authLimiter, [
         }
         console.log(`[register] Session saved — user id: ${user.id}, session id: ${req.sessionID}`);
         logActivity(user.id, 'signup', { email: user.email }, req.ip);
-        res.json({ success: true, user: { id: user.id, email: user.email, displayName: user.display_name, role: user.role, emailVerified: false } });
-
-        // Send verification email (non-blocking)
-        sendVerificationEmail(user.id, user.email).catch(err =>
-          console.error('Verification email error:', err.message)
-        );
+        res.json({ success: true, user: { id: user.id, email: user.email, displayName: user.display_name, role: user.role } });
 
         // Admin notification for new signup (non-blocking)
         if (resend && process.env.ADMIN_EMAIL) {
@@ -479,9 +425,8 @@ app.post('/api/auth/register', authLimiter, [
         setTimeout(async () => {
           if (!resend || !pool) return;
           try {
-            const check = await pool.query('SELECT email_unsubscribed, email_verified_at FROM users WHERE id = $1', [userId]);
-            if (check.rows.length === 0 || !check.rows[0].email_verified_at) return;
-            if (check.rows[0].email_unsubscribed) return;
+            const check = await pool.query('SELECT email_unsubscribed FROM users WHERE id = $1', [userId]);
+            if (check.rows.length === 0 || check.rows[0].email_unsubscribed) return;
             const baseUrl = process.env.BASE_URL || `http://localhost:${PORT}`;
             const unsubToken = generateUnsubscribeToken(userId);
             const unsubLink = `${baseUrl}/api/unsubscribe?id=${userId}&token=${unsubToken}`;
@@ -519,16 +464,9 @@ app.post('/api/auth/login', authLimiter, [
 
   try {
     const result = await pool.query(
-      'SELECT id, email, password_hash, display_name, role, failed_login_attempts, locked_until, email_verified_at FROM users WHERE email = $1',
+      'SELECT id, email, password_hash, display_name, role, failed_login_attempts, locked_until FROM users WHERE email = $1',
       [email]
-    ).catch(async (queryErr) => {
-      // Fallback if email_verified_at column doesn't exist yet (migration not run)
-      console.warn('[login] Primary query failed, falling back (missing column?):', queryErr.message);
-      return pool.query(
-        'SELECT id, email, password_hash, display_name, role, failed_login_attempts, locked_until FROM users WHERE email = $1',
-        [email]
-      );
-    });
+    );
     if (result.rows.length === 0) {
       console.log(`[login] No user found for email: ${email}`);
       // Constant-time: still hash to prevent response-timing enumeration
@@ -588,8 +526,6 @@ app.post('/api/auth/login', authLimiter, [
       res.cookie('csrf_token', req.session.csrfToken, {
         httpOnly: false, sameSite: 'lax', secure: process.env.NODE_ENV === 'production'
       });
-      req.session.emailVerified = !!user.email_verified_at;
-
       // Explicitly save session before responding to ensure it's persisted
       // before the client reloads (per express-session docs)
       req.session.save((saveErr) => {
@@ -599,7 +535,7 @@ app.post('/api/auth/login', authLimiter, [
         }
         console.log(`[login] Session saved — user id: ${user.id}, session id: ${req.sessionID}`);
         logActivity(user.id, 'login', { email: user.email }, req.ip);
-        res.json({ success: true, user: { id: user.id, email: user.email, displayName: user.display_name, role: user.role, emailVerified: !!user.email_verified_at } });
+        res.json({ success: true, user: { id: user.id, email: user.email, displayName: user.display_name, role: user.role } });
       });
     });
   } catch (err) {
@@ -628,69 +564,18 @@ app.get('/api/auth/me', async (req, res) => {
   }
   try {
     const result = await pool.query(
-      'SELECT id, email, display_name, role, email_verified_at FROM users WHERE id = $1', [req.user.id]
-    ).catch(async () => {
-      // Fallback if email_verified_at column doesn't exist yet (migration not run)
-      return pool.query('SELECT id, email, display_name, role FROM users WHERE id = $1', [req.user.id]);
-    });
+      'SELECT id, email, display_name, role FROM users WHERE id = $1', [req.user.id]
+    );
     if (result.rows.length === 0) {
       return res.json({ authenticated: false });
     }
     const user = result.rows[0];
     res.json({
       authenticated: true,
-      user: { id: user.id, email: user.email, displayName: user.display_name, role: user.role, emailVerified: !!user.email_verified_at }
+      user: { id: user.id, email: user.email, displayName: user.display_name, role: user.role }
     });
   } catch (err) {
     res.json({ authenticated: false });
-  }
-});
-
-app.get('/api/auth/verify-email', async (req, res) => {
-  const { token } = req.query;
-  if (!token || typeof token !== 'string') return res.redirect('/?verified=invalid');
-  if (!pool) return res.redirect('/?verified=error');
-
-  try {
-    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-    const result = await pool.query(
-      `SELECT t.id, t.user_id FROM email_verification_tokens t
-       WHERE t.token_hash = $1 AND t.used = false AND t.expires_at > NOW()`,
-      [tokenHash]
-    );
-    if (result.rows.length === 0) return res.redirect('/?verified=invalid');
-
-    const { id: tokenId, user_id: userId } = result.rows[0];
-    await pool.query('UPDATE users SET email_verified_at = NOW(), updated_at = NOW() WHERE id = $1', [userId]);
-    await pool.query('UPDATE email_verification_tokens SET used = true WHERE id = $1', [tokenId]);
-
-    if (req.session?.userId === userId) {
-      req.session.emailVerified = true;
-    }
-
-    logActivity(userId, 'email_verified', {}, req.ip);
-    res.redirect('/?verified=1');
-  } catch (err) {
-    console.error('Email verify error:', err.message);
-    res.redirect('/?verified=error');
-  }
-});
-
-app.post('/api/auth/resend-verification', requireAuth, authLimiter, async (req, res) => {
-  if (!pool) return res.status(500).json({ error: 'Database not configured' });
-  try {
-    const result = await pool.query(
-      'SELECT email, email_verified_at FROM users WHERE id = $1', [req.user.id]
-    );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
-    if (result.rows[0].email_verified_at) {
-      return res.status(400).json({ error: 'Email already verified' });
-    }
-    await sendVerificationEmail(req.user.id, result.rows[0].email);
-    res.json({ success: true });
-  } catch (err) {
-    console.error('Resend verification error:', err.message);
-    res.status(500).json({ error: 'Failed to send verification email' });
   }
 });
 
@@ -1855,10 +1740,6 @@ function generateShareId() {
 
 app.post('/api/meal-plans/share', requireAuth, shareLimiter, async (req, res) => {
   if (!pool) return res.status(500).json({ error: 'Database not configured' });
-  if (!req.user.emailVerified) {
-    return res.status(403).json({ error: 'Please verify your email before sharing.', code: 'EMAIL_UNVERIFIED' });
-  }
-
   const { recipeIds } = req.body;
   if (!Array.isArray(recipeIds) || recipeIds.length === 0 || recipeIds.length > 20) {
     return res.status(400).json({ error: 'recipeIds must be an array of 1–20 recipe IDs' });
@@ -2059,7 +1940,6 @@ app.get('/api/admin/users', requireAdmin, async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT u.id, u.email, u.display_name, u.role, u.created_at,
-             u.email_verified_at,
              COUNT(ur.id) as recipe_count,
              MAX(al.created_at) as last_active
       FROM users u

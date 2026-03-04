@@ -1,10 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script type="text/javascript">
+        if (location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+            (function(c,l,a,r,i,t,y){
+                c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+                t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+                y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+            })(window, document, "clarity", "script", "vqlz82mihp");
+        }
+    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DIY Meal Kit</title>
-    <link rel="icon" type="image/svg+xml" href="/images/logo.svg">
+    <link rel="icon" type="image/png" href="/images/logo.png">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="/js/auth.js"></script>
@@ -238,7 +247,7 @@
 <body class="min-h-screen bg-slate-50">
     <div class="container mx-auto px-4 py-8 max-w-6xl pb-36">
         <div class="flex items-center justify-between flex-wrap gap-2 mb-2">
-            <h1 class="text-4xl font-bold tracking-tight text-slate-900 flex items-center gap-3"><img src="/images/logo.svg" alt="DIY Meal Kit logo" class="h-10 w-auto">DIY Meal Kit</h1>
+            <h1 class="text-4xl font-bold tracking-tight text-slate-900 flex items-center gap-3"><img src="/images/logo.png" alt="DIY Meal Kit logo" class="h-10 w-auto">DIY Meal Kit</h1>
             <div class="flex items-center gap-3">
                 <div data-auth="guest" style="display:none">
                     <a href="/login.html" class="text-sm text-green-600 hover:text-green-700 font-medium">Log in</a>
@@ -470,6 +479,7 @@
         // recipeData is loaded asynchronously from /api/recipes
         let recipeData = null;
         let favoritesData = {};
+        let sharedPlanData = null; // Set when landing on /plan/:shareId
         const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=400&q=80';
 
         // --- DOM References ---
@@ -797,12 +807,112 @@
             });
         }
 
+        // --- Handle adding a recipe from a shared plan to user's collection ---
+        async function handleSharedAdd(btn, recipeId) {
+            if (!sharedPlanData) return;
+            if (!Auth.isUser()) {
+                sessionStorage.setItem('pendingSharedAdd', recipeId);
+                Auth.showLoginPrompt('Sign in to add this recipe to your collection');
+                return;
+            }
+            btn.disabled = true;
+            btn.textContent = 'Adding...';
+            try {
+                const res = await Auth.fetch('/api/meal-plans/' + sharedPlanData._shareId + '/add-recipe', {
+                    method: 'POST',
+                    body: JSON.stringify({ recipeId })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    btn.textContent = data.added ? 'Added \u2713' : 'Already in collection';
+                    btn.classList.replace('bg-teal-600', 'bg-teal-800');
+                } else {
+                    btn.textContent = 'Add to collection';
+                    btn.disabled = false;
+                }
+            } catch {
+                btn.textContent = 'Add to collection';
+                btn.disabled = false;
+            }
+        }
+
+        // --- Create a display-only card for a shared recipe not in the local recipe set ---
+        function createSharedSnapshotCard(recipe, sharedByName) {
+            const card = document.createElement('div');
+            card.className = 'group relative bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-200 border-2 border-transparent overflow-hidden';
+
+            // Image container
+            const imgContainer = document.createElement('div');
+            imgContainer.className = 'relative aspect-[4/3] overflow-hidden';
+            const img = document.createElement('img');
+            img.className = 'w-full h-full object-cover transition-transform duration-300 group-hover:scale-105';
+            img.src = recipe.image || DEFAULT_IMAGE;
+            img.alt = recipe.name;
+            img.onerror = () => { img.src = DEFAULT_IMAGE; };
+            imgContainer.appendChild(img);
+
+            // Shared badge
+            const sharedBadge = document.createElement('div');
+            sharedBadge.className = 'card-own-badge card-shared-badge';
+            sharedBadge.textContent = 'Shared by ' + sharedByName;
+            imgContainer.appendChild(sharedBadge);
+
+            card.appendChild(imgContainer);
+
+            // Content
+            const content = document.createElement('div');
+            content.className = 'p-4';
+            const title = document.createElement('div');
+            title.className = 'font-semibold text-slate-900 text-sm leading-tight';
+            title.textContent = recipe.name;
+            if (recipe.author) {
+                const authorSpan = document.createElement('span');
+                authorSpan.className = 'block text-xs font-normal text-slate-500 mt-0.5';
+                authorSpan.textContent = 'by ' + recipe.author;
+                title.appendChild(authorSpan);
+            }
+            content.appendChild(title);
+
+            if (recipe.activeTime || recipe.totalTime) {
+                const timesDiv = document.createElement('div');
+                timesDiv.className = 'flex items-center gap-3 mt-1.5 text-xs text-slate-400';
+                const clockSvg = '<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>';
+                const parts = [];
+                if (recipe.activeTime) parts.push(recipe.activeTime + ' active');
+                if (recipe.totalTime) parts.push(recipe.totalTime + ' total');
+                timesDiv.innerHTML = clockSvg + ' ' + parts.join(' &middot; ');
+                content.appendChild(timesDiv);
+            }
+
+            // "Add to collection" button
+            const addBtn = document.createElement('button');
+            addBtn.className = 'mt-2 w-full text-xs font-medium py-1.5 rounded-lg bg-teal-600 text-white hover:bg-teal-700 transition-colors';
+            addBtn.textContent = 'Add to collection';
+            addBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                handleSharedAdd(addBtn, recipe.id);
+            });
+            content.appendChild(addBtn);
+
+            card.appendChild(content);
+
+            // Link to recipe URL if available
+            if (recipe.url) {
+                card.style.cursor = 'pointer';
+                card.addEventListener('click', () => {
+                    window.open(recipe.url, '_blank', 'noopener,noreferrer');
+                });
+            }
+
+            return card;
+        }
+
         // --- Populate Recipe Cards ---
         function populateRecipeCards() {
             const selectableRecipes = getSelectableRecipes();
             recipeListDiv.innerHTML = '';
 
-            if (selectableRecipes.length === 0) {
+            if (selectableRecipes.length === 0 && !sharedPlanData) {
                 recipeListDiv.innerHTML = `
                     <div class="col-span-full text-center py-12">
                         <div class="text-slate-500">No recipes found in the data.</div>
@@ -811,8 +921,37 @@
                 return;
             }
 
-            // Split into visible vs hidden
-            const visibleRecipes = selectableRecipes.filter(r => !r.hidden);
+            // --- Shared recipes section (pinned at top when landing on /plan/:shareId) ---
+            const sharedRecipeIds = new Set();
+            if (sharedPlanData && sharedPlanData.recipes) {
+                const sharedByName = sharedPlanData.createdBy || 'Someone';
+                const dateStr = new Date(sharedPlanData.createdAt).toLocaleDateString('en-US', {
+                    month: 'long', day: 'numeric', year: 'numeric'
+                });
+
+                const heading = document.createElement('div');
+                heading.className = 'col-span-full';
+                heading.innerHTML = '<h3 class="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-1">' +
+                    'Shared by ' + sharedByName + ' &middot; ' + dateStr + '</h3>';
+                recipeListDiv.appendChild(heading);
+
+                sharedPlanData.recipes.forEach(sharedRecipe => {
+                    sharedRecipeIds.add(sharedRecipe.id);
+                    // Try to find a matching recipe in the full recipe set (has ingredients for shopping list)
+                    const fullRecipe = selectableRecipes.find(r => r.id === sharedRecipe.id);
+                    if (fullRecipe) {
+                        // Use full recipe data so it's selectable for shopping list
+                        const augmented = { ...fullRecipe, shared_by_name: sharedByName };
+                        recipeListDiv.appendChild(createRecipeCard(augmented));
+                    } else {
+                        // Custom recipe not in preloaded set — display-only card with add button
+                        recipeListDiv.appendChild(createSharedSnapshotCard(sharedRecipe, sharedByName));
+                    }
+                });
+            }
+
+            // Split into visible vs hidden (excluding shared recipes already shown)
+            const visibleRecipes = selectableRecipes.filter(r => !r.hidden && !sharedRecipeIds.has(r.id));
             const hiddenRecipes = selectableRecipes.filter(r => r.hidden);
 
             // Split visible into favorites and non-favorites
@@ -838,7 +977,7 @@
             if (favoriteRecipes.length > 0) {
                 // Favorites section heading
                 const favHeading = document.createElement('div');
-                favHeading.className = 'col-span-full';
+                favHeading.className = 'col-span-full' + (sharedPlanData ? ' mt-4' : '');
                 favHeading.innerHTML = '<h3 class="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-1">Favorites</h3>';
                 recipeListDiv.appendChild(favHeading);
 
@@ -849,7 +988,7 @@
 
             // All Recipes section (user-created first, then preloaded alphabetically)
             if (otherRecipes.length > 0) {
-                if (favoriteRecipes.length > 0) {
+                if (favoriteRecipes.length > 0 || sharedPlanData) {
                     const allHeading = document.createElement('div');
                     allHeading.className = 'col-span-full mt-4';
                     allHeading.innerHTML = '<h3 class="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-1">All Recipes</h3>';
@@ -1005,7 +1144,7 @@
                 }).catch(() => {});
             }
 
-            window.location.href = 'shopping-list.html';
+            window.location.href = '/shopping-list.html';
         });
 
         // --- Initialize ---
@@ -1116,10 +1255,6 @@
         }
 
         document.getElementById('share-plan-button')?.addEventListener('click', Auth.requireLogin(async function() {
-            if (!Auth.isVerified()) {
-                showToast('Please verify your email before sharing. Check your inbox for a verification link.', true);
-                return;
-            }
             const selectedRecipeIds = Array.from(document.querySelectorAll('input[name="recipe"]:checked'))
                 .map(cb => cb.value);
             if (selectedRecipeIds.length === 0) return;
@@ -1160,7 +1295,10 @@
                     method: 'POST',
                     body: JSON.stringify({ recipeId, hidden: hide })
                 });
-                if (!res.ok) throw new Error('Failed to update recipe');
+                if (!res.ok) {
+                    const data = await res.json().catch(() => ({}));
+                    throw new Error(data.error || 'Failed to update recipe');
+                }
 
                 // Update local data
                 const recipe = recipeData.recipes.find(r => r.id === recipeId);
@@ -1221,7 +1359,10 @@
             deleteConfirmBtn.disabled = true;
             try {
                 const res = await Auth.fetch(`/api/recipes/${encodeURIComponent(pendingDeleteId)}`, { method: 'DELETE' });
-                if (!res.ok) throw new Error('Failed to delete recipe');
+                if (!res.ok) {
+                    const data = await res.json().catch(() => ({}));
+                    throw new Error(data.error || 'Failed to delete recipe');
+                }
 
                 // Remove from local data
                 recipeData.recipes = recipeData.recipes.filter(r => r.id !== pendingDeleteId);
@@ -1427,61 +1568,26 @@
             // Wait for auth to initialize
             await new Promise(resolve => Auth.onReady(resolve));
 
-            // Handle ?verified= query param (redirected from email verification link)
-            const verifiedParam = new URLSearchParams(window.location.search).get('verified');
-            if (verifiedParam) {
-                history.replaceState({}, '', '/');
-                if (verifiedParam === '1') {
-                    showToast('Email verified! You can now share meal plans.');
-                } else if (verifiedParam === 'invalid') {
-                    showToast('This verification link is invalid or has expired. Please request a new one.', true);
-                }
-            }
-
-            // Show verification banner for logged-in but unverified users
-            if (Auth.isUser() && !Auth.isVerified()) {
-                const banner = document.createElement('div');
-                banner.id = 'verify-banner';
-                banner.className = 'fixed top-0 left-0 right-0 z-50 bg-amber-50 border-b border-amber-200 px-4 py-3 flex items-center justify-between gap-3 text-sm text-amber-900';
-                banner.innerHTML = `
-                    <span>Please verify your email address to unlock sharing. Check your inbox, or
-                        <button id="resend-verify-btn" class="font-semibold underline hover:no-underline ml-1">resend the email</button>.
-                    </span>
-                    <button id="dismiss-verify-btn" class="text-amber-600 hover:text-amber-900 text-lg leading-none flex-shrink-0">&times;</button>
-                `;
-                document.body.prepend(banner);
-                document.getElementById('resend-verify-btn').addEventListener('click', async () => {
-                    const btn = document.getElementById('resend-verify-btn');
-                    btn.disabled = true;
-                    btn.textContent = 'Sending...';
-                    try {
-                        const res = await Auth.fetch('/api/auth/resend-verification', { method: 'POST' });
-                        if (res.ok) {
-                            showToast('Verification email sent! Check your inbox.');
-                            document.getElementById('verify-banner')?.remove();
-                        } else {
-                            const data = await res.json();
-                            showToast(data.error || 'Failed to send verification email', true);
-                            btn.disabled = false;
-                            btn.textContent = 'resend the email';
-                        }
-                    } catch {
-                        showToast('Failed to send verification email', true);
-                        btn.disabled = false;
-                        btn.textContent = 'resend the email';
-                    }
-                });
-                document.getElementById('dismiss-verify-btn').addEventListener('click', () => {
-                    document.getElementById('verify-banner')?.remove();
-                });
-            }
+            // Detect shared plan URL (/plan/:shareId)
+            const shareMatch = window.location.pathname.match(/^\/plan\/([A-Za-z0-9_-]{12})$/);
 
             try {
-                const res = await fetch('/api/recipes', { credentials: 'same-origin' });
-                if (!res.ok) throw new Error('Failed to load recipes');
-                const data = await res.json();
+                const fetches = [fetch('/api/recipes', { credentials: 'same-origin' })];
+                if (shareMatch) {
+                    fetches.push(fetch('/api/meal-plans/' + encodeURIComponent(shareMatch[1])));
+                }
+                const responses = await Promise.all(fetches);
+
+                const recipesRes = responses[0];
+                if (!recipesRes.ok) throw new Error('Failed to load recipes');
+                const data = await recipesRes.json();
                 recipeData = data;
                 favoritesData = data.favorites || {};
+
+                if (shareMatch && responses[1] && responses[1].ok) {
+                    sharedPlanData = await responses[1].json();
+                    sharedPlanData._shareId = shareMatch[1];
+                }
             } catch (err) {
                 console.error('Error fetching recipe data:', err);
             }

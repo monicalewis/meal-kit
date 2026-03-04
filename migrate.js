@@ -18,7 +18,6 @@ CREATE TABLE IF NOT EXISTS users (
   failed_login_attempts INTEGER NOT NULL DEFAULT 0,
   locked_until  TIMESTAMPTZ,
   email_unsubscribed BOOLEAN NOT NULL DEFAULT false,
-  email_verified_at  TIMESTAMPTZ,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -92,17 +91,6 @@ CREATE TABLE IF NOT EXISTS shared_meal_plans (
 );
 CREATE INDEX IF NOT EXISTS idx_shared_plans_share_id ON shared_meal_plans (share_id);
 
--- Email verification tokens
-CREATE TABLE IF NOT EXISTS email_verification_tokens (
-  id         SERIAL PRIMARY KEY,
-  user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  token_hash VARCHAR(64) NOT NULL,
-  expires_at TIMESTAMPTZ NOT NULL,
-  used       BOOLEAN NOT NULL DEFAULT false,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-CREATE INDEX IF NOT EXISTS idx_email_verify_tokens_hash ON email_verification_tokens (token_hash);
-
 -- Password reset tokens
 CREATE TABLE IF NOT EXISTS password_reset_tokens (
   id         SERIAL PRIMARY KEY,
@@ -165,24 +153,6 @@ async function migrate() {
   await pool.query(`
     ALTER TABLE user_recipes ADD COLUMN IF NOT EXISTS shared_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
     ALTER TABLE user_recipes ADD COLUMN IF NOT EXISTS shared_by_name TEXT;
-  `);
-
-  // Add email verification to users
-  await pool.query(`
-    ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified_at TIMESTAMPTZ;
-  `);
-
-  // Email verification tokens table
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS email_verification_tokens (
-      id         SERIAL PRIMARY KEY,
-      user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      token_hash VARCHAR(64) NOT NULL,
-      expires_at TIMESTAMPTZ NOT NULL,
-      used       BOOLEAN NOT NULL DEFAULT false,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-    CREATE INDEX IF NOT EXISTS idx_email_verify_tokens_hash ON email_verification_tokens (token_hash);
   `);
 
   // Link user_recipes to the URL parse cache

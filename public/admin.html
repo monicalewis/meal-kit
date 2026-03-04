@@ -1,10 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script type="text/javascript">
+        if (location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+            (function(c,l,a,r,i,t,y){
+                c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+                t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+                y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+            })(window, document, "clarity", "script", "vqlz82mihp");
+        }
+    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard - DIY Meal Kit</title>
-    <link rel="icon" type="image/svg+xml" href="/images/logo.svg">
+    <link rel="icon" type="image/png" href="/images/logo.png">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -18,7 +27,7 @@
     <nav class="bg-white border-b border-slate-200 px-4 py-3">
         <div class="container mx-auto max-w-6xl flex items-center justify-between">
             <div class="flex items-center gap-3">
-                <img src="/images/logo.svg" alt="DIY Meal Kit logo" class="h-7 w-auto"><span class="text-lg font-bold text-slate-800">DIY Meal Kit</span>
+                <img src="/images/logo.png" alt="DIY Meal Kit logo" class="h-7 w-auto"><span class="text-lg font-bold text-slate-800">DIY Meal Kit</span>
                 <span class="text-xs font-medium bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">Admin</span>
             </div>
             <div class="flex items-center gap-4">
@@ -89,7 +98,6 @@
                                 <th class="px-5 py-3 text-xs font-medium text-slate-500 uppercase">Email</th>
                                 <th class="px-5 py-3 text-xs font-medium text-slate-500 uppercase">Name</th>
                                 <th class="px-5 py-3 text-xs font-medium text-slate-500 uppercase">Role</th>
-                                <th class="px-5 py-3 text-xs font-medium text-slate-500 uppercase">Verified</th>
                                 <th class="px-5 py-3 text-xs font-medium text-slate-500 uppercase">Joined</th>
                                 <th class="px-5 py-3 text-xs font-medium text-slate-500 uppercase">Recipes</th>
                                 <th class="px-5 py-3 text-xs font-medium text-slate-500 uppercase">Last Active</th>
@@ -265,9 +273,6 @@
                     <td class="px-5 py-3 text-slate-600">${escapeHtml(u.display_name || '-')}</td>
                     <td class="px-5 py-3">
                         <span class="text-xs font-medium px-2 py-0.5 rounded-full ${u.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'}">${escapeHtml(u.role)}</span>
-                    </td>
-                    <td class="px-5 py-3">
-                        <span class="text-xs font-medium px-2 py-0.5 rounded-full ${u.email_verified_at ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">${u.email_verified_at ? 'Yes' : 'No'}</span>
                     </td>
                     <td class="px-5 py-3 text-slate-500 text-xs">${formatDate(u.created_at)}</td>
                     <td class="px-5 py-3 text-slate-700 font-medium">
