@@ -83,7 +83,7 @@ CREATE INDEX IF NOT EXISTS idx_user_favorites_user ON user_favorites (user_id);
 CREATE TABLE IF NOT EXISTS shared_meal_plans (
   id               SERIAL PRIMARY KEY,
   share_id         VARCHAR(12) NOT NULL UNIQUE,
-  user_id          INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_id          INTEGER REFERENCES users(id) ON DELETE SET NULL,
   recipe_ids       JSONB NOT NULL,
   recipe_snapshot  JSONB NOT NULL,
   created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -153,6 +153,14 @@ async function migrate() {
   await pool.query(`
     ALTER TABLE user_recipes ADD COLUMN IF NOT EXISTS shared_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
     ALTER TABLE user_recipes ADD COLUMN IF NOT EXISTS shared_by_name TEXT;
+  `);
+
+  // Allow anonymous sharing (make user_id nullable on shared_meal_plans)
+  await pool.query(`
+    ALTER TABLE shared_meal_plans ALTER COLUMN user_id DROP NOT NULL;
+    ALTER TABLE shared_meal_plans DROP CONSTRAINT IF EXISTS shared_meal_plans_user_id_fkey;
+    ALTER TABLE shared_meal_plans ADD CONSTRAINT shared_meal_plans_user_id_fkey
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL;
   `);
 
   // Link user_recipes to the URL parse cache

@@ -133,14 +133,19 @@ app.use(csrfProtection);
 app.use(loadUser);
 
 // --- Shared meal plan page (serves index.html with dynamic OG tags) ---
-const indexHtmlTemplate = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf-8');
+const indexHtmlPath = path.join(__dirname, 'public', 'index.html');
+
+function getIndexHtml() {
+  return fs.readFileSync(indexHtmlPath, 'utf-8');
+}
 
 app.get('/plan/:shareId', async (req, res) => {
   const { shareId } = req.params;
+  const indexHtml = getIndexHtml();
 
   // For invalid IDs or when DB is unavailable, serve the template as-is (client-side will show error)
   if (!pool || !/^[A-Za-z0-9_-]{12}$/.test(shareId)) {
-    return res.send(indexHtmlTemplate);
+    return res.send(indexHtml);
   }
 
   try {
@@ -152,7 +157,7 @@ app.get('/plan/:shareId', async (req, res) => {
     );
 
     if (result.rows.length === 0) {
-      return res.send(indexHtmlTemplate);
+      return res.send(indexHtml);
     }
 
     const snapshot = result.rows[0].recipe_snapshot;
@@ -168,7 +173,7 @@ app.get('/plan/:shareId', async (req, res) => {
     const ogImage = (recipes.find(r => r.image) || {}).image || '';
 
     // Inject OG meta tags before </head> (index.html doesn't have OG placeholders)
-    let html = indexHtmlTemplate;
+    let html = indexHtml;
     const ogTags = [
       `<meta property="og:title" content="${escapeAttr(ogTitle)}">`,
       `<meta property="og:description" content="${escapeAttr(ogDescription)}">`,
@@ -192,7 +197,7 @@ app.get('/plan/:shareId', async (req, res) => {
     res.send(html);
   } catch (err) {
     console.error('Plan page OG error:', err.message);
-    res.send(indexHtmlTemplate);
+    res.send(indexHtml);
   }
 });
 
@@ -1738,7 +1743,7 @@ function generateShareId() {
   return crypto.randomBytes(9).toString('base64url');
 }
 
-app.post('/api/meal-plans/share', requireAuth, shareLimiter, async (req, res) => {
+app.post('/api/meal-plans/share', shareLimiter, async (req, res) => {
   if (!pool) return res.status(500).json({ error: 'Database not configured' });
   const { recipeIds } = req.body;
   if (!Array.isArray(recipeIds) || recipeIds.length === 0 || recipeIds.length > 20) {
@@ -1749,10 +1754,11 @@ app.post('/api/meal-plans/share', requireAuth, shareLimiter, async (req, res) =>
   }
 
   try {
-    const [globalData, userRows] = await Promise.all([
-      getRecipeData(),
-      getUserRecipes(req.user.id)
-    ]);
+    const userId = req.user ? req.user.id : null;
+    const fetches = [getRecipeData()];
+    if (userId) fetches.push(getUserRecipes(userId));
+    const [globalData, ...rest] = await Promise.all(fetches);
+    const userRows = rest[0] || [];
 
     const allRecipes = [
       ...globalData.recipes.map(r => ({ ...r })),
@@ -1768,10 +1774,12 @@ app.post('/api/meal-plans/share', requireAuth, shareLimiter, async (req, res) =>
     }
 
     // Get display name — never fall back to email to avoid leaking it on public share links
-    let createdBy = null;
-    const userResult = await pool.query('SELECT display_name FROM users WHERE id = $1', [req.user.id]);
-    if (userResult.rows.length > 0) {
-      createdBy = userResult.rows[0].display_name || 'a friend';
+    let createdBy = 'a friend';
+    if (userId) {
+      const userResult = await pool.query('SELECT display_name FROM users WHERE id = $1', [userId]);
+      if (userResult.rows.length > 0 && userResult.rows[0].display_name) {
+        createdBy = userResult.rows[0].display_name;
+      }
     }
 
     const snapshot = {
@@ -1799,10 +1807,10 @@ app.post('/api/meal-plans/share', requireAuth, shareLimiter, async (req, res) =>
     await pool.query(
       `INSERT INTO shared_meal_plans (share_id, user_id, recipe_ids, recipe_snapshot)
        VALUES ($1, $2, $3, $4)`,
-      [shareId, req.user.id, JSON.stringify(recipeIds), JSON.stringify(snapshot)]
+      [shareId, userId, JSON.stringify(recipeIds), JSON.stringify(snapshot)]
     );
 
-    logActivity(req.user.id, 'share_meal_plan', {
+    logActivity(userId, 'share_meal_plan', {
       share_id: shareId,
       recipe_ids: recipeIds,
       recipe_count: selectedRecipes.length

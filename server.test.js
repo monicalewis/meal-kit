@@ -1013,9 +1013,10 @@ describe('/api/recipes deduplication: user_recipes wins over preloaded', () => {
 describe('shared plan landing page serves index.html', () => {
   const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
 
-  test('server reads index.html as template for /plan/:shareId', () => {
-    expect(serverSource).toContain("indexHtmlTemplate = fs.readFileSync");
+  test('server reads index.html for /plan/:shareId', () => {
+    expect(serverSource).toContain("indexHtmlPath");
     expect(serverSource).toContain("'index.html'");
+    expect(serverSource).toContain("getIndexHtml()");
   });
 
   test('/plan/:shareId route injects OG tags before </head>', () => {
@@ -1030,8 +1031,8 @@ describe('shared plan landing page serves index.html', () => {
     expect(serverSource).toContain("- DIY Meal Kit</title>");
   });
 
-  test('falls back to indexHtmlTemplate on error or missing plan', () => {
-    expect(serverSource).toContain('res.send(indexHtmlTemplate)');
+  test('falls back to plain index.html on error or missing plan', () => {
+    expect(serverSource).toContain('res.send(indexHtml)');
   });
 });
 
@@ -1119,6 +1120,83 @@ describe('migrate.js shared recipe schema', () => {
 
   test('ALTER TABLE migration adds shared_by_name if not exists', () => {
     expect(migrateSource).toContain('ADD COLUMN IF NOT EXISTS shared_by_name');
+  });
+});
+
+// ── Anonymous sharing (no account required) ─────────────────────────
+
+describe('POST /api/meal-plans/share allows anonymous users', () => {
+  const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+
+  test('share endpoint does not use requireAuth middleware', () => {
+    const shareRoute = serverSource.match(/app\.post\('\/api\/meal-plans\/share',[^)]+\)/);
+    expect(shareRoute).not.toBeNull();
+    expect(shareRoute[0]).not.toContain('requireAuth');
+  });
+
+  test('share endpoint still uses shareLimiter rate limiting', () => {
+    const shareRoute = serverSource.match(/app\.post\('\/api\/meal-plans\/share',[^)]+\)/);
+    expect(shareRoute).not.toBeNull();
+    expect(shareRoute[0]).toContain('shareLimiter');
+  });
+
+  test('share endpoint handles missing user gracefully', () => {
+    expect(serverSource).toContain('req.user ? req.user.id : null');
+  });
+
+  test('anonymous shares default createdBy to "a friend"', () => {
+    expect(serverSource).toContain("createdBy = 'a friend'");
+  });
+
+  test('share endpoint accepts request without authentication', async () => {
+    const agent = request.agent(app);
+    // Establish a session first (to get a CSRF token)
+    const page = await agent.get('/');
+    const csrfMatch = (page.headers['set-cookie'] || []).join(';').match(/csrf_token=([^;]+)/);
+    const csrfToken = csrfMatch ? csrfMatch[1] : '';
+    const res = await agent
+      .post('/api/meal-plans/share')
+      .set('X-CSRF-Token', csrfToken)
+      .send({ recipeIds: ['test-recipe-1'] });
+    // Should get 400 or 500 (no DB), but NOT 401/403
+    expect(res.status).not.toBe(401);
+    expect(res.status).not.toBe(403);
+  });
+});
+
+describe('index.html share button does not require login', () => {
+  const indexSource = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8');
+
+  test('share button handler does not use Auth.requireLogin', () => {
+    expect(indexSource).not.toContain("Log in to share your meal plan");
+  });
+
+  test('share button uses plain addEventListener without requireLogin wrapper', () => {
+    // Find the line with share-plan-button addEventListener
+    const lines = indexSource.split('\n');
+    const handlerLine = lines.find(l => l.includes('share-plan-button') && l.includes('addEventListener'));
+    expect(handlerLine).toBeDefined();
+    expect(handlerLine).toContain('async function');
+    expect(handlerLine).not.toContain('requireLogin');
+  });
+});
+
+describe('migrate.js allows nullable user_id on shared_meal_plans', () => {
+  const migrateSource = fs.readFileSync(path.join(__dirname, 'migrate.js'), 'utf8');
+
+  test('DDL does not require NOT NULL on shared_meal_plans.user_id', () => {
+    const createTable = migrateSource.match(/CREATE TABLE IF NOT EXISTS shared_meal_plans[\s\S]*?\);/);
+    expect(createTable).not.toBeNull();
+    const userIdLine = createTable[0].split('\n').find(l => l.includes('user_id'));
+    expect(userIdLine).not.toContain('NOT NULL');
+  });
+
+  test('migration drops NOT NULL constraint on user_id for existing tables', () => {
+    expect(migrateSource).toContain('ALTER TABLE shared_meal_plans ALTER COLUMN user_id DROP NOT NULL');
+  });
+
+  test('migration updates foreign key to ON DELETE SET NULL', () => {
+    expect(migrateSource).toContain('ON DELETE SET NULL');
   });
 });
 
