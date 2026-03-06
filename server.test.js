@@ -92,6 +92,18 @@ describe('Favorites endpoints (Fix #4)', () => {
     expect(res.body.favorites).toEqual({});
   });
 
+  test('GET /api/recipes guest view contains only recipes.js recipes (no seed personal recipes)', async () => {
+    const res = await request(app).get('/api/recipes');
+    expect(res.status).toBe(200);
+    const recipeIds = res.body.recipes.map(r => r.id);
+    // Grazing platter is a seed personal recipe — must not appear in guest view
+    expect(recipeIds).not.toContain('grazing-platter');
+    // All recipes should be marked as preloaded
+    for (const r of res.body.recipes) {
+      expect(r.owner).toBe('preloaded');
+    }
+  });
+
   test('POST /api/favorites/record rejects unauthenticated requests', async () => {
     const res = await request(app)
       .post('/api/favorites/record')
@@ -1001,12 +1013,63 @@ describe('/api/recipes deduplication: user_recipes wins over preloaded', () => {
     expect(serverSource).toContain('preloadedRecipes.filter(r => !userRecipeIds.has(r.id))');
   });
 
-  test('admins bypass deduplication and see all preloaded recipes', () => {
-    expect(serverSource).toContain("req.user.role === 'admin'");
+  test('admin view returns only preloaded recipes (no user_recipes)', () => {
+    // Admin branch returns early with just preloadedRecipes — no getUserRecipes merge
+    expect(serverSource).toContain("if (req.user.role === 'admin')");
+    expect(serverSource).toContain('recipes: preloadedRecipes,');
   });
 
   test('user recipes include shared_by_name in API response', () => {
     expect(serverSource).toContain('shared_by_name: row.shared_by_name');
+  });
+});
+
+describe('Admin recipe isolation — seed personal recipes excluded', () => {
+  const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+
+  test('admin branch in GET /api/recipes returns early without loading user_recipes', () => {
+    // The admin block should return before the getUserRecipes call
+    const adminBlock = serverSource.indexOf("if (req.user.role === 'admin')");
+    const getUserRecipesCall = serverSource.indexOf('getUserRecipes(req.user.id)', adminBlock);
+    const adminReturn = serverSource.indexOf('return res.json(', adminBlock);
+    // Admin returns before the regular getUserRecipes call
+    expect(adminBlock).toBeGreaterThan(-1);
+    expect(adminReturn).toBeGreaterThan(adminBlock);
+    expect(getUserRecipesCall).toBeGreaterThan(adminReturn);
+  });
+
+  test('admin response includes only preloaded recipes and favorites', () => {
+    // Extract the admin block
+    const adminBlockStart = serverSource.indexOf("if (req.user.role === 'admin')");
+    const adminReturnEnd = serverSource.indexOf('});', serverSource.indexOf('return res.json(', adminBlockStart));
+    const adminBlock = serverSource.substring(adminBlockStart, adminReturnEnd);
+    expect(adminBlock).toContain('recipes: preloadedRecipes');
+    expect(adminBlock).toContain('ingredientDefs: globalData.ingredientDefs');
+    expect(adminBlock).toContain('favorites');
+  });
+
+  test('guest view returns only preloaded recipes with no user_recipes', () => {
+    // Guest block returns before any user_recipes logic
+    expect(serverSource).toContain('// Guest: preloaded only');
+    expect(serverSource).toContain('recipes: preloadedRecipes, favorites: {}');
+  });
+
+  test('getRecipeData reads from recipes.js file (canonical source), not DB', () => {
+    expect(serverSource).toContain('function getRecipeDataFromFile()');
+    expect(serverSource).toContain('// recipes.js is the canonical source of preloaded recipes');
+    expect(serverSource).toContain('return getRecipeDataFromFile()');
+  });
+
+  test('saveRecipeData always writes to recipes.js file first', () => {
+    // File write should happen before the DB mirror, not be skipped when pool exists
+    const saveFuncStart = serverSource.indexOf('async function saveRecipeData');
+    const nextFunc = serverSource.indexOf('\nasync function ', saveFuncStart + 1);
+    const saveFunc = serverSource.substring(saveFuncStart, nextFunc > -1 ? nextFunc : saveFuncStart + 500);
+    expect(saveFunc).toContain('// Always write to recipes.js');
+    expect(saveFunc).toContain('fs.writeFileSync');
+    expect(saveFunc).toContain('// Also mirror to DB');
+    // File write comes before DB write
+    expect(saveFunc.indexOf('writeFileSync')).toBeLessThan(saveFunc.indexOf('pool.query'));
   });
 });
 

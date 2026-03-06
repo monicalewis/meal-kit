@@ -279,12 +279,7 @@ async function logRecipeImport(userId, action, { url, recipeName, recipeId, erro
 // Data access helpers
 // ====================
 
-async function getRecipeData() {
-  if (pool) {
-    const result = await pool.query("SELECT value FROM app_data WHERE key = 'recipeData'");
-    if (result.rows.length > 0) return result.rows[0].value;
-    return { ingredientDefs: {}, recipes: [] };
-  }
+function getRecipeDataFromFile() {
   const recipesPath = path.join(__dirname, 'recipes.js');
   const content = fs.readFileSync(recipesPath, 'utf-8')
     .replace(/^const recipeData/m, 'var recipeData');
@@ -293,19 +288,26 @@ async function getRecipeData() {
   return sandbox.recipeData || { ingredientDefs: {}, recipes: [] };
 }
 
+async function getRecipeData() {
+  // recipes.js is the canonical source of preloaded recipes
+  return getRecipeDataFromFile();
+}
+
 async function saveRecipeData(recipeData) {
+  // Always write to recipes.js (canonical source)
+  const recipesPath = path.join(__dirname, 'recipes.js');
+  const newContent = '// Recipe data - edit this file to add/modify recipes\nconst recipeData = ' +
+    JSON.stringify(recipeData, null, 2) + ';\n';
+  fs.writeFileSync(recipesPath, newContent, 'utf-8');
+
+  // Also mirror to DB if available
   if (pool) {
     await pool.query(
       `INSERT INTO app_data (key, value) VALUES ('recipeData', $1)
        ON CONFLICT (key) DO UPDATE SET value = $1`,
       [JSON.stringify(recipeData)]
     );
-    return;
   }
-  const recipesPath = path.join(__dirname, 'recipes.js');
-  const newContent = '// Recipe data - edit this file to add/modify recipes\nconst recipeData = ' +
-    JSON.stringify(recipeData, null, 2) + ';\n';
-  fs.writeFileSync(recipesPath, newContent, 'utf-8');
 }
 
 async function getUserFavorites(userId) {
@@ -854,10 +856,21 @@ app.get('/api/recipes', async (req, res) => {
       return res.json({ ingredientDefs: globalData.ingredientDefs, recipes: preloadedRecipes, favorites: {} });
     }
 
-    // Logged-in user: merge preloaded + own custom recipes + per-user favorites
+    // Admin: only preloaded recipes (admin edits go straight to preloaded data;
+    // their user_recipes table may contain seed personal recipes that shouldn't show here)
+    if (req.user.role === 'admin') {
+      const favorites = await getUserFavorites(req.user.id);
+      return res.json({
+        ingredientDefs: globalData.ingredientDefs,
+        recipes: preloadedRecipes,
+        favorites
+      });
+    }
+
+    // Regular user: merge preloaded + own custom recipes + per-user favorites
     const [userRows, userPrefs, favorites] = await Promise.all([
       getUserRecipes(req.user.id),
-      req.user.role === 'admin' ? {} : getUserRecipePrefs(req.user.id),
+      getUserRecipePrefs(req.user.id),
       getUserFavorites(req.user.id)
     ]);
 
@@ -873,19 +886,15 @@ app.get('/api/recipes', async (req, res) => {
       });
     }
 
-    // For non-admin users, user_recipes "wins" over preloaded when same recipe_id exists.
+    // user_recipes "wins" over preloaded when same recipe_id exists.
     // This allows shared copies of preloaded recipes to replace the anonymous system version.
     const userRecipeIds = new Set(userRows.map(row => row.recipe_id));
-    const visiblePreloaded = req.user.role === 'admin'
-      ? preloadedRecipes
-      : preloadedRecipes.filter(r => !userRecipeIds.has(r.id));
+    const visiblePreloaded = preloadedRecipes.filter(r => !userRecipeIds.has(r.id));
 
-    // Apply per-user archive overrides to visible preloaded recipes (non-admin only)
-    if (req.user.role !== 'admin') {
-      for (const r of visiblePreloaded) {
-        if (userPrefs[r.id] !== undefined) {
-          r.hidden = userPrefs[r.id].hidden;
-        }
+    // Apply per-user archive overrides to visible preloaded recipes
+    for (const r of visiblePreloaded) {
+      if (userPrefs[r.id] !== undefined) {
+        r.hidden = userPrefs[r.id].hidden;
       }
     }
 
