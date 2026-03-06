@@ -1600,6 +1600,14 @@
                 if (shareMatch && responses[1] && responses[1].ok) {
                     sharedPlanData = await responses[1].json();
                     sharedPlanData._shareId = shareMatch[1];
+                    // Persist for guest session so badge survives navigation
+                    try { sessionStorage.setItem('sharedPlanData', JSON.stringify(sharedPlanData)); } catch(e) {}
+                } else if (!shareMatch) {
+                    // Restore from session if navigating away from share link
+                    try {
+                        const stored = sessionStorage.getItem('sharedPlanData');
+                        if (stored) sharedPlanData = JSON.parse(stored);
+                    } catch(e) {}
                 }
             } catch (err) {
                 console.error('Error fetching recipe data:', err);

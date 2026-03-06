@@ -1103,6 +1103,53 @@ describe('index.html Shared by badge', () => {
   });
 });
 
+describe('index.html shared badge session persistence', () => {
+  const indexSource = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8');
+
+  test('saves sharedPlanData to sessionStorage when landing on share link', () => {
+    expect(indexSource).toContain("sessionStorage.setItem('sharedPlanData'");
+    expect(indexSource).toContain('JSON.stringify(sharedPlanData)');
+  });
+
+  test('restores sharedPlanData from sessionStorage when not on a share link', () => {
+    expect(indexSource).toContain("sessionStorage.getItem('sharedPlanData')");
+  });
+
+  test('only restores from sessionStorage when no fresh share link is present', () => {
+    // The restore branch should only run when !shareMatch
+    expect(indexSource).toContain('!shareMatch');
+    // Verify the restore is inside the else branch, not alongside a fresh fetch
+    const restorePattern = /else if \(!shareMatch\)[\s\S]*?sessionStorage\.getItem\('sharedPlanData'\)/;
+    expect(indexSource).toMatch(restorePattern);
+  });
+
+  test('wraps sessionStorage access in try/catch for private browsing compat', () => {
+    // Both setItem and getItem should be wrapped in try/catch
+    const setMatch = indexSource.match(/try\s*\{\s*sessionStorage\.setItem/);
+    const getMatch = indexSource.match(/try\s*\{\s*(?:const|let|var)\s+stored\s*=\s*sessionStorage\.getItem/);
+    expect(setMatch).not.toBeNull();
+    expect(getMatch).not.toBeNull();
+  });
+});
+
+describe('server.js shared_by_name persists through recipe updates', () => {
+  const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+
+  test('UPDATE user_recipes does not overwrite shared_by columns', () => {
+    // Find all UPDATE user_recipes statements and ensure none touch shared_by_name
+    const updateStatements = serverSource.match(/UPDATE user_recipes SET[^;]+/g) || [];
+    expect(updateStatements.length).toBeGreaterThan(0);
+    for (const stmt of updateStatements) {
+      expect(stmt).not.toContain('shared_by_name');
+      expect(stmt).not.toContain('shared_by_user_id');
+    }
+  });
+
+  test('INSERT uses ON CONFLICT DO NOTHING to preserve existing attribution', () => {
+    expect(serverSource).toContain('ON CONFLICT (user_id, recipe_id) DO NOTHING');
+  });
+});
+
 describe('migrate.js shared recipe schema', () => {
   const migrateSource = fs.readFileSync(path.join(__dirname, 'migrate.js'), 'utf8');
 
