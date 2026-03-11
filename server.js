@@ -5,7 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const vm = require('vm');
 const crypto = require('crypto');
-const Groq = require('groq-sdk');
+const Anthropic = require('@anthropic-ai/sdk');
 const bcrypt = require('bcrypt');
 const session = require('express-session');
 const helmet = require('helmet');
@@ -205,12 +205,20 @@ function escapeAttr(str) {
   return String(str).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+// --- Protect admin page ---
+app.get('/admin.html', loadUser, (req, res, next) => {
+  if (!req.user || req.user.role !== 'admin') {
+    return res.redirect('/');
+  }
+  next();
+});
+
 // --- Static files ---
 app.use(express.static(path.join(__dirname, 'public')));
 
-// --- Groq AI setup ---
-const groq = process.env.GROQ_API_KEY
-  ? new Groq({ apiKey: process.env.GROQ_API_KEY })
+// --- Anthropic AI setup ---
+const anthropic = process.env.ANTHROPIC_API_KEY
+  ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   : null;
 
 // --- Resend email setup ---
@@ -224,6 +232,36 @@ function generateUnsubscribeToken(userId) {
   return crypto.createHmac('sha256', secret)
     .update(`unsubscribe:${userId}`)
     .digest('hex');
+}
+
+// --- Email verification helpers ---
+function generateVerificationToken(userId) {
+  const secret = process.env.SESSION_SECRET || 'default-secret';
+  return crypto.createHmac('sha256', secret)
+    .update(`verify-email:${userId}`)
+    .digest('hex');
+}
+
+async function sendVerificationEmail(userId, email) {
+  if (!resend) {
+    console.log('[verify] RESEND_API_KEY not configured. Skipping verification email.');
+    return;
+  }
+  const baseUrl = process.env.BASE_URL || `http://localhost:${PORT}`;
+  const token = generateVerificationToken(userId);
+  const verifyLink = `${baseUrl}/api/auth/verify-email?id=${userId}&token=${token}`;
+  await resend.emails.send({
+    from: process.env.RESEND_FROM || 'DIY Meal Kit <noreply@resend.dev>',
+    to: email,
+    subject: 'Verify your email — DIY Meal Kit',
+    html: `
+      <h2>Welcome to DIY Meal Kit!</h2>
+      <p>Please verify your email address to unlock all features:</p>
+      <p><a href="${verifyLink}" style="display:inline-block;padding:12px 24px;background:#4f46e5;color:#fff;text-decoration:none;border-radius:6px;">Verify Email</a></p>
+      <p style="color:#6b7280;font-size:14px;">Or copy this link: ${verifyLink}</p>
+    `
+  });
+  console.log(`[verify] Verification email sent to ${email}`);
 }
 
 // --- Admin parse-failure notification ---
@@ -412,7 +450,11 @@ app.post('/api/auth/register', authLimiter, [
         }
         console.log(`[register] Session saved — user id: ${user.id}, session id: ${req.sessionID}`);
         logActivity(user.id, 'signup', { email: user.email }, req.ip);
-        res.json({ success: true, user: { id: user.id, email: user.email, displayName: user.display_name, role: user.role } });
+        res.json({ success: true, user: { id: user.id, email: user.email, displayName: user.display_name, role: user.role, emailVerified: false } });
+
+        // Send verification email (non-blocking)
+        sendVerificationEmail(user.id, user.email)
+          .catch(err => console.error('[verify] email error:', err.message));
 
         // Admin notification for new signup (non-blocking)
         if (resend && process.env.ADMIN_EMAIL) {
@@ -471,7 +513,7 @@ app.post('/api/auth/login', authLimiter, [
 
   try {
     const result = await pool.query(
-      'SELECT id, email, password_hash, display_name, role, failed_login_attempts, locked_until FROM users WHERE email = $1',
+      'SELECT id, email, password_hash, display_name, role, failed_login_attempts, locked_until, email_verified_at FROM users WHERE email = $1',
       [email]
     );
     if (result.rows.length === 0) {
@@ -479,7 +521,7 @@ app.post('/api/auth/login', authLimiter, [
       // Constant-time: still hash to prevent response-timing enumeration
       await bcrypt.hash(password, 12);
       logActivity(null, 'login_failed', { email, reason: 'no_account' }, req.ip);
-      return res.status(401).json({ error: 'No account found with that email address.' });
+      return res.status(401).json({ error: 'Invalid email or password.' });
     }
 
     const user = result.rows[0];
@@ -509,11 +551,8 @@ app.post('/api/auth/login', authLimiter, [
           [attempts, user.id]
         );
       }
-      const remaining = MAX_FAILED_ATTEMPTS - attempts;
       logActivity(null, 'login_failed', { email, reason: 'wrong_password' }, req.ip);
-      return res.status(401).json({
-        error: `Incorrect password. Please try again.${remaining <= 2 ? ` (${remaining} attempt${remaining === 1 ? '' : 's'} remaining before lockout)` : ''}`
-      });
+      return res.status(401).json({ error: 'Invalid email or password.' });
     }
 
     // Successful login — reset lockout state
@@ -542,7 +581,7 @@ app.post('/api/auth/login', authLimiter, [
         }
         console.log(`[login] Session saved — user id: ${user.id}, session id: ${req.sessionID}`);
         logActivity(user.id, 'login', { email: user.email }, req.ip);
-        res.json({ success: true, user: { id: user.id, email: user.email, displayName: user.display_name, role: user.role } });
+        res.json({ success: true, user: { id: user.id, email: user.email, displayName: user.display_name, role: user.role, emailVerified: !!user.email_verified_at } });
       });
     });
   } catch (err) {
@@ -561,6 +600,53 @@ app.post('/api/auth/logout', (req, res) => {
   });
 });
 
+app.get('/api/auth/verify-email', async (req, res) => {
+  const { id, token } = req.query;
+  const userId = parseInt(id);
+  if (!id || !token || isNaN(userId)) {
+    return res.status(400).send('Invalid verification link.');
+  }
+  const expected = generateVerificationToken(userId);
+  if (token !== expected) {
+    return res.status(400).send('Invalid verification link.');
+  }
+  if (!pool) return res.status(500).send('Database not configured.');
+  try {
+    const result = await pool.query(
+      'UPDATE users SET email_verified_at = NOW(), updated_at = NOW() WHERE id = $1 AND email_verified_at IS NULL RETURNING email',
+      [userId]
+    );
+    if (result.rows.length === 0) {
+      // Already verified or user not found — still redirect gracefully
+      return res.redirect('/?verified=1');
+    }
+    logActivity(userId, 'email_verified', { email: result.rows[0].email }, req.ip);
+    res.redirect('/?verified=1');
+  } catch (err) {
+    console.error('[verify] error:', err.message);
+    res.status(500).send('Verification failed. Please try again.');
+  }
+});
+
+app.post('/api/auth/resend-verification', authLimiter, async (req, res) => {
+  if (!req.user) return res.status(401).json({ error: 'Not authenticated' });
+  if (!pool) return res.status(500).json({ error: 'Database not configured' });
+  try {
+    const result = await pool.query(
+      'SELECT email, email_verified_at FROM users WHERE id = $1', [req.user.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+    if (result.rows[0].email_verified_at) {
+      return res.json({ success: true, message: 'Email already verified.' });
+    }
+    await sendVerificationEmail(req.user.id, result.rows[0].email);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[verify] resend error:', err.message);
+    res.status(500).json({ error: 'Failed to send verification email.' });
+  }
+});
+
 app.get('/api/version', (req, res) => {
   res.json({ version: APP_VERSION });
 });
@@ -571,7 +657,7 @@ app.get('/api/auth/me', async (req, res) => {
   }
   try {
     const result = await pool.query(
-      'SELECT id, email, display_name, role FROM users WHERE id = $1', [req.user.id]
+      'SELECT id, email, display_name, role, email_verified_at FROM users WHERE id = $1', [req.user.id]
     );
     if (result.rows.length === 0) {
       return res.json({ authenticated: false });
@@ -579,7 +665,7 @@ app.get('/api/auth/me', async (req, res) => {
     const user = result.rows[0];
     res.json({
       authenticated: true,
-      user: { id: user.id, email: user.email, displayName: user.display_name, role: user.role }
+      user: { id: user.id, email: user.email, displayName: user.display_name, role: user.role, emailVerified: !!user.email_verified_at }
     });
   } catch (err) {
     res.json({ authenticated: false });
@@ -737,6 +823,17 @@ app.post('/api/auth/forgot-password', authLimiter, [
     const user = result.rows[0];
     const token = crypto.randomBytes(32).toString('hex');
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
+    // Invalidate any existing reset tokens for this user
+    await pool.query(
+      'UPDATE password_reset_tokens SET used = true WHERE user_id = $1 AND used = false',
+      [user.id]
+    );
+
+    // Clean up expired/used tokens older than 24 hours (opportunistic)
+    await pool.query(
+      "DELETE FROM password_reset_tokens WHERE used = true OR expires_at < NOW() - INTERVAL '24 hours'"
+    );
 
     await pool.query(
       'INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, NOW() + INTERVAL \'1 hour\')',
@@ -1351,16 +1448,14 @@ Return ONLY valid JSON in this exact format, no other text:
 }`;
 
   try {
-    if (!groq) return res.status(500).json({ error: 'AI service not configured (GROQ_API_KEY missing)' });
+    if (!anthropic) return res.status(500).json({ error: 'AI service not configured (ANTHROPIC_API_KEY missing)' });
     console.log('[parse-recipe] recipeName:', recipeName, '| ingredient count:', ingredients.length);
-    const result = await groq.chat.completions.create({
-      model: 'llama-3.1-8b-instant',
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.2,
+    const result = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 3000,
-      response_format: { type: 'json_object' },
+      messages: [{ role: 'user', content: prompt }],
     });
-    const text = result.choices[0].message.content;
+    const text = result.content[0].text;
     console.log('[parse-recipe] AI raw response (first 300 chars):', text.substring(0, 300));
     const parsed = extractJSON(text);
     normalizeNewDefs(parsed, existingDefs);
@@ -1375,14 +1470,14 @@ Return ONLY valid JSON in this exact format, no other text:
     logRecipeImport(req.user.id, 'parse_succeeded', { recipeName }, req.ip);
     res.json(parsed);
   } catch (err) {
-    console.error('Groq API error:', err.message);
+    console.error('Anthropic API error:', err.message);
     const msg = err.message || '';
     if (err.status === 429 || msg.includes('rate_limit') || msg.includes('Rate limit')) {
       notifyParseFailure({ endpoint: 'parse-recipe', errorType: 'rate_limit', userId: req.user.id, context: { recipe: recipeName } });
       logRecipeImport(req.user.id, 'parse_failed', { recipeName, error: 'ai_rate_limit' }, req.ip);
       return res.status(503).json({ error: 'The AI service is temporarily overloaded. Please wait a minute and try again.' });
     }
-    if (err.status === 503 || msg.includes('overloaded') || msg.includes('unavailable')) {
+    if (err.status === 529 || err.status === 503 || msg.includes('overloaded') || msg.includes('unavailable')) {
       notifyParseFailure({ endpoint: 'parse-recipe', errorType: 'ai_unavailable', userId: req.user.id, context: { recipe: recipeName } });
       logRecipeImport(req.user.id, 'parse_failed', { recipeName, error: 'ai_unavailable' }, req.ip);
       return res.status(503).json({ error: 'The AI service is temporarily unavailable. Please try again in a few minutes.' });
@@ -1466,16 +1561,14 @@ Return ONLY valid JSON in this exact format, no other text:
   }
 
   try {
-    if (!groq) return res.status(500).json({ error: 'AI service not configured (GROQ_API_KEY missing)' });
+    if (!anthropic) return res.status(500).json({ error: 'AI service not configured (ANTHROPIC_API_KEY missing)' });
     console.log('[extract-recipe] pageText first 200 chars:', pageText.substring(0, 200));
-    const result = await groq.chat.completions.create({
-      model: 'llama-3.1-8b-instant',
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.2,
+    const result = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 3000,
-      response_format: { type: 'json_object' },
+      messages: [{ role: 'user', content: prompt }],
     });
-    const text = result.choices[0].message.content;
+    const text = result.content[0].text;
     console.log('[extract-recipe] AI raw response (first 300 chars):', text.substring(0, 300));
     const parsed = extractJSON(text);
     if (parsed.not_a_recipe) {
@@ -1501,14 +1594,14 @@ Return ONLY valid JSON in this exact format, no other text:
     logRecipeImport(req.user.id, 'parse_succeeded', { url: sourceUrl, recipeName: parsed.name }, req.ip);
     res.json(parsed);
   } catch (err) {
-    console.error('Groq API error:', err.message);
+    console.error('Anthropic API error:', err.message);
     const msg = err.message || '';
     if (err.status === 429 || msg.includes('rate_limit') || msg.includes('Rate limit')) {
       notifyParseFailure({ endpoint: 'extract-recipe', errorType: 'rate_limit', userId: req.user.id, context: { url: sourceUrl } });
       logRecipeImport(req.user.id, 'parse_failed', { url: sourceUrl, error: 'ai_rate_limit' }, req.ip);
       return res.status(503).json({ error: 'The AI service is temporarily overloaded. Please wait a minute and try again.' });
     }
-    if (err.status === 503 || msg.includes('overloaded') || msg.includes('unavailable')) {
+    if (err.status === 529 || err.status === 503 || msg.includes('overloaded') || msg.includes('unavailable')) {
       notifyParseFailure({ endpoint: 'extract-recipe', errorType: 'ai_unavailable', userId: req.user.id, context: { url: sourceUrl } });
       logRecipeImport(req.user.id, 'parse_failed', { url: sourceUrl, error: 'ai_unavailable' }, req.ip);
       return res.status(503).json({ error: 'The AI service is temporarily unavailable. Please try again in a few minutes.' });
@@ -2032,6 +2125,81 @@ app.get('/api/admin/activity', requireAdmin, async (req, res) => {
   }
 });
 
+
+// GET /api/admin/action-summary — aggregated action counts with date range filtering
+app.get('/api/admin/action-summary', requireAdmin, async (req, res) => {
+  const startDate = req.query.start || null;
+  const endDate = req.query.end || null;
+
+  try {
+    const dateFilter = [];
+    const params = [];
+
+    if (startDate) {
+      params.push(startDate);
+      dateFilter.push(`al.created_at >= $${params.length}::date`);
+    }
+    if (endDate) {
+      params.push(endDate);
+      dateFilter.push(`al.created_at < ($${params.length}::date + INTERVAL '1 day')`);
+    }
+
+    const whereBase = '(u.role IS NULL OR u.role != \'admin\')';
+    const dateWhere = dateFilter.length > 0 ? ' AND ' + dateFilter.join(' AND ') : '';
+
+    // Define the action groups to query
+    const actionGroups = [
+      { label: 'Account creation', filter: "al.action = 'signup'" },
+      { label: 'Recipe selection', filter: "al.action = 'save_recipe'" },
+      { label: 'Shopping list generation', filter: "al.action = 'generate_shopping_list'" },
+      { label: 'Recipe load via URL', filter: "al.action = 'import_recipe'" },
+      { label: 'Photo import interest', filter: "al.action = 'photo_import_interest'" },
+      { label: 'Recipe share', filter: "al.action = 'share_meal_plan'" },
+      { label: 'Shopping list share', filter: "al.action = 'share_shopping_list'" },
+    ];
+
+    // Build one query per action group + one for page views
+    const queries = actionGroups.map(g =>
+      pool.query(
+        `SELECT COUNT(*) as total_count, COUNT(DISTINCT al.user_id) as unique_users
+         FROM activity_log al LEFT JOIN users u ON u.id = al.user_id
+         WHERE ${whereBase} AND ${g.filter}${dateWhere}`, params
+      )
+    );
+
+    // Page views broken down by page
+    queries.push(pool.query(
+      `SELECT al.details->>'page' as page, COUNT(*) as total_count, COUNT(DISTINCT al.user_id) as unique_users
+       FROM activity_log al LEFT JOIN users u ON u.id = al.user_id
+       WHERE ${whereBase} AND al.action = 'page_view'${dateWhere}
+       GROUP BY al.details->>'page'
+       ORDER BY total_count DESC`, params
+    ));
+
+    const results = await Promise.all(queries);
+
+    const rows = actionGroups.map((g, i) => ({
+      action: g.label,
+      unique_users: parseInt(results[i].rows[0].unique_users) || 0,
+      total_count: parseInt(results[i].rows[0].total_count) || 0,
+    }));
+
+    // Add page view rows
+    const pvResult = results[results.length - 1];
+    pvResult.rows.forEach(r => {
+      rows.push({
+        action: `Page visit: ${r.page || 'unknown'}`,
+        unique_users: parseInt(r.unique_users) || 0,
+        total_count: parseInt(r.total_count) || 0,
+      });
+    });
+
+    res.json({ rows });
+  } catch (err) {
+    console.error('Admin action summary error:', err.message);
+    res.status(500).json({ error: 'Failed to load action summary' });
+  }
+});
 
 // =============================
 // START SERVER

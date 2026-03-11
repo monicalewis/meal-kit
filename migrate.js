@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS users (
   failed_login_attempts INTEGER NOT NULL DEFAULT 0,
   locked_until  TIMESTAMPTZ,
   email_unsubscribed BOOLEAN NOT NULL DEFAULT false,
+  email_verified_at  TIMESTAMPTZ,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -147,6 +148,12 @@ async function migrate() {
     ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_login_attempts INTEGER NOT NULL DEFAULT 0;
     ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until TIMESTAMPTZ;
     ALTER TABLE users ADD COLUMN IF NOT EXISTS email_unsubscribed BOOLEAN NOT NULL DEFAULT false;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified_at TIMESTAMPTZ;
+  `);
+
+  // Grandfather existing users as verified
+  await pool.query(`
+    UPDATE users SET email_verified_at = created_at WHERE email_verified_at IS NULL AND created_at < NOW() - INTERVAL '1 minute';
   `);
 
   // Add shared-recipe attribution columns to user_recipes

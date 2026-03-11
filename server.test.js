@@ -125,9 +125,9 @@ describe('Favorites endpoints (Fix #4)', () => {
 describe('AI model configuration', () => {
   const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
 
-  test('uses llama-3.1-8b-instant model with JSON mode support', () => {
-    expect(serverSource).toContain('llama-3.1-8b-instant');
-    expect(serverSource).toContain("response_format: { type: 'json_object' }");
+  test('uses Claude Haiku model via Anthropic SDK', () => {
+    expect(serverSource).toContain('claude-haiku-4-5-20251001');
+    expect(serverSource).toContain('anthropic.messages.create');
   });
 
   test('sets max_tokens on AI calls', () => {
@@ -853,6 +853,22 @@ describe('normalizeNewDefs — ensures all ingredients have defs', () => {
 
 // ── Admin user recipes endpoint ─────────────────────────────────────
 
+describe('Admin page server-side protection', () => {
+  test('GET /admin.html redirects unauthenticated users to /', async () => {
+    const res = await request(app).get('/admin.html');
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe('/');
+  });
+
+  test('server.js intercepts /admin.html before static middleware', () => {
+    const src = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+    const guardIdx = src.indexOf("app.get('/admin.html'");
+    const staticIdx = src.indexOf('express.static');
+    expect(guardIdx).toBeGreaterThan(-1);
+    expect(staticIdx).toBeGreaterThan(guardIdx);
+  });
+});
+
 describe('Admin user recipes endpoint', () => {
   const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
   const adminSource = fs.readFileSync(path.join(__dirname, 'public', 'admin.html'), 'utf8');
@@ -898,6 +914,76 @@ describe('Admin user recipes endpoint', () => {
   test('admin.html modal can be closed by clicking backdrop or close button', () => {
     expect(adminSource).toContain('closeRecipesModal()');
     expect(adminSource).toContain('e.target === e.currentTarget');
+  });
+});
+
+// ── Admin action summary endpoint ────────────────────────────────────
+
+describe('Admin action summary endpoint', () => {
+  const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+  const adminSource = fs.readFileSync(path.join(__dirname, 'public', 'admin.html'), 'utf8');
+
+  test('GET /api/admin/action-summary route exists with requireAdmin', () => {
+    expect(serverSource).toContain("/api/admin/action-summary");
+    expect(serverSource).toContain("requireAdmin");
+  });
+
+  test('endpoint supports start and end date query params', () => {
+    expect(serverSource).toContain("req.query.start");
+    expect(serverSource).toContain("req.query.end");
+  });
+
+  test('endpoint queries all expected action types', () => {
+    expect(serverSource).toContain("al.action = 'signup'");
+    expect(serverSource).toContain("al.action = 'save_recipe'");
+    expect(serverSource).toContain("al.action = 'generate_shopping_list'");
+    expect(serverSource).toContain("al.action = 'import_recipe'");
+    expect(serverSource).toContain("al.action = 'photo_import_interest'");
+    expect(serverSource).toContain("al.action = 'share_meal_plan'");
+    expect(serverSource).toContain("al.action = 'share_shopping_list'");
+  });
+
+  test('endpoint includes page_view breakdown by page', () => {
+    expect(serverSource).toContain("al.action = 'page_view'");
+    expect(serverSource).toContain("al.details->>'page'");
+    expect(serverSource).toContain("GROUP BY");
+  });
+
+  test('endpoint returns unique_users and total_count per action', () => {
+    expect(serverSource).toContain('COUNT(DISTINCT al.user_id) as unique_users');
+    expect(serverSource).toContain('COUNT(*) as total_count');
+  });
+
+  test('endpoint excludes admin users from counts', () => {
+    const idx = serverSource.indexOf('/api/admin/action-summary');
+    const block = serverSource.substring(idx, idx + 2000);
+    expect(block).toContain("u.role != \\'admin\\'");
+  });
+
+  test('GET /api/admin/action-summary rejects unauthenticated requests', async () => {
+    const res = await request(app).get('/api/admin/action-summary');
+    expect([401, 403]).toContain(res.status);
+  });
+
+  test('admin.html has action summary table markup', () => {
+    expect(adminSource).toContain('summary-table-body');
+    expect(adminSource).toContain('summary-start');
+    expect(adminSource).toContain('summary-end');
+    expect(adminSource).toContain('summary-apply');
+  });
+
+  test('admin.html loadActionSummary fetches from action-summary endpoint', () => {
+    expect(adminSource).toContain('/api/admin/action-summary');
+    expect(adminSource).toContain('loadActionSummary');
+  });
+
+  test('admin.html date filter reset clears inputs and reloads', () => {
+    expect(adminSource).toContain('summary-reset');
+    expect(adminSource).toContain("loadActionSummary()");
+  });
+
+  test('admin.html renders action summary rows with escapeHtml', () => {
+    expect(adminSource).toContain('escapeHtml(r.action)');
   });
 });
 
@@ -1665,37 +1751,63 @@ describe('Register → session → /api/auth/me flow', () => {
   });
 });
 
-// ── Specific auth error messages ──────────────────────────────────────
+// ── Auth error messages ──────────────────────────────────────
 
-describe('Auth error messages are specific (source code)', () => {
+describe('Auth error messages (source code)', () => {
   const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
 
-  test('login returns specific "no account found" message when email not in DB', () => {
-    expect(serverSource).toContain('No account found with that email address.');
+  test('login returns generic message for both no-account and wrong-password (prevents enumeration)', () => {
+    // Should use the same generic message for both cases
+    expect(serverSource).toContain("'Invalid email or password.'");
+    // Should NOT contain specific messages that leak account existence
+    expect(serverSource).not.toContain('No account found with that email address.');
+    expect(serverSource).not.toContain('Incorrect password. Please try again.');
   });
 
-  test('login returns specific "incorrect password" message on wrong password', () => {
-    expect(serverSource).toContain('Incorrect password. Please try again.');
-  });
-
-  test('login warns about remaining attempts when close to lockout', () => {
-    expect(serverSource).toContain('remaining before lockout');
+  test('login does not leak attempts remaining count', () => {
+    expect(serverSource).not.toContain('remaining before lockout');
   });
 
   test('register returns 409 status for duplicate email (not 400)', () => {
     expect(serverSource).toContain('res.status(409)');
     expect(serverSource).toContain('An account with that email already exists.');
   });
+
+  test('forgot-password invalidates old tokens before creating new one', () => {
+    expect(serverSource).toContain("UPDATE password_reset_tokens SET used = true WHERE user_id = $1 AND used = false");
+  });
+
+  test('forgot-password cleans up expired/used tokens', () => {
+    expect(serverSource).toContain("DELETE FROM password_reset_tokens WHERE used = true OR expires_at < NOW()");
+  });
 });
 
 describe('Auth error messages at runtime (skips if no DB)', () => {
-  test('login with non-existent email returns 401 + no-account message', async () => {
+  test('login with non-existent email returns 401 + generic message', async () => {
     const res = await request(app)
       .post('/api/auth/login')
       .send({ email: 'nobody_xyz_999@example.com', password: 'SomePass1' });
     if (res.status === 500) return; // No DB — skip
     expect(res.status).toBe(401);
-    expect(res.body.error).toMatch(/no account found/i);
+    expect(res.body.error).toBe('Invalid email or password.');
+  });
+
+  test('login with wrong password returns same generic message as non-existent email', async () => {
+    const agent = request.agent(app);
+    const email = `wrongpw_${Date.now()}@example.com`;
+
+    const reg = await agent
+      .post('/api/auth/register')
+      .send({ email, password: 'CorrectPass1' });
+    if (reg.status !== 200) return; // No DB — skip
+
+    await agent.post('/api/auth/logout');
+
+    const login = await agent
+      .post('/api/auth/login')
+      .send({ email, password: 'WrongPass1' });
+    expect(login.status).toBe(401);
+    expect(login.body.error).toBe('Invalid email or password.');
   });
 
   test('register with duplicate email returns 409 + already-exists message', async () => {
@@ -1714,24 +1826,6 @@ describe('Auth error messages at runtime (skips if no DB)', () => {
       .send({ email, password: 'TestPass1' });
     expect(second.status).toBe(409);
     expect(second.body.error).toMatch(/already exists/i);
-  });
-
-  test('login with wrong password returns 401 + incorrect-password message', async () => {
-    const agent = request.agent(app);
-    const email = `wrongpw_${Date.now()}@example.com`;
-
-    const reg = await agent
-      .post('/api/auth/register')
-      .send({ email, password: 'CorrectPass1' });
-    if (reg.status !== 200) return; // No DB — skip
-
-    await agent.post('/api/auth/logout');
-
-    const login = await agent
-      .post('/api/auth/login')
-      .send({ email, password: 'WrongPass1' });
-    expect(login.status).toBe(401);
-    expect(login.body.error).toMatch(/incorrect password/i);
   });
 });
 
@@ -2054,5 +2148,103 @@ describe('Frontend error handling for archive/delete', () => {
     expect(deleteSection).not.toBeNull();
     expect(deleteSection[0]).toContain('res.json()');
     expect(deleteSection[0]).toContain('data.error');
+  });
+});
+
+// ── Email verification ─────────────────────────────────────────────────
+describe('Email verification', () => {
+  const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+  const authSource = fs.readFileSync(path.join(__dirname, 'public', 'js', 'auth.js'), 'utf8');
+  const migrateSource = fs.readFileSync(path.join(__dirname, 'migrate.js'), 'utf8');
+
+  test('migrate.js adds email_verified_at column', () => {
+    expect(migrateSource).toContain('email_verified_at');
+    expect(migrateSource).toContain('ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified_at');
+  });
+
+  test('migrate.js grandfathers existing users as verified', () => {
+    expect(migrateSource).toContain('UPDATE users SET email_verified_at = created_at');
+  });
+
+  test('registration response includes emailVerified: false', () => {
+    expect(serverSource).toContain('emailVerified: false');
+  });
+
+  test('login response includes emailVerified from DB', () => {
+    expect(serverSource).toContain('emailVerified: !!user.email_verified_at');
+  });
+
+  test('/api/auth/me returns emailVerified', () => {
+    expect(serverSource).toContain("email_verified_at FROM users WHERE id");
+    const meStart = serverSource.indexOf("app.get('/api/auth/me'");
+    const meSection = serverSource.substring(meStart, meStart + 800);
+    expect(meSection).toContain('emailVerified');
+  });
+
+  test('GET /api/auth/verify-email endpoint exists and validates token', () => {
+    expect(serverSource).toContain("app.get('/api/auth/verify-email'");
+    expect(serverSource).toContain('generateVerificationToken');
+  });
+
+  test('verify-email endpoint uses HMAC comparison', () => {
+    const verifySection = serverSource.substring(
+      serverSource.indexOf("app.get('/api/auth/verify-email'"),
+      serverSource.indexOf("app.get('/api/auth/verify-email'") + 800
+    );
+    expect(verifySection).toContain('generateVerificationToken(userId)');
+    expect(verifySection).toContain("token !== expected");
+  });
+
+  test('verify-email rejects invalid requests', async () => {
+    const res = await request(app).get('/api/auth/verify-email');
+    expect(res.status).toBe(400);
+  });
+
+  test('verify-email rejects bad token', async () => {
+    const res = await request(app).get('/api/auth/verify-email?id=1&token=badtoken');
+    expect(res.status).toBe(400);
+  });
+
+  test('POST /api/auth/resend-verification exists with rate limiting', () => {
+    expect(serverSource).toContain("app.post('/api/auth/resend-verification'");
+    expect(serverSource).toContain('authLimiter');
+  });
+
+  test('resend-verification rejects unauthenticated requests', async () => {
+    const res = await request(app).post('/api/auth/resend-verification');
+    expect([401, 403]).toContain(res.status);
+  });
+
+  test('sendVerificationEmail is called after registration', () => {
+    const regSection = serverSource.substring(
+      serverSource.indexOf("app.post('/api/auth/register'"),
+      serverSource.indexOf("app.post('/api/auth/login'")
+    );
+    expect(regSection).toContain('sendVerificationEmail(user.id, user.email)');
+  });
+
+  test('frontend auth.js has isVerified helper', () => {
+    expect(authSource).toContain('isVerified()');
+    expect(authSource).toContain('emailVerified');
+  });
+
+  test('frontend shows verification wall for unverified users', () => {
+    expect(authSource).toContain('verify-email-wall');
+    expect(authSource).toContain('Resend Verification Email');
+  });
+
+  test('frontend cleans up ?verified query param', () => {
+    expect(authSource).toContain("has('verified')");
+    expect(authSource).toContain('replaceState');
+  });
+
+  test('registration success shows verification wall instead of reloading', () => {
+    // After register success, should call updateUI (which shows the wall) not reload
+    const regSuccess = authSource.substring(
+      authSource.indexOf("[auth:register] Success"),
+      authSource.indexOf("[auth:register] Success") + 200
+    );
+    expect(regSuccess).toContain('this.updateUI()');
+    expect(regSuccess).not.toContain('window.location.reload()');
   });
 });

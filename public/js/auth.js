@@ -32,6 +32,7 @@ const Auth = {
   isGuest() { return !this.user; },
   isUser() { return !!this.user; },
   isAdmin() { return this.user && this.user.role === 'admin'; },
+  isVerified() { return this.user && (this.user.emailVerified || this.user.role === 'admin'); },
 
   // Show/hide elements based on data-auth attribute
   updateUI() {
@@ -50,6 +51,56 @@ const Auth = {
     if (nameEl && this.user) {
       nameEl.textContent = this.user.displayName || this.user.email.split('@')[0];
     }
+
+    // Email verification wall for unverified logged-in users
+    this._updateVerificationWall();
+  },
+
+  _updateVerificationWall() {
+    const existing = document.getElementById('verify-email-wall');
+    if (existing) existing.remove();
+
+    if (!this.user || this.isVerified()) return;
+
+    const wall = document.createElement('div');
+    wall.id = 'verify-email-wall';
+    wall.style.cssText = 'position:fixed;inset:0;background:white;z-index:9999;display:flex;align-items:center;justify-content:center;font-family:Inter,system-ui,sans-serif;';
+    wall.innerHTML = `
+      <div style="text-align:center;max-width:420px;padding:24px;">
+        <div style="font-size:3rem;margin-bottom:16px;">&#9993;</div>
+        <h2 style="margin:0 0 8px;font-size:1.5rem;font-weight:700;color:#0f172a;">Check your email</h2>
+        <p style="color:#64748b;margin-bottom:24px;">We sent a verification link to <strong>${this.escapeHtml(this.user.email)}</strong>. Please verify your email to continue.</p>
+        <button id="verify-resend-btn" style="padding:10px 24px;background:#4f46e5;color:white;border:none;border-radius:8px;font-size:0.875rem;font-weight:600;cursor:pointer;margin-bottom:12px;">Resend Verification Email</button>
+        <div id="verify-resend-msg" style="font-size:0.8rem;color:#16a34a;min-height:1.2em;"></div>
+        <p style="margin-top:16px;"><button id="verify-logout-btn" style="background:none;border:none;color:#64748b;font-size:0.8rem;cursor:pointer;text-decoration:underline;">Log out</button></p>
+      </div>
+    `;
+    document.body.appendChild(wall);
+
+    wall.querySelector('#verify-resend-btn').addEventListener('click', async () => {
+      const msg = wall.querySelector('#verify-resend-msg');
+      const btn = wall.querySelector('#verify-resend-btn');
+      btn.disabled = true;
+      btn.textContent = 'Sending...';
+      try {
+        const res = await this.fetch('/api/auth/resend-verification', { method: 'POST' });
+        const data = await res.json();
+        if (res.ok) {
+          msg.style.color = '#16a34a';
+          msg.textContent = 'Verification email sent! Check your inbox.';
+        } else {
+          msg.style.color = '#dc2626';
+          msg.textContent = data.error || 'Failed to send. Try again.';
+        }
+      } catch {
+        msg.style.color = '#dc2626';
+        msg.textContent = 'Connection error. Try again.';
+      }
+      btn.disabled = false;
+      btn.textContent = 'Resend Verification Email';
+    });
+
+    wall.querySelector('#verify-logout-btn').addEventListener('click', () => this.logout());
   },
 
   // Wrap a callback so it only fires if logged in, otherwise show login prompt
@@ -332,7 +383,7 @@ const Auth = {
         console.log('[auth:register] Success — user id:', data.user?.id);
         this.user = data.user;
         closeModal();
-        window.location.reload();
+        this.updateUI();
       } catch (err) {
         console.error('[auth:register] Network error:', err);
         errorEl.textContent = 'Connection error. Please try again.';
@@ -354,4 +405,10 @@ const Auth = {
 };
 
 // Auto-init on DOMContentLoaded
-document.addEventListener('DOMContentLoaded', () => Auth.init());
+document.addEventListener('DOMContentLoaded', () => {
+  Auth.init();
+  // Clean up ?verified=1 query param after successful verification redirect
+  if (new URLSearchParams(window.location.search).has('verified')) {
+    window.history.replaceState({}, '', window.location.pathname);
+  }
+});
