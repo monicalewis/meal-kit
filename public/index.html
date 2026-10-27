@@ -19,6 +19,7 @@
     <script src="/js/auth.js"></script>
     <script src="/js/unit-conversion.js"></script>
     <script src="/js/ingredient-editor.js"></script>
+    <script src="/js/recipe-seasons.js"></script>
     <!-- ShadcnUI Dependencies -->
     <link href="https://cdn.jsdelivr.net/npm/@radix-ui/colors/blackA.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/@radix-ui/colors/green.css" rel="stylesheet">
@@ -242,6 +243,8 @@
             background-color: #fef9c3;
         }
 
+        #season-filter summary::-webkit-details-marker, #mp-season-filter summary::-webkit-details-marker { display: none; }
+
         /* Mobile FAB for import button */
         @media (max-width: 639px) {
             #import-recipe-button {
@@ -333,6 +336,21 @@
             <span class="text-sm text-slate-500 mr-1">Cooking time:</span>
             <button type="button" data-time="all" class="time-filter-btn text-sm font-medium py-1.5 px-4 rounded-full border transition-colors bg-green-600 text-white border-green-600">All</button>
             <button type="button" data-time="under30" class="time-filter-btn text-sm font-medium py-1.5 px-4 rounded-full border transition-colors bg-white text-slate-700 border-slate-300 hover:border-green-500">Under 30 min</button>
+            <details id="season-filter" class="relative">
+                <summary class="list-none cursor-pointer select-none text-sm font-medium py-1.5 px-4 rounded-full border border-slate-300 bg-white text-slate-700 hover:border-green-500 flex items-center gap-2">
+                    <span id="season-filter-label">Seasons: All</span>
+                    <svg aria-hidden="true" class="w-3 h-3" viewBox="0 0 12 12" fill="none"><path d="m3 4.5 3 3 3-3" stroke="currentColor" stroke-width="1.5"/></svg>
+                </summary>
+                <fieldset class="absolute right-0 top-full mt-2 w-52 p-3 bg-white border border-slate-200 rounded-xl shadow-lg z-30">
+                    <legend class="sr-only">Filter recipes by season</legend>
+                    <p class="text-xs text-slate-500 mb-2">Match any selected season</p>
+                    <label class="flex items-center gap-3 py-2 text-sm text-slate-700 cursor-pointer"><input type="checkbox" name="season" value="Spring" class="accent-green-600 w-4 h-4">Spring</label>
+                    <label class="flex items-center gap-3 py-2 text-sm text-slate-700 cursor-pointer"><input type="checkbox" name="season" value="Summer" class="accent-green-600 w-4 h-4">Summer</label>
+                    <label class="flex items-center gap-3 py-2 text-sm text-slate-700 cursor-pointer"><input type="checkbox" name="season" value="Fall" class="accent-green-600 w-4 h-4">Fall</label>
+                    <label class="flex items-center gap-3 py-2 text-sm text-slate-700 cursor-pointer"><input type="checkbox" name="season" value="Winter" class="accent-green-600 w-4 h-4">Winter</label>
+                    <button id="season-filter-clear" type="button" class="mt-2 text-sm text-green-700 hover:underline">All seasons</button>
+                </fieldset>
+            </details>
             <button type="button" id="suggest-plan-button" class="ml-auto text-sm font-medium py-1.5 px-4 rounded-full border transition-colors bg-white text-green-700 border-green-600 hover:bg-green-50 flex items-center gap-1.5">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 21h6m-5 0v-3.5a1 1 0 00-.3-.7A6 6 0 1116.3 16.8a1 1 0 00-.3.7V21"/></svg>
                 Suggest a plan
@@ -526,17 +544,65 @@
         const recipeListDiv = document.getElementById('recipe-list');
         const generateButton = document.getElementById('generate-list-button');
 
+        // Seasons live in an external CSV-derived lookup, never on recipe objects.
+        let selectedSeasons = [];
+        function passesSeasonFilter(recipe) {
+            return RecipeSeasons.matches(recipe.id, selectedSeasons);
+        }
+        function setupSeasonFilter() {
+            const dropdown = document.getElementById('season-filter');
+            const label = document.getElementById('season-filter-label');
+            const inputs = Array.from(dropdown.querySelectorAll('input[name="season"]'));
+            const panel = dropdown.querySelector('fieldset');
+            function fitPanel() {
+                if (!dropdown.open) return;
+                const width = window.innerWidth || document.documentElement.clientWidth;
+                if (!width) return;
+                panel.style.transform = '';
+                const bounds = panel.getBoundingClientRect();
+                const shift = bounds.left < 12 ? 12 - bounds.left
+                    : bounds.right > width - 12 ? width - 12 - bounds.right : 0;
+                panel.style.transform = 'translateX(' + shift + 'px)';
+            }
+            dropdown.addEventListener('toggle', fitPanel);
+            window.addEventListener?.('resize', fitPanel);
+            function apply() {
+                selectedSeasons = inputs.filter(input => input.checked).map(input => input.value);
+                label.textContent = selectedSeasons.length === 0 ? 'Seasons: All'
+                    : selectedSeasons.length === 1 ? 'Seasons: ' + selectedSeasons[0]
+                    : 'Seasons (' + selectedSeasons.length + ')';
+                dropdown.querySelector('summary').classList.toggle('border-green-600', selectedSeasons.length > 0);
+                fitPanel();
+                populateRecipeCards();
+            }
+            inputs.forEach(input => input.addEventListener('change', apply));
+            document.getElementById('season-filter-clear').addEventListener('click', () => {
+                inputs.forEach(input => { input.checked = false; });
+                apply();
+            });
+            document.addEventListener('click', event => {
+                if (!dropdown.contains(event.target)) dropdown.open = false;
+            });
+            dropdown.addEventListener('keydown', event => {
+                if (event.key === 'Escape') {
+                    dropdown.open = false;
+                    dropdown.querySelector('summary').focus();
+                }
+            });
+        }
+        setupSeasonFilter();
+
         // --- Get Selectable Recipes (exclude staples, respect archive toggle) ---
         let showArchived = false;
 
-        function getSelectableRecipes() {
+        function getSelectableRecipes(seasons = selectedSeasons) {
             if (!recipeData || !recipeData.recipes) return [];
 
             return recipeData.recipes
                 .filter(recipe => {
                     const name = recipe.name.toLowerCase();
                     if (name === 'everyday staples' || name === 'infrequent staples' || name === 'everday staples') return false;
-                    return true;
+                    return RecipeSeasons.matches(recipe.id, seasons);
                 })
                 .sort((a, b) => a.name.localeCompare(b.name));
         }
@@ -1059,8 +1125,11 @@
             const selectableRecipes = getSelectableRecipes().filter(passesTimeFilter);
             recipeListDiv.innerHTML = '';
 
-            if (selectableRecipes.length === 0 && !sharedPlanData) {
-                const msg = timeFilter === 'under30'
+            const matchingSharedRecipes = (sharedPlanData?.recipes || []).filter(passesSeasonFilter);
+            if (selectableRecipes.length === 0 && matchingSharedRecipes.length === 0) {
+                const msg = selectedSeasons.length > 0
+                    ? 'No recipes match your filters. Try another season or choose All seasons.'
+                    : timeFilter === 'under30'
                     ? 'No recipes under 30 minutes. Try the "All" filter.'
                     : 'No recipes found in the data.';
                 recipeListDiv.innerHTML = `
@@ -1073,7 +1142,7 @@
 
             // --- Shared recipes section (pinned at top when landing on /plan/:shareId) ---
             const sharedRecipeIds = new Set();
-            if (sharedPlanData && sharedPlanData.recipes) {
+            if (matchingSharedRecipes.length > 0) {
                 const sharedByName = sharedPlanData.createdBy || 'Someone';
                 const dateStr = new Date(sharedPlanData.createdAt).toLocaleDateString('en-US', {
                     month: 'long', day: 'numeric', year: 'numeric'
@@ -1085,7 +1154,7 @@
                     'Shared by ' + sharedByName + ' &middot; ' + dateStr + '</h3>';
                 recipeListDiv.appendChild(heading);
 
-                sharedPlanData.recipes.forEach(sharedRecipe => {
+                matchingSharedRecipes.forEach(sharedRecipe => {
                     sharedRecipeIds.add(sharedRecipe.id);
                     // Try to find a matching recipe in the full recipe set (has ingredients for shopping list)
                     const fullRecipe = selectableRecipes.find(r => r.id === sharedRecipe.id);
@@ -1759,9 +1828,9 @@
             return { buy: union.size, shared: slots - union.size };
         }
 
-        // Qualifying recipes: selectable, have ingredients, and (if asked) quick to cook.
-        function mpPool(quickOnly = false){
-            return getSelectableRecipes().filter(r => (r.ingredients || []).length > 0 && (!quickOnly || isQuickRecipe(r)));
+        // Qualifying recipes: selected seasons, usable ingredients, and optional quick cooking.
+        function mpPool(quickOnly = false, seasons){
+            return getSelectableRecipes(seasons).filter(r => (r.ingredients || []).length > 0 && (!quickOnly || isQuickRecipe(r)));
         }
 
         // Backfill a removed slot by randomly picking a qualifying recipe that is not
@@ -1773,8 +1842,8 @@
             return candidates[Math.floor(Math.random() * candidates.length)];
         }
 
-        function mpGenerate(n, pref, quickOnly = false){
-            const pool = mpPool(quickOnly);
+        function mpGenerate(n, pref, quickOnly = false, seasons){
+            const pool = mpPool(quickOnly, seasons);
             if (pool.length === 0) return [];
             const count = Math.min(n, pool.length);
             const sa = mpShuffle(pool);
@@ -1834,6 +1903,23 @@
                                 <button type="button" id="mp-plus" class="w-9 h-9 rounded-full border border-slate-300 text-slate-700 text-lg hover:border-green-500">+</button>
                             </div>
                         </div>
+                        <fieldset>
+                            <legend class="block text-sm font-medium text-slate-700 mb-2">Which seasons?</legend>
+                            <details id="mp-season-filter" class="relative">
+                                <summary class="list-none cursor-pointer flex items-center justify-between gap-2 w-full px-4 py-3 border border-slate-300 rounded-lg text-sm text-slate-700 hover:border-green-500">
+                                    <span id="mp-season-label">All seasons</span>
+                                    <svg aria-hidden="true" class="w-3 h-3" viewBox="0 0 12 12" fill="none"><path d="m3 4.5 3 3 3-3" stroke="currentColor" stroke-width="1.5"/></svg>
+                                </summary>
+                                <div class="absolute top-full left-0 right-0 mt-1 p-3 bg-white border border-slate-200 rounded-xl shadow-lg z-30">
+                                    <p class="text-xs text-slate-500 mb-2">Choose one or more seasons</p>
+                                    <label class="flex items-center gap-3 py-2 text-sm text-slate-700 cursor-pointer"><input type="checkbox" name="plan-season" value="Spring" class="accent-green-600 w-4 h-4">Spring</label>
+                                    <label class="flex items-center gap-3 py-2 text-sm text-slate-700 cursor-pointer"><input type="checkbox" name="plan-season" value="Summer" class="accent-green-600 w-4 h-4">Summer</label>
+                                    <label class="flex items-center gap-3 py-2 text-sm text-slate-700 cursor-pointer"><input type="checkbox" name="plan-season" value="Fall" class="accent-green-600 w-4 h-4">Fall</label>
+                                    <label class="flex items-center gap-3 py-2 text-sm text-slate-700 cursor-pointer"><input type="checkbox" name="plan-season" value="Winter" class="accent-green-600 w-4 h-4">Winter</label>
+                                    <button type="button" id="mp-season-clear" class="mt-2 text-sm text-green-700 hover:underline">All seasons</button>
+                                </div>
+                            </details>
+                        </fieldset>
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-2">Share ingredients across meals?</label>
                             <div id="mp-pref" class="space-y-2">
@@ -1858,6 +1944,34 @@
             mealPlannerEl = overlay;
 
             let count = 3, pref = 'yes', quickOnly = false;
+            let planSeasons = selectedSeasons.slice();
+            const seasonDropdown = overlay.querySelector('#mp-season-filter');
+            const seasonInputs = Array.from(seasonDropdown.querySelectorAll('input[name="plan-season"]'));
+            const seasonLabel = overlay.querySelector('#mp-season-label');
+            function applyPlanSeasons() {
+                planSeasons = seasonInputs.filter(input => input.checked).map(input => input.value);
+                seasonLabel.textContent = planSeasons.length === 0 ? 'All seasons'
+                    : planSeasons.length <= 2 ? planSeasons.join(', ') : planSeasons.length + ' seasons selected';
+                overlay.querySelector('#mp-results').innerHTML = '';
+            }
+            seasonInputs.forEach(input => {
+                input.checked = planSeasons.includes(input.value);
+                input.addEventListener('change', applyPlanSeasons);
+            });
+            applyPlanSeasons();
+            overlay.querySelector('#mp-season-clear').addEventListener('click', () => {
+                seasonInputs.forEach(input => { input.checked = false; });
+                applyPlanSeasons();
+            });
+            overlay.addEventListener('click', event => {
+                if (!seasonDropdown.contains(event.target)) seasonDropdown.open = false;
+            });
+            seasonDropdown.addEventListener('keydown', event => {
+                if (event.key === 'Escape') {
+                    seasonDropdown.open = false;
+                    seasonDropdown.querySelector('summary').focus();
+                }
+            });
             const countEl = overlay.querySelector('#mp-count');
             overlay.querySelector('#mp-minus').addEventListener('click', () => { count = Math.max(1, count - 1); countEl.textContent = count; });
             overlay.querySelector('#mp-plus').addEventListener('click', () => { count = Math.min(7, count + 1); countEl.textContent = count; });
@@ -1885,16 +1999,18 @@
             overlay.addEventListener('click', e => { if (e.target === overlay) closeMealPlanner(); });
 
             overlay.querySelector('#mp-generate').addEventListener('click', () => {
-                const plans = mpGenerate(count, pref, quickOnly);
+                const plans = mpGenerate(count, pref, quickOnly, planSeasons);
                 const results = overlay.querySelector('#mp-results');
                 if (plans.length === 0){
-                    results.innerHTML = quickOnly
+                    results.innerHTML = planSeasons.length > 0
+                        ? '<p class="text-sm text-slate-500">No recipes match these preferences. Try other seasons or allow longer cooking times.</p>'
+                        : quickOnly
                         ? '<p class="text-sm text-slate-500">No recipes with a total time under 30 minutes are available. Choose “No, I don’t mind” to include all cooking times.</p>'
                         : '<p class="text-sm text-slate-500">No recipes available to plan with.</p>';
                     return;
                 }
                 // Qualifying pool used to backfill removed slots (same filter as generation).
-                const pool = mpPool(quickOnly);
+                const pool = mpPool(quickOnly, planSeasons);
                 const labels = ['Option A', 'Option B'];
 
                 // Re-render the plan cards from the current (mutable) plans so that

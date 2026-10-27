@@ -13,7 +13,7 @@ beforeEach(() => {
         { id: 'slow', name: 'Slow', activeTime: '10 min', totalTime: '1 hour 10 minutes', ingredients: [{ id: 'flour' }] },
         { id: 'unknown', name: 'Unknown time', ingredients: [{ id: 'flour' }] }
     ];
-    context = vm.createContext({ document, getSelectableRecipes: () => recipes });
+    context = vm.createContext({ document, selectedSeasons: [], getSelectableRecipes: () => recipes });
     vm.runInContext("let timeFilter = 'all';\n" + timing + planner, context);
 });
 test('quick plans exclude unknown, exactly 30-minute, and slow total times', () => {

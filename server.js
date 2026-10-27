@@ -1,5 +1,5 @@
 require('dotenv').config();
-const APP_VERSION = '1.0.1';
+const APP_VERSION = '1.0.2';
 const express = require('express');
 const path = require('path');
 const fs = require('fs');

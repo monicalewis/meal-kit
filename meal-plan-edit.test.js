@@ -29,7 +29,7 @@ beforeEach(() => {
     ];
     shoppingCalls = [];
     context = vm.createContext({
-        document,
+        document, selectedSeasons: [],
         getSelectableRecipes: () => recipes,
         generateShoppingList: (ids) => { shoppingCalls.push(ids); },
     });

@@ -1216,7 +1216,7 @@ describe('index.html shared plan detection and rendering', () => {
 
   test('renders shared recipes section with heading', () => {
     expect(indexSource).toContain("'Shared by '");
-    expect(indexSource).toContain('sharedPlanData.recipes');
+    expect(indexSource).toContain('matchingSharedRecipes');
   });
 
   test('deduplicates shared recipes from normal recipe list', () => {

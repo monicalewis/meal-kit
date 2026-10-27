@@ -2,6 +2,7 @@
 // Execute the actual client functions rather than a duplicate implementation.
 const fs = require('node:fs');
 const vm = require('node:vm');
+const RecipeSeasons = require('./public/js/recipe-seasons');
 const html = fs.readFileSync('public/index.html', 'utf8');
 const selectionCode = html.slice(html.indexOf('        function createRecipeTitle('), html.indexOf('        // --- Initialize ---'));
 const plannerCode = html.slice(html.indexOf('        function mpResetTimeFilterToAll('), html.indexOf('        let mealPlannerEl'));
@@ -20,7 +21,7 @@ function fixture(loggedIn) {
         Auth: { user: loggedIn ? { id: 7 } : null, isGuest: () => !loggedIn, isUser: () => loggedIn, isAdmin: () => false, fetch: jest.fn().mockResolvedValue({}), trackActivity: jest.fn() },
         DEFAULT_IMAGE: 'default.jpg', favoritesData: {}, sharedPlanData: null, showArchived: true, timeFilter: 'all',
         recipeData: { recipes, ingredientDefs: { flour: { name: 'Flour', units: 'cup', section: 'Cooking' } } },
-        getSelectableRecipes: () => recipes, passesTimeFilter: () => true,
+        getSelectableRecipes: () => recipes, passesTimeFilter: () => true, selectedSeasons: [], passesSeasonFilter: recipe => RecipeSeasons.matches(recipe.id, []),
         recipeListDiv: document.getElementById('recipe-list'), generateButton: document.getElementById('generate-list-button'),
         closeMealPlanner: jest.fn()
     });
