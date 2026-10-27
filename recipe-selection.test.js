@@ -51,7 +51,8 @@ describe.each([['guest', false], ['signed-in user', true]])('%s recipe selection
         assertVisualState(f.card('alpha'), true);
         assertVisualState(f.card('beta'), true);
         expect(document.querySelector('.card-archived')?.classList.contains('ring-green-500') || false).toBe(false);
-        expect(document.getElementById('generate-list-button').textContent).toContain('(2)');
+        expect(document.getElementById('generate-list-button').textContent.trim()).toBe('Get shopping list');
+        expect(document.getElementById('generate-list-button').disabled).toBe(false);
         expect(document.getElementById('share-plan-button').disabled).toBe(false);
         expect(localStorage.getItem('selectedRecipeIds')).toBe(saved);
         expect(write).not.toHaveBeenCalled();

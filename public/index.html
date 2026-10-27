@@ -258,6 +258,39 @@
 
         #season-filter summary::-webkit-details-marker, #mp-season-filter summary::-webkit-details-marker { display: none; }
 
+        /* Keep the mobile filters and planner on a single row. */
+        @media (max-width: 639px) {
+            #recipe-controls {
+                display: flex;
+                flex-wrap: nowrap;
+                gap: 6px;
+            }
+            #recipe-controls > label,
+            #recipe-controls > #season-filter {
+                flex: 0 1 auto;
+                min-width: 0;
+            }
+            #recipe-controls > label,
+            #season-filter summary,
+            #suggest-plan-button {
+                min-width: 0;
+                min-height: 36px;
+                padding: 6px 8px;
+                font-size: 12px;
+                white-space: nowrap;
+                gap: 4px;
+            }
+            #recipe-controls > label > span,
+            #mobile-season-filter-label {
+                min-width: 0;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+            #recipe-controls svg { flex-shrink: 0; }
+            #suggest-plan-button { margin-left: 0; flex: 0 0 auto; }
+        }
+
         /* Mobile FAB for import button */
         @media (max-width: 639px) {
             #import-recipe-button {
@@ -345,7 +378,7 @@
                 <span class="import-label">Add Recipe</span>
             </button>
         </div>
-        <div class="flex items-center gap-2 mb-3 sm:mb-6 flex-wrap">
+        <div id="recipe-controls" class="flex items-center gap-2 mb-3 sm:mb-6 flex-wrap">
             <label class="sm:hidden relative focus-within:ring-2 focus-within:ring-green-600 text-sm font-medium py-1.5 px-3 rounded-full border border-slate-300 bg-white text-slate-700 flex items-center gap-1">
                 Time: <span id="mobile-time-filter-label" aria-hidden="true">Any</span>
                 <svg aria-hidden="true" class="w-3 h-3 ml-1" viewBox="0 0 12 12" fill="none"><path d="m3 4.5 3 3 3-3" stroke="currentColor" stroke-width="1.5"/></svg>
@@ -374,7 +407,7 @@
             </details>
             <button type="button" id="suggest-plan-button" class="ml-auto text-sm font-medium py-1.5 px-2 sm:px-4 rounded-full border transition-colors bg-white text-green-700 border-green-600 hover:bg-green-50 flex items-center gap-1.5">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 21h6m-5 0v-3.5a1 1 0 00-.3-.7A6 6 0 1116.3 16.8a1 1 0 00-.3.7V21"/></svg>
-                <span class="sm:hidden">Suggest plan</span><span class="hidden sm:inline">Suggest a plan</span>
+                <span class="sm:hidden">Make plan</span><span class="hidden sm:inline">Suggest a plan</span>
             </button>
         </div>
         <div class="space-y-6">
@@ -392,7 +425,7 @@
             <div id="app-version" class="mt-1"></div>
         </footer>
 
-        <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-4">
+        <div class="fixed bottom-0 left-0 right-0 z-30 bg-white border-t border-slate-200 p-4">
             <div class="container mx-auto max-w-6xl flex gap-3">
                 <div class="flex-shrink-0">
                     <button id="share-plan-button"
@@ -407,7 +440,7 @@
                 <button id="generate-list-button"
                         class="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-4 px-6 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                         disabled>
-                    <span>Get Shopping List</span>
+                    <span>Get shopping list</span>
                 </button>
             </div>
         </div>
@@ -1026,9 +1059,9 @@
             `;
             
             if (checked > 0) {
-                button.innerHTML = `${cartIcon}<span>Get Shopping List (${checked})</span>`;
+                button.innerHTML = `${cartIcon}<span>Get shopping list</span>`;
             } else {
-                button.innerHTML = `${cartIcon}<span>Get Shopping List</span>`;
+                button.innerHTML = `${cartIcon}<span>Get shopping list</span>`;
             }
         }
 
@@ -1923,15 +1956,15 @@
             const overlay = document.createElement('div');
             overlay.className = 'fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-start justify-center p-4 overflow-y-auto';
             overlay.innerHTML = `
-                <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg my-8">
-                    <div class="p-6 border-b border-slate-200 flex items-start justify-between">
+                <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg my-0 sm:my-8">
+                    <div class="px-4 pt-4 pb-0 sm:p-6 border-b border-slate-200 flex items-start justify-between">
                         <div>
                             <h3 class="text-xl font-bold text-slate-900">Suggest a meal plan</h3>
-                            <p class="text-sm text-slate-500 mt-1">We'll pick recipes that fit, then you select a set in one tap.</p>
+                            <p class="text-sm text-slate-500 mt-1">Share your preferences, we'll pick your recipes</p>
                         </div>
                         <button id="mp-close" class="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>
                     </div>
-                    <div class="p-6 space-y-5">
+                    <div class="px-4 pt-0 pb-4 space-y-3 sm:p-6 sm:space-y-5">
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-2">How many meals?</label>
                             <div class="flex items-center gap-3">
@@ -1943,7 +1976,7 @@
                         <fieldset>
                             <legend class="block text-sm font-medium text-slate-700 mb-2">Which seasons?</legend>
                             <details id="mp-season-filter" class="relative">
-                                <summary class="list-none cursor-pointer flex items-center justify-between gap-2 w-full px-4 py-3 border border-slate-300 rounded-lg text-sm text-slate-700 hover:border-green-500">
+                                <summary class="list-none cursor-pointer flex items-center justify-between gap-2 w-full px-4 py-2.5 sm:py-3 border border-slate-300 rounded-lg text-sm text-slate-700 hover:border-green-500">
                                     <span id="mp-season-label">All seasons</span>
                                     <svg aria-hidden="true" class="w-3 h-3" viewBox="0 0 12 12" fill="none"><path d="m3 4.5 3 3 3-3" stroke="currentColor" stroke-width="1.5"/></svg>
                                 </summary>
@@ -1960,20 +1993,20 @@
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-2">Share ingredients across meals?</label>
                             <div id="mp-pref" class="space-y-2">
-                                <button type="button" data-pref="yes" class="mp-pref-btn w-full text-left px-4 py-3 rounded-lg border text-sm transition-colors border-green-600 bg-green-50 text-green-800">Yes — streamline my shopping</button>
-                                <button type="button" data-pref="no" class="mp-pref-btn w-full text-left px-4 py-3 rounded-lg border text-sm transition-colors border-slate-300 hover:border-green-500">No — I prefer variety</button>
-                                <button type="button" data-pref="idk" class="mp-pref-btn w-full text-left px-4 py-3 rounded-lg border text-sm transition-colors border-slate-300 hover:border-green-500">I don't mind</button>
+                                <button type="button" data-pref="yes" class="mp-pref-btn w-full text-left px-4 py-2.5 sm:py-3 rounded-lg border text-sm transition-colors border-green-600 bg-green-50 text-green-800">Yes — streamline my shopping</button>
+                                <button type="button" data-pref="no" class="mp-pref-btn w-full text-left px-4 py-2.5 sm:py-3 rounded-lg border text-sm transition-colors border-slate-300 hover:border-green-500">No — I prefer variety</button>
+                                <button type="button" data-pref="idk" class="mp-pref-btn w-full text-left px-4 py-2.5 sm:py-3 rounded-lg border text-sm transition-colors border-slate-300 hover:border-green-500">I don't mind</button>
                             </div>
                         </div>
                         <fieldset>
                             <legend class="block text-sm font-medium text-slate-700 mb-2">Prefer quick cook recipes?</legend>
                             <div id="mp-quick-pref" class="space-y-2">
-                                <button type="button" data-quick="yes" aria-pressed="false" class="mp-quick-btn w-full text-left px-4 py-3 rounded-lg border text-sm transition-colors border-slate-300 hover:border-green-500">Yes, under 30 min</button>
-                                <button type="button" data-quick="no" aria-pressed="true" class="mp-quick-btn w-full text-left px-4 py-3 rounded-lg border text-sm transition-colors border-green-600 bg-green-50 text-green-800">No, I don't mind</button>
+                                <button type="button" data-quick="yes" aria-pressed="false" class="mp-quick-btn w-full text-left px-4 py-2.5 sm:py-3 rounded-lg border text-sm transition-colors border-slate-300 hover:border-green-500">Yes, under 30 min</button>
+                                <button type="button" data-quick="no" aria-pressed="true" class="mp-quick-btn w-full text-left px-4 py-2.5 sm:py-3 rounded-lg border text-sm transition-colors border-green-600 bg-green-50 text-green-800">No, I don't mind</button>
                             </div>
                         </fieldset>
                         <button type="button" id="mp-generate" class="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2.5 rounded-lg">Suggest plans</button>
-                        <div id="mp-results" class="space-y-4"></div>
+                        <div id="mp-results" class="space-y-4 empty:hidden"></div>
                     </div>
                 </div>
             `;
