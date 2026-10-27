@@ -383,6 +383,19 @@ describe('Account lockout', () => {
     expect(serverSource).toContain('failed_login_attempts = 0, locked_until = NULL');
   });
 
+  test('login route clears the stale counter once the lockout window expires', () => {
+    // After locked_until passes, the failed-attempt counter must be reset to 0
+    // so a single later wrong password cannot re-lock the account instantly.
+    const lockReturn = serverSource.indexOf("code: 'ACCOUNT_LOCKED' });");
+    const bcryptCompare = serverSource.indexOf('bcrypt.compare(password, user.password_hash)');
+    const expiryReset = serverSource.indexOf('Lock expired for user id');
+    // The expiry reset runs after the "still locked" early return and before
+    // the password comparison.
+    expect(expiryReset).toBeGreaterThan(lockReturn);
+    expect(expiryReset).toBeLessThan(bcryptCompare);
+    expect(serverSource).toContain('user.failed_login_attempts = 0;');
+  });
+
   test('login route logs account_locked events', () => {
     expect(serverSource).toContain("'account_locked'");
   });
@@ -709,8 +722,8 @@ describe('XSS: no innerHTML with unsanitized user data', () => {
   test('recipe name " by " split uses textContent, not innerHTML', () => {
     // The old pattern: title.innerHTML = `${main}<span...>${by}</span>`
     expect(indexSource).not.toMatch(/title\.innerHTML\s*=\s*`\$\{main\}/);
-    expect(indexSource).toContain('title.textContent = main');
-    expect(indexSource).toContain('bySpan.textContent = by');
+    expect(indexSource).toContain('document.createTextNode(name)');
+    expect(indexSource).toContain("source.textContent = ' by ' + author");
   });
 
   test('archive undo toast uses textContent, not innerHTML', () => {

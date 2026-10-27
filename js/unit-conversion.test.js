@@ -100,14 +100,14 @@ describe('convertQty — cross-type (weight↔volume)', () => {
 
 // ── convertQty: cross-type with default density ─────────────────────
 
-describe('convertQty — cross-type (default density)', () => {
-  test('uses DEFAULT_DENSITY for unknown ingredient', () => {
-    // DEFAULT_DENSITY = 150 g/cup → 150g = 1 cup
-    expect(UC.convertQty(150, 'g', 'cup', 'some-unknown-thing')).toBe(1);
+describe('convertQty — unknown density', () => {
+  test('does not guess density for an unknown ingredient', () => {
+    // Unknown densities must not change physical amounts.
+    expect(UC.convertQty(150, 'g', 'cup', 'some-unknown-thing')).toBeNull();
   });
 
-  test('uses DEFAULT_DENSITY for null slug', () => {
-    expect(UC.convertQty(150, 'g', 'cup', null)).toBe(1);
+  test('does not guess density without an ingredient', () => {
+    expect(UC.convertQty(150, 'g', 'cup', null)).toBeNull();
   });
 });
 

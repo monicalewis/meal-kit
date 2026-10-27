@@ -197,6 +197,7 @@
     }
 
     // Cross-type: need density (grams per cup)
+    if (!Object.prototype.hasOwnProperty.call(DENSITY, ingredientSlug)) return null;
     const gpc = getDensity(ingredientSlug);
     // grams per tsp = gpc / 48
     const gramsPerTsp = gpc / 48;
@@ -274,7 +275,7 @@
         return { id: ing.id, qty: ing.qty };
       }
       var converted = convertQty(ing.qty, sourceUnit, targetUnit, ing.id);
-      return { id: ing.id, qty: converted !== null ? converted : ing.qty };
+      return converted !== null ? { id: ing.id, qty: converted } : { id: ing.id, qty: ing.qty, unit: ing.unit };
     });
   }
 

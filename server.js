@@ -1,5 +1,5 @@
 require('dotenv').config();
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '1.0.1';
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
@@ -57,9 +57,11 @@ app.use(express.json({ limit: '5mb' }));
 let pool = null;
 if (process.env.DATABASE_URL) {
   const { Pool } = require('pg');
+  // Render's managed Postgres requires SSL; a local Postgres does not offer it.
+  const isLocalDb = /@(localhost|127\.0\.0\.1)[:/]/.test(process.env.DATABASE_URL || '');
   pool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false }
+    ssl: isLocalDb ? false : { rejectUnauthorized: false }
   });
 }
 
@@ -205,6 +207,248 @@ function escapeAttr(str) {
   return String(str).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+// --- Self-hosted recipe pages (for recipes not published elsewhere on the web) ---
+// A recipe becomes a hosted page by carrying page content (description/steps/
+// displayIngredients) plus an internal url of the form "/recipes/<id>". Recipes
+// that only point to an external source are redirected to that source instead.
+// Wrap time durations ("15–20 minutes", "10 min") in a pill, matching the
+// cook-mode layout. Runs on already-escaped text — time tokens contain no HTML
+// characters, so escaping leaves them intact.
+function highlightTimes(escaped) {
+  return escaped.replace(
+    /\b(\d+(?:[–-]\d+)?)\s*(seconds?|secs?|minutes?|mins?|hours?|hrs?)\b/gi,
+    '<span class="time">$1 $2</span>'
+  );
+}
+
+function renderRecipePage(recipe) {
+  // Names follow the app convention "<Dish> by <Source>". Show the dish as the
+  // page title and the source as an attribution line underneath.
+  const fullName = recipe.name || 'Recipe';
+  const byIdx = fullName.toLowerCase().indexOf(' by ');
+  const titleText = byIdx !== -1 ? fullName.slice(0, byIdx) : fullName;
+  const attribution = byIdx !== -1 ? fullName.slice(byIdx + 4) : '';
+  const name = escapeAttr(titleText);
+  const attributionHtml = attribution
+    ? `<div class="attribution">From ${escapeAttr(attribution)}</div>`
+    : '';
+
+  const pills = [];
+  if (recipe.totalTime) pills.push(`<span class="pill pill-time">${escapeAttr(recipe.totalTime)}${recipe.activeTime ? ' total' : ''}</span>`);
+  if (recipe.activeTime) pills.push(`<span class="pill pill-yield">${escapeAttr(recipe.activeTime)} active</span>`);
+  if (recipe.servings) pills.push(`<span class="pill pill-yield">${escapeAttr(recipe.servings)}</span>`);
+  const metaPills = pills.join('\n        ');
+
+  const displayIngredients = recipe.displayIngredients || [];
+  const ingredientItems = displayIngredients
+    .map(i => `<li>${escapeAttr(i)}</li>`)
+    .join('\n          ');
+
+  const stepItems = (recipe.steps || [])
+    .map((s, idx) => `<li><span class="num">${idx + 1}</span><div class="steptext">${highlightTimes(escapeAttr(s))}</div></li>`)
+    .join('\n          ');
+
+  const heroHtml = recipe.image
+    ? `<div class="hero"><img src="${escapeAttr(recipe.image)}" alt="${name}"></div>`
+    : `<div class="hero placeholder"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div>`;
+
+  const ogDescription = `Ingredients and step-by-step instructions for ${titleText}.`;
+  const ogTags = [
+    `<meta property="og:title" content="${name} — DIY Meal Kit">`,
+    `<meta property="og:description" content="${escapeAttr(ogDescription)}">`,
+    `<meta property="og:type" content="article">`,
+    `<meta name="twitter:card" content="summary_large_image">`,
+    `<meta name="twitter:title" content="${name}">`,
+    `<meta name="twitter:description" content="${escapeAttr(ogDescription)}">`
+  ];
+  if (recipe.image) {
+    ogTags.push(`<meta property="og:image" content="${escapeAttr(recipe.image)}">`);
+    ogTags.push(`<meta name="twitter:image" content="${escapeAttr(recipe.image)}">`);
+  }
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${name} — DIY Meal Kit</title>
+  <link rel="icon" type="image/png" href="/images/logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caprasimo&family=Figtree:wght@400;500;600;700&display=swap">
+  ${ogTags.join('\n  ')}
+  <style>
+    :root{--ink:#1E1A1F;--rose:#B85C8B;--plum:#6F2C4F;--pink-50:#FFE6F6;--pink-tint:#FBEFF5;--rose-soft:#F6E4EE;--cream:#FFEFD3;--cream-ink:#624000;--gray-pill:#F4F0F3;--gray-ink:#4C454B;--line:#EFE9EC;}
+    *{box-sizing:border-box;}
+    body{margin:0;background:#fff;color:var(--ink);font-family:'Figtree',system-ui,-apple-system,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased;}
+    .wrap{max-width:680px;margin:0 auto;padding:20px 20px 64px;}
+    .topbar{display:flex;align-items:center;justify-content:space-between;}
+    .back,.brand{display:inline-flex;align-items:center;gap:6px;color:var(--rose);text-decoration:none;font-weight:600;font-size:15px;}
+    .title{font-family:'Caprasimo',Georgia,serif;font-weight:400;font-size:34px;line-height:1.12;margin:18px 0 8px;}
+    .attribution{color:var(--rose);font-weight:600;font-size:14px;margin:0 0 14px;}
+    .meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px;}
+    .pill{display:inline-flex;align-items:center;border-radius:999px;font-size:12px;font-weight:600;padding:4px 11px;}
+    .pill-time{background:var(--cream);color:var(--cream-ink);}
+    .pill-yield{background:var(--gray-pill);color:var(--gray-ink);}
+    .hero{width:100%;border-radius:20px;overflow:hidden;margin-bottom:22px;}
+    .hero img{display:block;width:100%;height:320px;object-fit:cover;}
+    .hero.placeholder{height:200px;background:var(--pink-tint);display:flex;align-items:center;justify-content:center;color:#E0B9CF;}
+    .tabs{display:flex;background:var(--pink-tint);border-radius:999px;padding:5px;gap:4px;margin-bottom:22px;}
+    .tab{flex:1;border:0;background:transparent;color:var(--ink);font-family:inherit;font-size:16px;font-weight:600;padding:11px;border-radius:999px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;}
+    .tab.active{background:var(--rose);color:#fff;}
+    .count{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;padding:0 6px;border-radius:999px;background:var(--rose-soft);color:var(--plum);font-size:12px;font-weight:700;}
+    .tab.active .count{background:rgba(255,255,255,.3);color:#fff;}
+    body.js .panel{display:none;}
+    body.js .panel.active{display:block;}
+    h2.sect{font-family:'Caprasimo',Georgia,serif;font-weight:400;font-size:22px;margin:0 0 14px;}
+    body.js h2.sect{display:none;}
+    .ingredients{list-style:none;margin:0;padding:0;}
+    .ingredients li{display:flex;gap:12px;padding:12px 2px;border-bottom:1px solid var(--line);font-size:16px;line-height:1.45;}
+    .ingredients li:last-child{border-bottom:0;}
+    .ingredients li::before{content:'';flex:none;width:7px;height:7px;border-radius:999px;background:var(--rose);margin-top:9px;}
+    .stepmode{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:22px;}
+    body:not(.js) .stepmode{display:none;}
+    .seg{border:0;background:transparent;color:var(--ink);font-family:inherit;font-size:14px;font-weight:600;padding:8px 16px;cursor:pointer;}
+    .seg.active{background:var(--rose);color:#fff;}
+    .steps{list-style:none;margin:0;padding:0;}
+    .steps li{display:flex;gap:16px;margin-bottom:22px;}
+    .num{flex:none;display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:999px;background:var(--pink-50);color:var(--plum);font-weight:700;font-size:15px;}
+    .steptext{padding-top:5px;font-size:17px;line-height:1.55;}
+    .time{display:inline-flex;align-items:center;border:1px solid var(--rose);color:var(--plum);border-radius:999px;padding:1px 9px;font-size:.9em;font-weight:600;white-space:nowrap;}
+    .stepnav{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:8px;padding-top:16px;border-top:1px solid var(--line);}
+    .stepnav[hidden]{display:none;}
+    .navbtn{border:1px solid var(--line);background:#fff;color:var(--ink);font-family:inherit;font-weight:600;font-size:15px;padding:10px 18px;border-radius:999px;cursor:pointer;}
+    .navbtn.primary{background:var(--rose);border-color:var(--rose);color:#fff;}
+    .navbtn[disabled]{opacity:.4;cursor:default;}
+    .progress{font-size:14px;color:var(--gray-ink);font-weight:600;}
+    .cta{margin-top:40px;background:var(--pink-tint);border-radius:18px;padding:24px;text-align:center;}
+    .cta p{margin:0 0 14px;color:var(--plum);font-size:15px;}
+    .cta a{display:inline-flex;align-items:center;justify-content:center;background:var(--rose);color:#fff;text-decoration:none;font-weight:600;padding:11px 22px;border-radius:999px;}
+    .foot{margin-top:28px;text-align:center;font-size:12px;color:#B9AEB5;}
+    @media(max-width:520px){.title{font-size:28px;}.hero img{height:220px;}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <a class="back" href="/"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>Recipes</a>
+      <a class="brand" href="/">DIY Meal Kit</a>
+    </div>
+
+    <h1 class="title">${name}</h1>
+    ${attributionHtml}
+    <div class="meta">
+        ${metaPills}
+    </div>
+    ${heroHtml}
+
+    <div class="tabs">
+      <button class="tab" data-panel="ingredients">Ingredients <span class="count">${displayIngredients.length}</span></button>
+      <button class="tab" data-panel="instructions">Instructions</button>
+    </div>
+
+    <section id="panel-ingredients" class="panel">
+      <h2 class="sect">Ingredients</h2>
+      <ul class="ingredients">
+          ${ingredientItems}
+      </ul>
+    </section>
+
+    <section id="panel-instructions" class="panel">
+      <h2 class="sect">Instructions</h2>
+      <div class="stepmode">
+        <button class="seg active" data-mode="all">All steps</button>
+        <button class="seg" data-mode="one">One at a time</button>
+      </div>
+      <ol class="steps">
+          ${stepItems}
+      </ol>
+      <div class="stepnav" hidden>
+        <button class="navbtn" data-dir="-1">Back</button>
+        <span class="progress"></span>
+        <button class="navbtn primary" data-dir="1">Next step</button>
+      </div>
+    </section>
+
+    <div class="cta">
+      <p>Add this recipe to your plan and auto-build a shopping list.</p>
+      <a href="/">Open DIY Meal Kit</a>
+    </div>
+    <div class="foot">Hosted on diymealkit.com</div>
+  </div>
+
+  <script>
+  (function(){
+    var body=document.body; body.classList.add('js');
+    var tabs=document.querySelectorAll('.tab');
+    function showPanel(id){
+      var panels=document.querySelectorAll('.panel');
+      for(var i=0;i<panels.length;i++){ panels[i].classList.toggle('active', panels[i].id==='panel-'+id); }
+      for(var j=0;j<tabs.length;j++){ tabs[j].classList.toggle('active', tabs[j].getAttribute('data-panel')===id); }
+    }
+    for(var t=0;t<tabs.length;t++){ (function(tab){ tab.addEventListener('click', function(){ showPanel(tab.getAttribute('data-panel')); }); })(tabs[t]); }
+    showPanel('ingredients');
+
+    var segs=document.querySelectorAll('.seg');
+    var steps=Array.prototype.slice.call(document.querySelectorAll('.steps > li'));
+    var nav=document.querySelector('.stepnav');
+    var prog=document.querySelector('.progress');
+    var backBtn=document.querySelector('.navbtn[data-dir="-1"]');
+    var nextBtn=document.querySelector('.navbtn[data-dir="1"]');
+    var mode='all', cur=0, lock=null;
+    function render(){
+      for(var i=0;i<steps.length;i++){ steps[i].style.display=(mode==='one' && i!==cur)?'none':''; }
+      if(nav){ nav.hidden=(mode!=='one'); }
+      if(prog){ prog.textContent='Step '+(cur+1)+' of '+steps.length; }
+      if(backBtn){ backBtn.disabled=(cur===0); }
+      if(nextBtn){ nextBtn.textContent=(cur===steps.length-1)?'Done':'Next step'; }
+    }
+    function setMode(m){
+      mode=m; cur=0;
+      for(var i=0;i<segs.length;i++){ segs[i].classList.toggle('active', segs[i].getAttribute('data-mode')===m); }
+      render();
+      if(m==='one' && 'wakeLock' in navigator){ navigator.wakeLock.request('screen').then(function(l){lock=l;}).catch(function(){}); }
+      else if(lock){ try{ lock.release(); }catch(e){} lock=null; }
+    }
+    for(var s=0;s<segs.length;s++){ (function(seg){ seg.addEventListener('click', function(){ setMode(seg.getAttribute('data-mode')); }); })(segs[s]); }
+    var navBtns=document.querySelectorAll('.navbtn');
+    for(var n=0;n<navBtns.length;n++){ (function(btn){ btn.addEventListener('click', function(){
+      var d=parseInt(btn.getAttribute('data-dir'),10);
+      cur=Math.max(0, Math.min(steps.length-1, cur+d));
+      render();
+      window.scrollTo({top:0,behavior:'smooth'});
+    }); })(navBtns[n]); }
+    render();
+  })();
+  </script>
+</body>
+</html>`;
+}
+
+app.get('/recipes/:id', async (req, res) => {
+  const { id } = req.params;
+  let recipe = null;
+  try {
+    const data = await getRecipeData();
+    recipe = (data.recipes || []).find(r => r.id === id);
+  } catch (err) {
+    console.error('Recipe page load error:', err.message);
+  }
+
+  // Render a hosted page only when the recipe carries page content.
+  if (recipe && Array.isArray(recipe.steps) && recipe.steps.length > 0) {
+    return res.send(renderRecipePage(recipe));
+  }
+
+  // Known recipe that lives on an external site → send people there.
+  if (recipe && typeof recipe.url === 'string' && /^https?:\/\//.test(recipe.url)) {
+    return res.redirect(302, recipe.url);
+  }
+
+  // Unknown id or no hosted content → back to the app.
+  return res.redirect(302, '/');
+});
+
 // --- Protect admin page ---
 app.get('/admin.html', loadUser, (req, res, next) => {
   if (!req.user || req.user.role !== 'admin') {
@@ -225,6 +469,13 @@ const anthropic = process.env.ANTHROPIC_API_KEY
 const resend = process.env.RESEND_API_KEY
   ? new Resend(process.env.RESEND_API_KEY)
   : null;
+
+// Default sender for all transactional email. Must be an address on a domain
+// verified in Resend — the welcome email already sends from hello@diymealkit.com,
+// so that domain is verified. The old fallback (noreply@resend.dev) is NOT a
+// deliverable sender, so reset/verification emails silently failed whenever
+// RESEND_FROM was unset.
+const EMAIL_FROM = process.env.RESEND_FROM || 'DIY Meal Kit <hello@diymealkit.com>';
 
 // --- Unsubscribe token helper ---
 function generateUnsubscribeToken(userId) {
@@ -251,7 +502,7 @@ async function sendVerificationEmail(userId, email) {
   const token = generateVerificationToken(userId);
   const verifyLink = `${baseUrl}/api/auth/verify-email?id=${userId}&token=${token}`;
   await resend.emails.send({
-    from: process.env.RESEND_FROM || 'DIY Meal Kit <noreply@resend.dev>',
+    from: EMAIL_FROM,
     to: email,
     subject: 'Verify your email — DIY Meal Kit',
     html: `
@@ -272,7 +523,7 @@ async function notifyParseFailure({ endpoint, errorType, userId, context }) {
     .map(([k, v]) => `<tr><td style="padding:4px 8px;color:#6b7280;">${k}</td><td style="padding:4px 8px;">${v ?? '—'}</td></tr>`)
     .join('');
   resend.emails.send({
-    from: process.env.RESEND_FROM || 'DIY Meal Kit <noreply@resend.dev>',
+    from: EMAIL_FROM,
     to: process.env.ADMIN_EMAIL,
     subject: `[DIY Meal Kit] Recipe parse failed — ${label}`,
     html: `
@@ -459,7 +710,7 @@ app.post('/api/auth/register', authLimiter, [
         // Admin notification for new signup (non-blocking)
         if (resend && process.env.ADMIN_EMAIL) {
           resend.emails.send({
-            from: process.env.RESEND_FROM || 'DIY Meal Kit <noreply@resend.dev>',
+            from: EMAIL_FROM,
             to: process.env.ADMIN_EMAIL,
             subject: `New signup: ${user.email}`,
             text: `A new account was created.\n\nEmail: ${user.email}\nName: ${user.display_name || '(none)'}\nTime: ${new Date().toISOString()}`
@@ -532,6 +783,19 @@ app.post('/api/auth/login', authLimiter, [
       console.log(`[login] Account locked until ${user.locked_until} for user id: ${user.id}`);
       logActivity(user.id, 'login_failed', { email, reason: 'account_locked' }, req.ip);
       return res.status(423).json({ error: 'Account is temporarily locked due to too many failed login attempts. Please try again later.', code: 'ACCOUNT_LOCKED' });
+    }
+
+    // Lockout window has passed — clear the stale counter so the user gets a
+    // fresh set of attempts. Without this, a once-locked account re-locks on
+    // the very next wrong password (5 + 1 >= MAX) and the lock message shows up
+    // on what looks like the first attempt.
+    if (user.locked_until) {
+      console.log(`[login] Lock expired for user id: ${user.id} — resetting failed attempt counter`);
+      await pool.query(
+        'UPDATE users SET failed_login_attempts = 0, locked_until = NULL, updated_at = NOW() WHERE id = $1',
+        [user.id]
+      );
+      user.failed_login_attempts = 0;
     }
 
     const valid = await bcrypt.compare(password, user.password_hash);
@@ -845,7 +1109,7 @@ app.post('/api/auth/forgot-password', authLimiter, [
 
     if (resend) {
       const emailResult = await resend.emails.send({
-        from: process.env.RESEND_FROM || 'DIY Meal Kit <noreply@resend.dev>',
+        from: EMAIL_FROM,
         to: user.email,
         subject: 'Reset your password — DIY Meal Kit',
         html: `
@@ -1619,10 +1883,23 @@ Return ONLY valid JSON in this exact format, no other text:
 
 // /api/convert-units removed — unit conversion now handled by js/unit-conversion.js density table
 
+function isValidRecipeImage(image) {
+  return image === undefined || image === null || image === '' ||
+    (typeof image === 'string' && (/^https?:\/\//i.test(image) ||
+      /^\/images\/[a-z0-9/_-]+\.(?:jpe?g|png|webp|gif|svg)$/i.test(image)));
+}
+
 // POST /api/save-recipe — requires auth, branches by role
 app.post('/api/save-recipe', requireAuth, async (req, res) => {
   const { recipe, newIngredientDefs } = req.body;
   if (!recipe) return res.status(400).json({ error: 'recipe is required' });
+  if (typeof recipe.id !== 'string' || !recipe.id || typeof recipe.name !== 'string' || !recipe.name.trim() ||
+      !Array.isArray(recipe.ingredients) || recipe.ingredients.some(ing =>
+        !ing || typeof ing.id !== 'string' || !Number.isFinite(ing.qty) || ing.qty < 0 ||
+        (ing.unit !== undefined && (typeof ing.unit !== 'string' || !ing.unit.trim() || ing.unit.length > 40))) ||
+      !isValidRecipeImage(recipe.image)) {
+    return res.status(400).json({ error: 'Invalid recipe, quantities, units, or image URL' });
+  }
 
   try {
     if (req.user.role === 'admin') {
@@ -1659,7 +1936,8 @@ app.post('/api/save-recipe', requireAuth, async (req, res) => {
       if (!pool) return res.status(500).json({ error: 'Database not configured' });
 
       const count = await getUserRecipeCount(req.user.id);
-      if (count >= 100) {
+      const alreadySaved = count >= 100 && (await getUserRecipes(req.user.id)).some(row => row.recipe_id === recipe.id);
+      if (count >= 100 && !alreadySaved) {
         return res.status(403).json({ error: 'Recipe limit reached (100 max). Delete some recipes to add more.' });
       }
 
@@ -1678,7 +1956,7 @@ app.post('/api/save-recipe', requireAuth, async (req, res) => {
             const u = userResult.rows[0];
             const username = u?.display_name || u?.email || `user #${req.user.id}`;
             return resend.emails.send({
-              from: process.env.RESEND_FROM || 'DIY Meal Kit <noreply@resend.dev>',
+              from: EMAIL_FROM,
               to: process.env.ADMIN_EMAIL,
               subject: `New recipe: ${recipe.name}`,
               text: `A new recipe was uploaded.\n\nRecipe: ${recipe.name}\nUploaded by: ${username}\nTime: ${new Date().toISOString()}`
@@ -2215,3 +2493,5 @@ module.exports = app;
 module.exports.extractJSON = extractJSON;
 module.exports.normalizeNewDefs = normalizeNewDefs;
 module.exports.generateUnsubscribeToken = generateUnsubscribeToken;
+
+module.exports.isValidRecipeImage = isValidRecipeImage;

@@ -701,6 +701,7 @@
     <div class="toast" id="toast">Copied to clipboard!</div>
 
     <script src="/js/unit-conversion.js"></script>
+    <script src="/js/shopping-units.js"></script>
     <script>
         // --- Global State ---
         let recipeData = null;
@@ -708,97 +709,7 @@
         // Merge entries that share the same ingredient name but have different units.
         // Uses deterministic density lookup table (no API calls).
         function mergeCompatibleUnits(shoppingList, ingredientDefs) {
-            const UI = UnitConversion.UNIT_INFO;
-
-            // Group entries by ingredient name (lowercase)
-            const byName = {};
-            for (const [key, item] of Object.entries(shoppingList)) {
-                const name = item.originalName.toLowerCase().trim();
-                if (!byName[name]) byName[name] = [];
-                byName[name].push({ key, item });
-            }
-
-            const merged = {};
-            for (const [name, entries] of Object.entries(byName)) {
-                if (entries.length === 1) {
-                    merged[entries[0].key] = entries[0].item;
-                    continue;
-                }
-
-                const units = entries.map(e => e.item.units.toLowerCase().trim());
-                const infos = units.map(u => UI[u]);
-                const types = new Set(infos.filter(i => i).map(i => i.type));
-                const allKnown = infos.every(i => i);
-
-                if (!allKnown) {
-                    // Unknown unit — keep separate
-                    entries.forEach(e => { merged[e.key] = e.item; });
-                    continue;
-                }
-
-                // Look up density via slug
-                const ingredientName = entries[0].item.originalName;
-                const slug = UnitConversion.findSlugByName(ingredientName, ingredientDefs || {});
-                const gpc = UnitConversion.getDensity(slug);
-
-                if (types.size === 1) {
-                    // Same type (all volume or all weight) — convert within type
-                    const type = infos[0].type;
-                    let totalBase = 0;
-                    entries.forEach((e, i) => {
-                        totalBase += e.item.quantity * infos[i].toBase;
-                    });
-                    let displayUnit, displayQty;
-                    if (type === 'volume') {
-                        displayUnit = UnitConversion.bestVolumeUnit(totalBase);
-                        displayQty = totalBase / UI[displayUnit].toBase;
-                    } else {
-                        // All weight — convert to volume via density
-                        const totalCups = totalBase / gpc;
-                        const totalTsp = totalCups * 48;
-                        displayUnit = UnitConversion.bestVolumeUnit(totalTsp);
-                        displayQty = totalTsp / UI[displayUnit].toBase;
-                    }
-                    const first = entries[0].item;
-                    const mergedRecipes = new Set(entries.flatMap(e => [...(e.item.recipes || [])]));
-                    merged[`${name}|${displayUnit}`] = {
-                        quantity: displayQty,
-                        units: displayUnit,
-                        section: first.section,
-                        originalName: first.originalName,
-                        recipes: mergedRecipes
-                    };
-                } else if (types.has('volume') && types.has('weight')) {
-                    // Mixed volume + weight — convert weight to volume using density
-                    let totalTsp = 0;
-                    entries.forEach((e, i) => {
-                        const info = infos[i];
-                        if (info.type === 'volume') {
-                            totalTsp += e.item.quantity * info.toBase;
-                        } else {
-                            // weight → grams → cups → tsp
-                            const grams = e.item.quantity * info.toBase;
-                            const cups = grams / gpc;
-                            totalTsp += cups * 48;
-                        }
-                    });
-                    const displayUnit = UnitConversion.bestVolumeUnit(totalTsp);
-                    const displayQty = totalTsp / UI[displayUnit].toBase;
-                    const first = entries[0].item;
-                    const mergedRecipes2 = new Set(entries.flatMap(e => [...(e.item.recipes || [])]));
-                    merged[`${name}|${displayUnit}`] = {
-                        quantity: displayQty,
-                        units: displayUnit,
-                        section: first.section,
-                        originalName: first.originalName,
-                        recipes: mergedRecipes2
-                    };
-                } else {
-                    // Other mixed types — keep separate
-                    entries.forEach(e => { merged[e.key] = e.item; });
-                }
-            }
-            return merged;
+            return ShoppingUnits.mergeCompatibleUnits(shoppingList, ingredientDefs);
         }
 
         // Build recipe URL lookup (populated after async fetch)

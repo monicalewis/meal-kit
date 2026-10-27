@@ -18,6 +18,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="/js/auth.js"></script>
     <script src="/js/unit-conversion.js"></script>
+    <script src="/js/ingredient-editor.js"></script>
     <!-- ShadcnUI Dependencies -->
     <link href="https://cdn.jsdelivr.net/npm/@radix-ui/colors/blackA.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/@radix-ui/colors/green.css" rel="stylesheet">
@@ -60,6 +61,36 @@
             font-feature-settings: "rlig" 1, "calt" 1;
         }
 
+        .recipe-card-title {
+            font-size: 1rem;
+            line-height: 1.3;
+        }
+        .recipe-card-source {
+            display: block;
+            font-size: 0.85em;
+            font-weight: 400;
+            color: #64748b;
+        }
+        @media (max-width: 639px) {
+            .recipe-card-title {
+                font-size: 0.8125rem;
+                min-height: 2.6em;
+                overflow: hidden;
+                display: -webkit-box;
+                -webkit-box-orient: vertical;
+                -webkit-line-clamp: 2;
+            }
+            .recipe-card-source {
+                display: inline-block;
+                max-width: var(--source-width, 0px);
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: pre;
+                vertical-align: bottom;
+            }
+            .card-menu { top: 0.5rem; left: 0.5rem; }
+        }
+
         .card-menu {
             position: absolute;
             top: 0.75rem;
@@ -76,7 +107,7 @@
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            opacity: 0;
+            opacity: 1;
             transition: opacity 0.2s;
             border: none;
             font-size: 1rem;
@@ -245,9 +276,9 @@
     </style>
 </head>
 <body class="min-h-screen bg-slate-50">
-    <div class="container mx-auto px-4 py-8 max-w-6xl pb-36">
+    <div class="container mx-auto px-3 sm:px-4 py-4 sm:py-8 max-w-6xl pb-36">
         <div class="flex items-center justify-between flex-wrap gap-2 mb-2">
-            <h1 class="text-4xl font-bold tracking-tight text-slate-900 flex items-center gap-3"><img src="/images/logo.png" alt="DIY Meal Kit logo" class="h-10 w-auto">DIY Meal Kit</h1>
+            <h1 class="text-3xl sm:text-4xl font-bold tracking-tight text-slate-900 flex items-center gap-3"><img src="/images/logo.png" alt="DIY Meal Kit logo" class="h-8 sm:h-10 w-auto">DIY Meal Kit</h1>
             <div class="flex items-center gap-3">
                 <div data-auth="guest" style="display:none">
                     <a href="/login.html" class="text-sm text-green-600 hover:text-green-700 font-medium">Log in</a>
@@ -288,8 +319,8 @@
                 </div>
             </div>
         </div>
-        <div class="flex items-center justify-between flex-wrap gap-2 mb-6">
-            <p class="text-slate-500">Choose recipes to make, and we'll take it from there to generate your shopping list!</p>
+        <div class="flex items-center justify-between flex-wrap gap-2 mb-3 sm:mb-6">
+            <p class="text-slate-500">Choose recipes to generate shopping list!</p>
             <button id="import-recipe-button"
                     class="bg-white hover:bg-slate-50 text-slate-700 font-medium py-2 px-4 rounded-lg border border-slate-300 hover:border-green-500 transition-colors duration-200 flex items-center gap-2 text-sm">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -298,9 +329,18 @@
                 <span class="import-label">Add Recipe</span>
             </button>
         </div>
+        <div class="flex items-center gap-2 mb-3 sm:mb-6 flex-wrap">
+            <span class="text-sm text-slate-500 mr-1">Cooking time:</span>
+            <button type="button" data-time="all" class="time-filter-btn text-sm font-medium py-1.5 px-4 rounded-full border transition-colors bg-green-600 text-white border-green-600">All</button>
+            <button type="button" data-time="under30" class="time-filter-btn text-sm font-medium py-1.5 px-4 rounded-full border transition-colors bg-white text-slate-700 border-slate-300 hover:border-green-500">Under 30 min</button>
+            <button type="button" id="suggest-plan-button" class="ml-auto text-sm font-medium py-1.5 px-4 rounded-full border transition-colors bg-white text-green-700 border-green-600 hover:bg-green-50 flex items-center gap-1.5">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 21h6m-5 0v-3.5a1 1 0 00-.3-.7A6 6 0 1116.3 16.8a1 1 0 00-.3.7V21"/></svg>
+                Suggest a plan
+            </button>
+        </div>
         <div class="space-y-6">
             
-            <div id="recipe-list" class="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            <div id="recipe-list" class="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
                 <!-- Loading state -->
                 <div class="col-span-full text-center py-12">
                     <div class="text-slate-500">Loading recipes...</div>
@@ -501,15 +541,96 @@
                 .sort((a, b) => a.name.localeCompare(b.name));
         }
 
+        // --- Cooking time filter ---
+        let timeFilter = 'all'; // 'all' | 'under30'
+
+        function totalTimeMinutes(str) {
+            if (typeof str !== 'string' || !str.trim()) return null;
+            const text = str.trim();
+            const hours = text.match(/(\d+(?:\.\d+)?)\s*(?:hours?|hrs?|h)\b/i);
+            const minutes = text.match(/(\d+(?:\.\d+)?)\s*(?:minutes?|mins?|m)\b/i);
+            if (hours || minutes) return (hours ? Number(hours[1]) * 60 : 0) + (minutes ? Number(minutes[1]) : 0);
+            return /^\d+(?:\.\d+)?$/.test(text) ? Number(text) : null;
+        }
+
+        function isQuickRecipe(recipe) {
+            const mins = totalTimeMinutes(recipe.totalTime);
+            return mins !== null && mins > 0 && mins < 30;
+        }
+
+        function passesTimeFilter(recipe) {
+            return timeFilter !== 'under30' || isQuickRecipe(recipe);
+        }
+
+        function setupTimeFilter() {
+            const btns = document.querySelectorAll('.time-filter-btn');
+            btns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    timeFilter = btn.getAttribute('data-time');
+                    btns.forEach(b => {
+                        const active = b.getAttribute('data-time') === timeFilter;
+                        b.classList.toggle('bg-green-600', active);
+                        b.classList.toggle('text-white', active);
+                        b.classList.toggle('border-green-600', active);
+                        b.classList.toggle('bg-white', !active);
+                        b.classList.toggle('text-slate-700', !active);
+                        b.classList.toggle('border-slate-300', !active);
+                    });
+                    populateRecipeCards();
+                });
+            });
+        }
+        setupTimeFilter();
+
+        function createRecipeTitle(recipe) {
+            const title = document.createElement('div');
+            title.className = 'recipe-card-title font-semibold text-slate-900';
+            const byIndex = recipe.name.toLowerCase().indexOf(' by ');
+            const name = byIndex < 0 ? recipe.name : recipe.name.slice(0, byIndex);
+            const author = byIndex < 0 ? recipe.author : recipe.name.slice(byIndex + 4);
+            const nameNode = document.createTextNode(name);
+            title.appendChild(nameNode);
+            title.title = author ? name + ' by ' + author : name;
+            if (author) {
+                const source = document.createElement('span');
+                source.className = 'recipe-card-source';
+                source.textContent = ' by ' + author;
+                title.appendChild(source);
+                // Give the source only the space remaining on the name's last
+                // line, so it ellipsizes there instead of forcing another line.
+                if (typeof ResizeObserver !== 'undefined') {
+                    const observer = new ResizeObserver(() => {
+                        if (!title.isConnected) { observer.disconnect(); return; }
+                        const range = document.createRange();
+                        range.selectNode(nameNode);
+                        const lines = range.getClientRects();
+                        const lastLine = lines[lines.length - 1];
+                        if (lastLine) source.style.setProperty('--source-width', Math.max(0, Math.floor(title.getBoundingClientRect().right - lastLine.right)) + 'px');
+                    });
+                    observer.observe(title);
+                }
+            }
+            return title;
+        }
+
+        function syncRecipeSelection(checkbox) {
+            const card = checkbox.closest('.group');
+            if (!card) return;
+            card.classList.toggle('ring-2', checkbox.checked);
+            card.classList.toggle('ring-green-500', checkbox.checked);
+            card.querySelector('[data-icon="plus"]').classList.toggle('hidden', checkbox.checked);
+            card.querySelector('[data-icon="check"]').classList.toggle('hidden', !checkbox.checked);
+        }
+
         // --- Create Recipe Card ---
         function createRecipeCard(recipe, isFavorite = false) {
             const isArchived = recipe.hidden === true;
             const card = document.createElement('div');
-            card.className = 'group relative bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-200 border-2 border-transparent hover:border-green-500 overflow-hidden' + (isArchived ? ' card-archived' : '');
+            card.className = 'group relative bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-200 border-2 border-transparent hover:border-green-500 overflow-hidden' + (isArchived ? ' card-archived' : ' cursor-pointer');
 
             // Image container with aspect ratio
             const imgContainer = document.createElement('div');
-            imgContainer.className = 'relative aspect-[4/3] overflow-hidden';
+            imgContainer.className = 'recipe-card-image relative aspect-video sm:aspect-[4/3] overflow-hidden';
 
             const img = document.createElement('img');
             img.className = 'w-full h-full object-cover transition-transform duration-300 group-hover:scale-105';
@@ -663,6 +784,31 @@
                 menuDropdown.appendChild(archiveItem);
             }
 
+            if (!Auth.isGuest()) {
+                const editItem = document.createElement('button');
+                editItem.className = 'card-menu-item w-full text-left';
+                editItem.textContent = 'Edit recipe';
+                editItem.addEventListener('click', e => {
+                    e.stopPropagation();
+                    menuDropdown.classList.add('hidden');
+                    openImportModal();
+                    pendingRecipe = {
+                        recipe: JSON.parse(JSON.stringify(recipe)),
+                        newIngredientDefs: {},
+                        candidateImages: recipe.image ? [recipe.image] : [],
+                        editing: true
+                    };
+                    showImportPreview(pendingRecipe);
+                    importSectionUrl.classList.add('hidden');
+                    importSectionPhoto.classList.add('hidden');
+                    importTabUrl.parentElement.classList.add('hidden');
+                    document.getElementById('recipe-modal-title').textContent = 'Edit recipe';
+                    document.getElementById('recipe-modal-description').textContent = Auth.isAdmin() ? 'Changes update this recipe for everyone.' : 'Changes are saved to your personal recipe collection.';
+                    importSaveBtn.textContent = 'Save changes';
+                });
+                menuDropdown.appendChild(editItem);
+            }
+
             if (canManage) {
                 const deleteItem = document.createElement('div');
                 deleteItem.className = 'card-menu-item destructive';
@@ -699,7 +845,7 @@
             if (isArchived) checkbox.disabled = true;
 
             const checkboxButton = document.createElement('div');
-            checkboxButton.className = 'w-10 h-10 rounded-full bg-white/90 shadow-md flex items-center justify-center text-green-600 opacity-0 group-hover:opacity-100 peer-checked:opacity-100 peer-checked:bg-green-600 peer-checked:text-white transition-all duration-200';
+            checkboxButton.className = 'w-10 h-10 rounded-full bg-white/90 shadow-md flex items-center justify-center text-green-600 opacity-100 peer-checked:bg-green-600 peer-checked:text-white transition-all duration-200';
             checkboxButton.innerHTML = `
                 <svg data-icon="plus" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16M4 12h16" />
@@ -714,35 +860,30 @@
 
             // Content
             const content = document.createElement('div');
-            content.className = 'p-4';
+            content.className = 'recipe-card-content p-2.5 sm:p-4';
 
-            const title = document.createElement('div');
-            title.className = 'font-semibold text-slate-900';
-
-            const byIndex = recipe.name.toLowerCase().indexOf(' by ');
-            if (byIndex !== -1) {
-                const main = recipe.name.slice(0, byIndex);
-                const by = recipe.name.slice(byIndex);
-                title.textContent = main;
-                const bySpan = document.createElement('span');
-                bySpan.className = 'block text-sm font-normal text-slate-500';
-                bySpan.textContent = by;
-                title.appendChild(bySpan);
-            } else {
-                title.textContent = recipe.name;
-            }
+            const title = createRecipeTitle(recipe);
 
             content.appendChild(title);
 
             // Cooking times (only shown when data exists)
             if (recipe.activeTime || recipe.totalTime) {
                 const timesDiv = document.createElement('div');
-                timesDiv.className = 'flex items-center gap-3 mt-1.5 text-xs text-slate-400';
+                timesDiv.className = (recipe.totalTime ? 'flex' : 'hidden sm:flex') + ' recipe-card-times items-center gap-3 mt-1.5 text-xs text-slate-400';
                 const clockSvg = '<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>';
-                const parts = [];
-                if (recipe.activeTime) parts.push(recipe.activeTime + ' active');
-                if (recipe.totalTime) parts.push(recipe.totalTime + ' total');
-                timesDiv.innerHTML = clockSvg + ' ' + parts.join(' &middot; ');
+                timesDiv.innerHTML = clockSvg;
+                if (recipe.activeTime) {
+                    const active = document.createElement('span');
+                    active.className = 'recipe-active-time hidden sm:inline';
+                    active.textContent = recipe.activeTime + ' active';
+                    timesDiv.appendChild(active);
+                }
+                if (recipe.totalTime) {
+                    const total = document.createElement('span');
+                    total.className = 'recipe-total-time';
+                    total.textContent = recipe.totalTime + ' total';
+                    timesDiv.appendChild(total);
+                }
                 content.appendChild(timesDiv);
             }
 
@@ -757,22 +898,14 @@
                 if (isArchived) return;
                 if (e.target.closest('.card-menu')) return;
                 if (e.target.closest('button[title="Remove from favorites"]')) return;
-                if (e.target === checkbox || e.target === checkboxButton) return;
+                if (checkboxWrapper.contains(e.target)) return;
                 checkbox.checked = !checkbox.checked;
                 checkbox.dispatchEvent(new Event('change'));
             });
 
             // Handle checkbox changes
             checkbox.addEventListener('change', () => {
-                if (checkbox.checked) {
-                    card.classList.add('ring-2', 'ring-green-500');
-                    checkboxButton.querySelector('[data-icon="plus"]').classList.add('hidden');
-                    checkboxButton.querySelector('[data-icon="check"]').classList.remove('hidden');
-                } else {
-                    card.classList.remove('ring-2', 'ring-green-500');
-                    checkboxButton.querySelector('[data-icon="plus"]').classList.remove('hidden');
-                    checkboxButton.querySelector('[data-icon="check"]').classList.add('hidden');
-                }
+                syncRecipeSelection(checkbox);
                 updateButtonState();
                 saveSelectedRecipeIds();
             });
@@ -809,14 +942,14 @@
         }
 
         function restoreSelectedRecipeIds() {
-            const saved = JSON.parse(localStorage.getItem('selectedRecipeIds') || '[]');
-            saved.forEach(id => {
-                const checkbox = document.querySelector(`input[name="recipe"][value="${id}"]`);
-                if (checkbox && !checkbox.disabled) {
-                    checkbox.checked = true;
-                    const card = checkbox.closest('.group');
-                    if (card) card.classList.add('ring-2', 'ring-green-500');
-                }
+            let saved;
+            try { saved = JSON.parse(localStorage.getItem('selectedRecipeIds') || '[]'); }
+            catch { return; }
+            if (!Array.isArray(saved)) return;
+            const selected = new Set(saved);
+            document.querySelectorAll('input[name="recipe"]').forEach(checkbox => {
+                checkbox.checked = !checkbox.disabled && selected.has(checkbox.value);
+                syncRecipeSelection(checkbox);
             });
         }
 
@@ -856,7 +989,7 @@
 
             // Image container
             const imgContainer = document.createElement('div');
-            imgContainer.className = 'relative aspect-[4/3] overflow-hidden';
+            imgContainer.className = 'recipe-card-image relative aspect-video sm:aspect-[4/3] overflow-hidden';
             const img = document.createElement('img');
             img.className = 'w-full h-full object-cover transition-transform duration-300 group-hover:scale-105';
             img.src = recipe.image || DEFAULT_IMAGE;
@@ -874,26 +1007,27 @@
 
             // Content
             const content = document.createElement('div');
-            content.className = 'p-4';
-            const title = document.createElement('div');
-            title.className = 'font-semibold text-slate-900 text-sm leading-tight';
-            title.textContent = recipe.name;
-            if (recipe.author) {
-                const authorSpan = document.createElement('span');
-                authorSpan.className = 'block text-xs font-normal text-slate-500 mt-0.5';
-                authorSpan.textContent = 'by ' + recipe.author;
-                title.appendChild(authorSpan);
-            }
+            content.className = 'recipe-card-content p-2.5 sm:p-4';
+            const title = createRecipeTitle(recipe);
             content.appendChild(title);
 
             if (recipe.activeTime || recipe.totalTime) {
                 const timesDiv = document.createElement('div');
-                timesDiv.className = 'flex items-center gap-3 mt-1.5 text-xs text-slate-400';
+                timesDiv.className = (recipe.totalTime ? 'flex' : 'hidden sm:flex') + ' recipe-card-times items-center gap-3 mt-1.5 text-xs text-slate-400';
                 const clockSvg = '<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>';
-                const parts = [];
-                if (recipe.activeTime) parts.push(recipe.activeTime + ' active');
-                if (recipe.totalTime) parts.push(recipe.totalTime + ' total');
-                timesDiv.innerHTML = clockSvg + ' ' + parts.join(' &middot; ');
+                timesDiv.innerHTML = clockSvg;
+                if (recipe.activeTime) {
+                    const active = document.createElement('span');
+                    active.className = 'recipe-active-time hidden sm:inline';
+                    active.textContent = recipe.activeTime + ' active';
+                    timesDiv.appendChild(active);
+                }
+                if (recipe.totalTime) {
+                    const total = document.createElement('span');
+                    total.className = 'recipe-total-time';
+                    total.textContent = recipe.totalTime + ' total';
+                    timesDiv.appendChild(total);
+                }
                 content.appendChild(timesDiv);
             }
 
@@ -922,13 +1056,16 @@
 
         // --- Populate Recipe Cards ---
         function populateRecipeCards() {
-            const selectableRecipes = getSelectableRecipes();
+            const selectableRecipes = getSelectableRecipes().filter(passesTimeFilter);
             recipeListDiv.innerHTML = '';
 
             if (selectableRecipes.length === 0 && !sharedPlanData) {
+                const msg = timeFilter === 'under30'
+                    ? 'No recipes under 30 minutes. Try the "All" filter.'
+                    : 'No recipes found in the data.';
                 recipeListDiv.innerHTML = `
                     <div class="col-span-full text-center py-12">
-                        <div class="text-slate-500">No recipes found in the data.</div>
+                        <div class="text-slate-500">${msg}</div>
                     </div>
                 `;
                 return;
@@ -1074,7 +1211,7 @@
                             recipeName: recipe.name,
                             ingredient: ing.id.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
                             quantity: ing.qty,
-                            units: 'count',
+                            units: ing.unit || 'count',
                             section: 'Other'
                         });
                         return;
@@ -1085,7 +1222,7 @@
                         recipeName: recipe.name,
                         ingredient: def.name,
                         quantity: ing.qty,
-                        units: def.units,
+                        units: ing.unit || def.units,
                         section: def.section
                     });
                 });
@@ -1100,23 +1237,13 @@
         }
 
         // --- Event Listeners ---
-        generateButton.addEventListener('click', () => {
-            const selectedRecipeIds = Array.from(document.querySelectorAll('input[name="recipe"]:checked'))
-                .map(checkbox => checkbox.value);
-                
-            if (selectedRecipeIds.length === 0) {
-                // Show error toast
-                const toast = document.createElement('div');
-                toast.className = 'fixed bottom-20 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-50';
-                toast.textContent = 'Please select at least one recipe';
-                document.body.appendChild(toast);
-                setTimeout(() => toast.remove(), 3000);
-                return;
-            }
-
+        // Build the shopping list for the given recipe ids and navigate to it.
+        // Shared by the "Generate shopping list" button and the meal planner's
+        // "Select these recipes" action.
+        function generateShoppingList(selectedRecipeIds) {
             // Build the shopping list in flat format for compatibility
             const shoppingListData = buildShoppingListData(selectedRecipeIds);
-            
+
             // Get selected recipe names for display
             const selectedRecipeNames = selectedRecipeIds.map(id => {
                 const recipe = recipeData.recipes.find(r => r.id === id);
@@ -1158,6 +1285,23 @@
             }
 
             window.location.href = '/shopping-list.html';
+        }
+
+        generateButton.addEventListener('click', () => {
+            const selectedRecipeIds = Array.from(document.querySelectorAll('input[name="recipe"]:checked'))
+                .map(checkbox => checkbox.value);
+
+            if (selectedRecipeIds.length === 0) {
+                // Show error toast
+                const toast = document.createElement('div');
+                toast.className = 'fixed bottom-20 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-50';
+                toast.textContent = 'Please select at least one recipe';
+                document.body.appendChild(toast);
+                setTimeout(() => toast.remove(), 3000);
+                return;
+            }
+
+            generateShoppingList(selectedRecipeIds);
         });
 
         // --- Initialize ---
@@ -1572,6 +1716,242 @@
         });
 
         // Start the app — wait for auth, then fetch recipe data
+        // --- Suggested meal plans ---
+        function mpEsc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+        function mpIngredientIds(r){ return (r.ingredients || []).map(i => i.id); }
+        function mpDisplayName(r){ const i = r.name.toLowerCase().indexOf(' by '); return i !== -1 ? r.name.slice(0, i) : r.name; }
+
+        function mpShuffle(arr){
+            const a = arr.slice();
+            for (let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); const t = a[i]; a[i] = a[j]; a[j] = t; }
+            return a;
+        }
+
+        // Greedy build: seed with one recipe, then add recipes that best match the
+        // shared-ingredients preference (overlap for "yes", novelty for "no").
+        function mpBuildPlan(pool, n, pref, seedId){
+            const chosen = [], used = new Set(), union = new Set();
+            const take = r => { chosen.push(r); used.add(r.id); mpIngredientIds(r).forEach(id => union.add(id)); };
+            const seed = pool.find(r => r.id === seedId) || pool[0];
+            if (!seed) return [];
+            take(seed);
+            while (chosen.length < n && chosen.length < pool.length){
+                let best = null, bestScore = -Infinity;
+                for (const r of pool){
+                    if (used.has(r.id)) continue;
+                    const ids = mpIngredientIds(r);
+                    let ov = 0; ids.forEach(id => { if (union.has(id)) ov++; });
+                    let score;
+                    if (pref === 'yes') score = ov - ids.length * 0.01;
+                    else if (pref === 'no') score = -ov + ids.length * 0.01;
+                    else score = Math.random();
+                    if (score > bestScore){ best = r; bestScore = score; }
+                }
+                if (!best) break;
+                take(best);
+            }
+            return chosen;
+        }
+
+        function mpStats(recipes){
+            const union = new Set(); let slots = 0;
+            recipes.forEach(r => { const ids = mpIngredientIds(r); slots += ids.length; ids.forEach(id => union.add(id)); });
+            return { buy: union.size, shared: slots - union.size };
+        }
+
+        // Qualifying recipes: selectable, have ingredients, and (if asked) quick to cook.
+        function mpPool(quickOnly = false){
+            return getSelectableRecipes().filter(r => (r.ingredients || []).length > 0 && (!quickOnly || isQuickRecipe(r)));
+        }
+
+        // Backfill a removed slot by randomly picking a qualifying recipe that is not
+        // already in the plan. Pure client-side random selection — no LLM call.
+        function mpBackfill(plan, pool){
+            const used = new Set(plan.map(r => r.id));
+            const candidates = pool.filter(r => !used.has(r.id));
+            if (candidates.length === 0) return null;
+            return candidates[Math.floor(Math.random() * candidates.length)];
+        }
+
+        function mpGenerate(n, pref, quickOnly = false){
+            const pool = mpPool(quickOnly);
+            if (pool.length === 0) return [];
+            const count = Math.min(n, pool.length);
+            const sa = mpShuffle(pool);
+            const planA = mpBuildPlan(sa, count, pref, sa[0].id);
+            const aKey = planA.map(r => r.id).sort().join();
+            const aIds = new Set(planA.map(r => r.id));
+            const sb = mpShuffle(pool);
+            const seedB = (sb.find(r => !aIds.has(r.id)) || sb[0]).id;
+            let planB = mpBuildPlan(sb, count, pref, seedB);
+            let tries = 0;
+            while (tries < 8 && planB.map(r => r.id).sort().join() === aKey){
+                const s = mpShuffle(pool);
+                planB = mpBuildPlan(s, count, pref, s[0].id);
+                tries++;
+            }
+            return [planA, planB];
+        }
+
+        function mpResetTimeFilterToAll(){
+            timeFilter = 'all';
+            document.querySelectorAll('.time-filter-btn').forEach(b => {
+                const active = b.getAttribute('data-time') === 'all';
+                b.classList.toggle('bg-green-600', active); b.classList.toggle('text-white', active); b.classList.toggle('border-green-600', active);
+                b.classList.toggle('bg-white', !active); b.classList.toggle('text-slate-700', !active); b.classList.toggle('border-slate-300', !active);
+            });
+        }
+
+        function mpApplyPlan(ids){
+            if (!ids || ids.length === 0) return;
+            mpResetTimeFilterToAll();
+            closeMealPlanner();
+            generateShoppingList(ids); // builds the list and navigates to shopping-list.html
+        }
+
+        let mealPlannerEl = null;
+        function closeMealPlanner(){ if (mealPlannerEl){ mealPlannerEl.remove(); mealPlannerEl = null; } }
+
+        function openMealPlanner(){
+            closeMealPlanner();
+            const overlay = document.createElement('div');
+            overlay.className = 'fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-start justify-center p-4 overflow-y-auto';
+            overlay.innerHTML = `
+                <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg my-8">
+                    <div class="p-6 border-b border-slate-200 flex items-start justify-between">
+                        <div>
+                            <h3 class="text-xl font-bold text-slate-900">Suggest a meal plan</h3>
+                            <p class="text-sm text-slate-500 mt-1">We'll pick recipes that fit, then you select a set in one tap.</p>
+                        </div>
+                        <button id="mp-close" class="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>
+                    </div>
+                    <div class="p-6 space-y-5">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">How many meals?</label>
+                            <div class="flex items-center gap-3">
+                                <button type="button" id="mp-minus" class="w-9 h-9 rounded-full border border-slate-300 text-slate-700 text-lg hover:border-green-500">&minus;</button>
+                                <span id="mp-count" class="text-lg font-semibold w-8 text-center">3</span>
+                                <button type="button" id="mp-plus" class="w-9 h-9 rounded-full border border-slate-300 text-slate-700 text-lg hover:border-green-500">+</button>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Share ingredients across meals?</label>
+                            <div id="mp-pref" class="space-y-2">
+                                <button type="button" data-pref="yes" class="mp-pref-btn w-full text-left px-4 py-3 rounded-lg border text-sm transition-colors border-green-600 bg-green-50 text-green-800">Yes — streamline my shopping</button>
+                                <button type="button" data-pref="no" class="mp-pref-btn w-full text-left px-4 py-3 rounded-lg border text-sm transition-colors border-slate-300 hover:border-green-500">No — I prefer variety</button>
+                                <button type="button" data-pref="idk" class="mp-pref-btn w-full text-left px-4 py-3 rounded-lg border text-sm transition-colors border-slate-300 hover:border-green-500">I don't mind</button>
+                            </div>
+                        </div>
+                        <fieldset>
+                            <legend class="block text-sm font-medium text-slate-700 mb-2">Prefer quick cook recipes?</legend>
+                            <div id="mp-quick-pref" class="space-y-2">
+                                <button type="button" data-quick="yes" aria-pressed="false" class="mp-quick-btn w-full text-left px-4 py-3 rounded-lg border text-sm transition-colors border-slate-300 hover:border-green-500">Yes, under 30 min</button>
+                                <button type="button" data-quick="no" aria-pressed="true" class="mp-quick-btn w-full text-left px-4 py-3 rounded-lg border text-sm transition-colors border-green-600 bg-green-50 text-green-800">No, I don't mind</button>
+                            </div>
+                        </fieldset>
+                        <button type="button" id="mp-generate" class="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2.5 rounded-lg">Suggest plans</button>
+                        <div id="mp-results" class="space-y-4"></div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+            mealPlannerEl = overlay;
+
+            let count = 3, pref = 'yes', quickOnly = false;
+            const countEl = overlay.querySelector('#mp-count');
+            overlay.querySelector('#mp-minus').addEventListener('click', () => { count = Math.max(1, count - 1); countEl.textContent = count; });
+            overlay.querySelector('#mp-plus').addEventListener('click', () => { count = Math.min(7, count + 1); countEl.textContent = count; });
+            overlay.querySelectorAll('.mp-pref-btn').forEach(b => b.addEventListener('click', () => {
+                pref = b.getAttribute('data-pref');
+                overlay.querySelectorAll('.mp-pref-btn').forEach(x => {
+                    const on = x.getAttribute('data-pref') === pref;
+                    x.classList.toggle('border-green-600', on); x.classList.toggle('bg-green-50', on); x.classList.toggle('text-green-800', on);
+                    x.classList.toggle('border-slate-300', !on);
+                });
+            }));
+            overlay.querySelectorAll('.mp-quick-btn').forEach(button => button.addEventListener('click', () => {
+                quickOnly = button.getAttribute('data-quick') === 'yes';
+                overlay.querySelectorAll('.mp-quick-btn').forEach(option => {
+                    const active = (option.getAttribute('data-quick') === 'yes') === quickOnly;
+                    option.setAttribute('aria-pressed', String(active));
+                    option.classList.toggle('border-green-600', active);
+                    option.classList.toggle('bg-green-50', active);
+                    option.classList.toggle('text-green-800', active);
+                    option.classList.toggle('border-slate-300', !active);
+                });
+                overlay.querySelector('#mp-results').innerHTML = '';
+            }));
+            overlay.querySelector('#mp-close').addEventListener('click', closeMealPlanner);
+            overlay.addEventListener('click', e => { if (e.target === overlay) closeMealPlanner(); });
+
+            overlay.querySelector('#mp-generate').addEventListener('click', () => {
+                const plans = mpGenerate(count, pref, quickOnly);
+                const results = overlay.querySelector('#mp-results');
+                if (plans.length === 0){
+                    results.innerHTML = quickOnly
+                        ? '<p class="text-sm text-slate-500">No recipes with a total time under 30 minutes are available. Choose “No, I don’t mind” to include all cooking times.</p>'
+                        : '<p class="text-sm text-slate-500">No recipes available to plan with.</p>';
+                    return;
+                }
+                // Qualifying pool used to backfill removed slots (same filter as generation).
+                const pool = mpPool(quickOnly);
+                const labels = ['Option A', 'Option B'];
+
+                // Re-render the plan cards from the current (mutable) plans so that
+                // removing a recipe or backfilling a slot updates the view in place.
+                function renderPlans(){
+                    const shortfall = pool.length < count ? `<p class="text-sm text-slate-500">Only ${pool.length} matching recipe${pool.length === 1 ? '' : 's'} available for your ${count}-meal plan.</p>` : '';
+                    results.innerHTML = shortfall + plans.map((plan, idx) => {
+                        const s = mpStats(plan);
+                        const metric = pref === 'yes'
+                            ? `${s.buy} ingredients to buy &middot; ${s.shared} shared across meals`
+                            : pref === 'no'
+                            ? `${s.buy} ingredients &middot; max variety`
+                            : `${s.buy} ingredients to buy`;
+                        const items = plan.length === 0
+                            ? '<li class="text-sm text-slate-400 italic">No recipes — backfill or remove this option.</li>'
+                            : plan.map((r, i) => { const nm = mpDisplayName(r); return `<li class="flex items-center gap-2 text-sm text-slate-700"><span class="text-green-600">&bull;</span><span class="flex-1">${mpEsc(nm)}</span><button type="button" class="mp-remove text-slate-400 hover:text-red-600 text-lg leading-none px-1" data-plan="${idx}" data-idx="${i}" aria-label="Remove ${mpEsc(nm).replace(/"/g, '&quot;')}" title="Remove">&times;</button></li>`; }).join('');
+                        const canBackfill = plan.length < count && mpBackfill(plan, pool) !== null;
+                        const backfill = canBackfill
+                            ? `<button type="button" class="mp-backfill w-full mb-2 text-sm font-medium text-green-700 border border-green-600 bg-white hover:bg-green-50 py-2 rounded-lg" data-plan="${idx}">+ Backfill a recipe</button>`
+                            : '';
+                        const selectAttrs = plan.length === 0
+                            ? 'disabled class="mp-select w-full bg-slate-300 text-white text-sm font-medium py-2 rounded-lg cursor-not-allowed"'
+                            : 'class="mp-select w-full bg-green-600 hover:bg-green-700 text-white text-sm font-medium py-2 rounded-lg"';
+                        return `
+                            <div class="border border-slate-200 rounded-xl p-4">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="font-semibold text-slate-900">${labels[idx]}</span>
+                                    <span class="text-xs text-slate-500">${metric}</span>
+                                </div>
+                                <ul class="space-y-1 mb-3">${items}</ul>
+                                ${backfill}
+                                <button type="button" data-plan="${idx}" ${selectAttrs}>Select these ${plan.length} recipe${plan.length === 1 ? '' : 's'}</button>
+                            </div>
+                        `;
+                    }).join('');
+
+                    results.querySelectorAll('.mp-remove').forEach(btn => btn.addEventListener('click', () => {
+                        plans[+btn.dataset.plan].splice(+btn.dataset.idx, 1);
+                        renderPlans();
+                    }));
+                    results.querySelectorAll('.mp-backfill').forEach(btn => btn.addEventListener('click', () => {
+                        const plan = plans[+btn.dataset.plan];
+                        const pick = mpBackfill(plan, pool); // random qualifying recipe, no LLM
+                        if (pick) plan.push(pick);
+                        renderPlans();
+                    }));
+                    results.querySelectorAll('.mp-select').forEach(btn => btn.addEventListener('click', () => {
+                        mpApplyPlan(plans[+btn.dataset.plan].map(r => r.id));
+                    }));
+                }
+
+                renderPlans();
+            });
+        }
+
+        (function(){ const b = document.getElementById('suggest-plan-button'); if (b) b.addEventListener('click', openMealPlanner); })();
+
         async function initApp() {
             recipeListDiv.innerHTML = `
                 <div class="col-span-full text-center py-12">
@@ -1626,8 +2006,8 @@
     <div id="import-overlay" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 hidden"></div>
     <div id="import-modal" class="fixed inset-x-4 top-[10%] max-w-lg mx-auto bg-white rounded-2xl shadow-2xl z-50 hidden max-h-[80vh] flex flex-col">
         <div class="p-6 border-b border-slate-200">
-            <h3 class="text-xl font-bold text-slate-900">Add Recipe</h3>
-            <p class="text-sm text-slate-500 mt-1">Paste a URL or take a photo of a recipe</p>
+            <h3 id="recipe-modal-title" class="text-xl font-bold text-slate-900">Add Recipe</h3>
+            <p id="recipe-modal-description" class="text-sm text-slate-500 mt-1">Paste a URL or take a photo of a recipe</p>
         </div>
         <div class="p-6 overflow-y-auto flex-1 space-y-4" id="import-modal-body">
             <!-- Tab switcher -->
@@ -1775,6 +2155,11 @@
         }
 
         function resetImportModal() {
+            document.getElementById('recipe-modal-title').textContent = 'Add Recipe';
+            document.getElementById('recipe-modal-description').textContent = 'Paste a URL or take a photo of a recipe';
+            importTabUrl.parentElement.classList.remove('hidden');
+            importSaveBtn.textContent = 'Save recipe';
+            importSaveBtn.disabled = false;
             importUrlInput.value = '';
             importStatus.classList.add('hidden');
             importError.classList.add('hidden');
@@ -2255,7 +2640,14 @@
             imageUrlBtn.onclick = () => {
                 const manualUrl = imageUrlInput.value.trim();
                 if (!manualUrl) return;
+                if (!/^https?:\/\//i.test(manualUrl)) { showImportError('Enter an http or https image URL.'); return; }
                 pending.recipe.image = manualUrl;
+                previewImageGrid.innerHTML = '';
+                const preview = document.createElement('img');
+                preview.src = manualUrl;
+                preview.alt = 'Selected recipe image';
+                preview.className = 'w-32 h-24 object-cover rounded-lg';
+                previewImageGrid.appendChild(preview);
                 // Deselect grid thumbnails
                 previewImageGrid.querySelectorAll('div').forEach(d => {
                     d.className = d.className
@@ -2273,6 +2665,22 @@
                 const getDef = () => isNew()
                     ? pending.newIngredientDefs[ing.id]
                     : recipeData.ingredientDefs[ing.id];
+
+                // Change this ingredient's unit (convert the amount when compatible, and
+                // persist the choice). Logic lives in /js/ingredient-editor.js so it can be
+                // unit-tested; here we just feed it this row's context and sync the qty input.
+                function applyUnitChange(newUnit, qtyInputEl) {
+                    const result = IngredientEditor.applyUnitChange(
+                        { ing: ing, newIngredientDefs: pending.newIngredientDefs, ingredientDefs: recipeData.ingredientDefs },
+                        newUnit
+                    );
+                    if (result.changed && qtyInputEl) qtyInputEl.value = ing.qty;
+                    if (result.changed && result.converted === null) showToast('No reliable conversion available. Enter the quantity for the new unit.');
+                }
+
+                function buildUnitSelect(currentUnit) {
+                    return IngredientEditor.buildUnitSelect(currentUnit, UNIT_OPTIONS);
+                }
 
                 const container = document.createElement('div');
                 let editing = false;
@@ -2311,9 +2719,14 @@
                         ing.qty = parseFloat(qtyInput.value) || 0;
                     });
 
-                    const units = document.createElement('span');
-                    units.className = 'text-slate-400 text-xs w-10';
-                    units.textContent = def ? def.units : '';
+                    const unitSelect = buildUnitSelect(IngredientEditor.effectiveUnit(ing, pending.newIngredientDefs, recipeData.ingredientDefs));
+                    // Interacting with the dropdown must not trigger the row's click-to-edit.
+                    unitSelect.addEventListener('click', e => e.stopPropagation());
+                    unitSelect.addEventListener('mousedown', e => e.stopPropagation());
+                    unitSelect.addEventListener('change', e => {
+                        e.stopPropagation();
+                        applyUnitChange(unitSelect.value, qtyInput);
+                    });
 
                     const removeBtn = document.createElement('button');
                     removeBtn.className = 'text-slate-300 hover:text-red-500 transition-colors p-0.5';
@@ -2328,12 +2741,12 @@
 
                     row.appendChild(name);
                     row.appendChild(qtyInput);
-                    row.appendChild(units);
+                    row.appendChild(unitSelect);
                     row.appendChild(removeBtn);
 
                     if (isNew()) {
                         row.addEventListener('click', e => {
-                            if (e.target === qtyInput || e.target === removeBtn || removeBtn.contains(e.target)) return;
+                            if (e.target === qtyInput || e.target === unitSelect || unitSelect.contains(e.target) || e.target === removeBtn || removeBtn.contains(e.target)) return;
                             renderEdit();
                         });
                     }
@@ -2346,7 +2759,6 @@
                     container.innerHTML = '';
                     editing = true;
                     const def = getDef();
-                    const oldUnits = def?.units || 'count';
 
                     const editDiv = document.createElement('div');
                     editDiv.className = 'ing-row-editing space-y-2';
@@ -2396,7 +2808,8 @@
                     });
                     unitSelect.value = def?.units || 'count';
                     unitSelect.addEventListener('change', () => {
-                        if (isNew()) pending.newIngredientDefs[ing.id].units = unitSelect.value;
+                        applyUnitChange(unitSelect.value, qtyInput);
+                        unitsSpan.textContent = unitSelect.value;
                     });
 
                     const secLabel = document.createElement('span');
@@ -2503,8 +2916,11 @@
 
                     function selectExisting(item) {
                         const oldSlug = ing.id;
-                        const converted = UnitConversion.convertQty(ing.qty, oldUnits, item.units, item.slug);
+                        const curUnit = IngredientEditor.effectiveUnit(ing, pending.newIngredientDefs, recipeData.ingredientDefs);
+                        const converted = UnitConversion.convertQty(ing.qty, curUnit, item.units, item.slug);
                         ing.id = item.slug;
+                        delete ing.unit;
+                        if (converted === null) ing.unit = curUnit;
                         ing.qty = converted !== null ? converted : ing.qty;
                         cleanupNewDef(oldSlug, pending);
                         renderDisplay();
@@ -2597,7 +3013,8 @@
                     method: 'POST',
                     body: JSON.stringify({
                         recipe: pendingRecipe.recipe,
-                        newIngredientDefs: pendingRecipe.newIngredientDefs
+                        newIngredientDefs: Object.fromEntries(pendingRecipe.recipe.ingredients.map(ing => [ing.id,
+                            pendingRecipe.newIngredientDefs[ing.id] || recipeData.ingredientDefs[ing.id]]).filter(([, def]) => def))
                     })
                 });
                 const data = await res.json();
@@ -2619,8 +3036,9 @@
                     recipeData.recipes.push(savedRecipe);
                 }
 
+                const wasEditing = pendingRecipe.editing;
                 closeImportModal();
-                showToast(`"${savedRecipe.name}" added successfully!`);
+                showToast(`"${savedRecipe.name}" ${wasEditing ? 'updated' : 'added'} successfully!`);
 
                 populateRecipeCards();
             } catch (err) {

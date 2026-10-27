@@ -735,6 +735,131 @@ const recipeData = {
       "name": "Nutmeg",
       "units": "whole",
       "section": "Cooking"
+    },
+    "apple-cider-vinegar": {
+      "name": "Apple cider vinegar",
+      "units": "tbsp",
+      "section": "Cooking"
+    },
+    "dijon-mustard": {
+      "name": "Dijon mustard",
+      "units": "tsp",
+      "section": "Cooking"
+    },
+    "powdered-sugar": {
+      "name": "Powdered sugar",
+      "units": "tbsp",
+      "section": "Cooking"
+    },
+    "cayenne": {
+      "name": "Cayenne",
+      "units": "tsp",
+      "section": "Cooking"
+    },
+    "cabbage": {
+      "name": "Cabbage or coleslaw mix",
+      "units": "count",
+      "section": "Produce"
+    },
+    "hot-sauce": {
+      "name": "Hot sauce",
+      "units": "count",
+      "section": "Cooking"
+    },
+    "brussels-sprouts": {
+      "name": "Brussels sprouts",
+      "units": "lbs",
+      "section": "Produce"
+    },
+    "green-chili": {
+      "name": "Green chili",
+      "units": "count",
+      "section": "Produce"
+    },
+    "tarragon": {
+      "name": "Tarragon",
+      "units": "bunch",
+      "section": "Produce"
+    },
+    "dill": {
+      "name": "Dill",
+      "units": "bunch",
+      "section": "Produce"
+    },
+    "parsley": {
+      "name": "Parsley",
+      "units": "bunch",
+      "section": "Produce"
+    },
+    "preserved-lemon": {
+      "name": "Preserved lemon",
+      "units": "count",
+      "section": "Cooking"
+    },
+    "active-dry-yeast": {
+      "name": "Active dry yeast",
+      "units": "tsp",
+      "section": "Cooking"
+    },
+    "fresh-rosemary": {
+      "name": "Fresh rosemary",
+      "units": "bunch",
+      "section": "Produce"
+    },
+    "red-wine-vinegar": {
+      "name": "Red wine vinegar",
+      "units": "tbsp",
+      "section": "Cooking"
+    },
+    "capers": {
+      "name": "Capers",
+      "units": "tbsp",
+      "section": "Cooking"
+    },
+    "honey": {
+      "name": "Honey",
+      "units": "tbsp",
+      "section": "Cooking"
+    },
+    "orange-bell-pepper": {
+      "name": "Orange bell pepper",
+      "units": "count",
+      "section": "Produce"
+    },
+    "russet-potato": {
+      "name": "Russet potato",
+      "units": "count",
+      "section": "Produce"
+    },
+    "breadcrumbs": {
+      "name": "Breadcrumbs",
+      "units": "cup",
+      "section": "Cooking"
+    },
+    "gnocchi": {
+      "name": "Gnocchi",
+      "units": "package",
+      "section": "Cooking"
+    },
+    "marinara-sauce": {
+      "name": "Marinara sauce",
+      "units": "cup",
+      "section": "Cooking"
+    },
+    "marinated-artichoke-hearts": {
+      "name": "Marinated artichoke hearts",
+      "units": "tbsp",
+      "section": "Cooking"
+    },
+    "no-boil-lasagna-noodles": {
+      "name": "No-boil lasagna noodles",
+      "units": "strips",
+      "section": "Cooking"
+    },
+    "broccoli": {
+      "name": "Broccoli",
+      "units": "count",
+      "section": "Produce"
     }
   },
   "recipes": [
@@ -950,7 +1075,7 @@ const recipeData = {
       "id": "mushroom-buratta-pizza-by-good-eggs",
       "name": "Mushroom buratta pizza by Good Eggs",
       "url": "https://www.goodeggs.com/sfbay/bundlessfbay/mushroom-pizza-with-burrata-arugula/5b58e54d9c68f5000ff4e2ad",
-      "image": "https://goodeggs4.imgix.net/da949f17-33ce-4864-bc35-76ae05d5c10a.jpg?w=840&h=525&fm=jpg&q=80&fit=crop",
+      "image": "/images/recipes/mushroom-buratta-pizza.jpg",
       "activeTime": "15 min",
       "totalTime": "25 min",
       "ingredients": [
@@ -1001,7 +1126,7 @@ const recipeData = {
     {
       "id": "pea-fritters",
       "name": "Pea, Feta and Mint Fritters by Smitten Kitchen",
-      "image": "https://dishingupthedirt.com/wp-content/uploads/2021/03/010819_DUTD2_PeaFrittersAmity.jpg",
+      "image": "/images/recipes/pea-feta-mint-fritters.jpg",
       "totalTime": "30 min",
       "ingredients": [
         { "id": "frozen-peas", "qty": 2 },
@@ -1038,7 +1163,7 @@ const recipeData = {
       "id": "peach-panzanella-with-burrata-and-mint-by-good-eggs",
       "name": "Peach panzanella with burrata & mint by Good Eggs",
       "url": "https://www.goodeggs.com/bundlessfbay/peach-panzanella-with-burrata-mint/5cd5c7e536ac96000eceb455",
-      "image": "https://goodeggs4.imgix.net/c2470fe2-bb40-4f1e-93f6-8681eaaea4c4.jpg?w=840&h=525&fm=jpg&q=80&fit=crop",
+      "image": "/images/recipes/peach-panzanella-burrata-mint.jpg",
       "totalTime": "10 min",
       "ingredients": [
         { "id": "cherry-tomato", "qty": 8 },
@@ -1284,6 +1409,270 @@ const recipeData = {
         { "id": "flour", "qty": 1 },
         { "id": "whole-milk", "qty": 10 },
         { "id": "nutmeg", "qty": 0.25 }
+      ]
+    },
+    {
+      "id": "apple-and-cheddar-crisp-salad-by-smitten-kitchen",
+      "name": "Apple and cheddar crisp salad by Smitten Kitchen",
+      "url": "https://smittenkitchen.com/2022/10/apple-and-cheddar-crisp-salad/",
+      "image": "https://i0.wp.com/smittenkitchen.com/wp-content/uploads/2022/10/apple-and-cheddar-crisp-salad-14-scaled.jpg?fit=1200%2C800&quality=89&ssl=1",
+      "totalTime": "30 min",
+      "ingredients": [
+        { "id": "shallots", "qty": 1 },
+        { "id": "apple-cider-vinegar", "qty": 3 },
+        { "id": "dijon-mustard", "qty": 0.5 },
+        { "id": "mayonnaise", "qty": 1 },
+        { "id": "olive-oil", "qty": 18 },
+        { "id": "cheddar-cheese", "qty": 1 },
+        { "id": "sliced-almonds", "qty": 3 },
+        { "id": "powdered-sugar", "qty": 2 },
+        { "id": "cayenne", "qty": 0.25 },
+        { "id": "kale", "qty": 0.5 },
+        { "id": "apples", "qty": 1 }
+      ]
+    },
+    {
+      "id": "crispy-black-bean-tacos-with-feta-and-slaw-by-smitten-kitchen",
+      "name": "Crispy black bean tacos with feta and slaw by Smitten Kitchen",
+      "url": "https://smittenkitchen.com/2009/02/crispy-black-bean-tacos-with-feta-and-slaw/",
+      "image": "https://i0.wp.com/smittenkitchen.com/wp-content/uploads/2009/02/crisp-black-bean-tacos-3-scaled.jpg?fit=1200%2C800&quality=89&ssl=1",
+      "totalTime": "20 min",
+      "ingredients": [
+        { "id": "canned-black-beans", "qty": 1 },
+        { "id": "cumin", "qty": 1 },
+        { "id": "olive-oil", "qty": 5 },
+        { "id": "lime", "qty": 1 },
+        { "id": "cabbage", "qty": 1 },
+        { "id": "scallions", "qty": 2 },
+        { "id": "cilantro", "qty": 1 },
+        { "id": "tortillas", "qty": 4 },
+        { "id": "feta---goat-cheese", "qty": 0.5 },
+        { "id": "hot-sauce", "qty": 1 }
+      ]
+    },
+    {
+      "id": "charred-brussels-sprouts-with-olive-oil-and-lemon-by-ottolenghi",
+      "name": "Charred brussels sprouts with olive oil and lemon by Ottolenghi",
+      "url": "https://ottolenghi.co.uk/pages/recipes/charred-brussels-sprouts-olive-oil-lemon",
+      "image": "https://ottolenghi.co.uk/cdn/shop/files/Charred_brussels_sprouts_with_olive_oil_and_lemon.jpg?v=1716838408",
+      "activeTime": "30 min",
+      "totalTime": "1 hr 25 min",
+      "ingredients": [
+        { "id": "brussels-sprouts", "qty": 2 },
+        { "id": "garlic", "qty": 12 },
+        { "id": "green-chili", "qty": 1 },
+        { "id": "olive-oil", "qty": 30 },
+        { "id": "onion", "qty": 2 },
+        { "id": "veggie-stock", "qty": 1 },
+        { "id": "lemon", "qty": 2 },
+        { "id": "tarragon", "qty": 1 },
+        { "id": "dill", "qty": 1 },
+        { "id": "parsley", "qty": 1 },
+        { "id": "preserved-lemon", "qty": 2 }
+      ]
+    },
+    {
+      "id": "dutch-oven-bread-by-the-cookie-rookie",
+      "name": "No knead dutch oven bread by The Cookie Rookie",
+      "url": "https://www.thecookierookie.com/dutch-oven-bread/",
+      "image": "/images/recipes/no-knead-dutch-oven-bread.jpg",
+      "activeTime": "20 min",
+      "totalTime": "13 hr 10 min",
+      "ingredients": [
+        { "id": "flour", "qty": 3 },
+        { "id": "active-dry-yeast", "qty": 0.5 },
+        { "id": "salt", "qty": 1.75 },
+        { "id": "fresh-rosemary", "qty": 1 }
+      ]
+    },
+    {
+      "id": "caponata",
+      "name": "Caponata by The Forest Feast",
+      "url": "/recipes/caponata",
+      "image": "/images/recipes/caponata.jpg",
+      "servings": "Serves 6–8 as an appetizer",
+      "activeTime": "30 min",
+      "totalTime": "45 min",
+      "displayIngredients": [
+        "1 eggplant, cut into ½-in (12-mm) cubes",
+        "1 onion, cut into ½-in (12-mm) cubes",
+        "4 cloves garlic, minced",
+        "¼ cup (60 ml) olive oil, plus more as needed",
+        "Salt & pepper",
+        "3 Roma tomatoes, diced",
+        "3 Tbsp red wine vinegar",
+        "2 Tbsp capers",
+        "1 Tbsp honey",
+        "Pine nuts, to garnish",
+        "Fresh basil, to garnish"
+      ],
+      "steps": [
+        "Cut the eggplant and onion into ½-in (12-mm) cubes.",
+        "Put the cubes in a big skillet along with the minced garlic, a generous amount of olive oil (start with ¼ cup / 60 ml), and a pinch of salt and pepper.",
+        "Cook for 15–20 minutes on medium heat, stirring often. Then add the diced Roma tomatoes, red wine vinegar, capers, honey, and a bit more salt and pepper. Cook for another 10 minutes, stirring often.",
+        "Transfer to a bowl and garnish with pine nuts and basil."
+      ],
+      "ingredients": [
+        { "id": "eggplant", "qty": 1 },
+        { "id": "onion", "qty": 1 },
+        { "id": "garlic", "qty": 4 },
+        { "id": "roma-tomatoes", "qty": 3 },
+        { "id": "red-wine-vinegar", "qty": 3 },
+        { "id": "capers", "qty": 2 },
+        { "id": "honey", "qty": 1 },
+        { "id": "pine-nuts", "qty": 1 },
+        { "id": "fresh-basil", "qty": 1 }
+      ]
+    },
+    {
+      "id": "summer-corn-and-peach-salad",
+      "name": "Summer Corn & Peach Salad by The Forest Feast",
+      "url": "/recipes/summer-corn-and-peach-salad",
+      "image": "/images/recipes/summer-corn-and-peach-salad.jpg",
+      "totalTime": "15 min",
+      "displayIngredients": [
+        "2 peaches, cut into small cubes",
+        "2 ears of corn, kernels cut off",
+        "1 cup (145 g) yellow cherry tomatoes, halved",
+        "1 small orange bell pepper, diced",
+        "¼ red onion, diced",
+        "2 Tbsp basil, chopped",
+        "2 Tbsp mint, chopped",
+        "1 Tbsp olive oil",
+        "2 tsp red wine vinegar",
+        "2 Tbsp Parmesan, grated (to serve)",
+        "Black pepper (to serve)"
+      ],
+      "steps": [
+        "Toss the peaches, corn kernels, cherry tomatoes, orange bell pepper, red onion, basil, mint, olive oil, and red wine vinegar together in a bowl.",
+        "Serve in a bowl or on a platter topped with grated Parmesan and a sprinkling of black pepper."
+      ],
+      "ingredients": [
+        { "id": "peaches", "qty": 2 },
+        { "id": "corn-on-cob", "qty": 2 },
+        { "id": "cherry-tomato", "qty": 5 },
+        { "id": "orange-bell-pepper", "qty": 1 },
+        { "id": "red-onion", "qty": 0.25 },
+        { "id": "fresh-basil", "qty": 1 },
+        { "id": "fresh-mint", "qty": 1 },
+        { "id": "parmesan", "qty": 1 }
+      ]
+    },
+    {
+      "id": "mushroom-croquettes",
+      "name": "Mushroom Croquettes by The Forest Feast",
+      "url": "/recipes/mushroom-croquettes",
+      "image": "/images/recipes/mushroom-croquettes.jpg",
+      "totalTime": "40 min",
+      "displayIngredients": [
+        "1 Russet potato, peeled & cubed",
+        "1 sweet potato, peeled & cubed",
+        "½ red onion, diced",
+        "6 cremini mushrooms, diced",
+        "Olive oil",
+        "Salt & pepper",
+        "About 2 eggs, beaten",
+        "About 1 cup (100 g) breadcrumbs",
+        "Greek yogurt + hot sauce (or another dipping sauce), to serve"
+      ],
+      "steps": [
+        "Peel, cube & boil the Russet and sweet potato in water for about 10 minutes, or until soft.",
+        "Dice & sauté the red onion and cremini mushrooms with olive oil & salt over medium heat, about 5 minutes.",
+        "Mash the potatoes with a fork, then stir in the cooked onion-mushroom mixture, plus salt & pepper. Allow to cool a bit, then roll into 1-Tbsp balls.",
+        "Dip each ball first in beaten egg (you'll need about 2), then in breadcrumbs (you'll need about 1 cup / 100 g).",
+        "Fry the balls in a pan with a thin layer of olive oil on medium heat, turning a few times, until browned & crispy.",
+        "Enjoy right away with a dipping sauce — simply mix Greek yogurt with hot sauce, or choose your own."
+      ],
+      "ingredients": [
+        { "id": "russet-potato", "qty": 1 },
+        { "id": "sweet-potatoes", "qty": 1 },
+        { "id": "red-onion", "qty": 0.5 },
+        { "id": "mushrooms", "qty": 4 },
+        { "id": "eggs", "qty": 2 },
+        { "id": "breadcrumbs", "qty": 1 },
+        { "id": "greek-yogurt", "qty": 1 },
+        { "id": "hot-sauce", "qty": 1 }
+      ]
+    },
+    {
+      "id": "gnocchi-and-cauliflower-casserole",
+      "name": "Gnocchi + Cauliflower Casserole by The Forest Feast",
+      "url": "/recipes/gnocchi-and-cauliflower-casserole",
+      "image": "/images/recipes/gnocchi-and-cauliflower-casserole.jpg",
+      "totalTime": "25 min",
+      "displayIngredients": [
+        "1 small head cauliflower, cut into florets (about 4 cups / 530 g)",
+        "17-oz (480 g) package gnocchi",
+        "1 cup (100 g) Parmesan, grated",
+        "2 Tbsp butter",
+        "2 tsp olive oil",
+        "Salt & black pepper"
+      ],
+      "steps": [
+        "In a big pot of water, boil the cauliflower for 3 minutes, then throw in the gnocchi. Cook for 2 more minutes, or until the gnocchi floats, then turn the burner off & strain everything.",
+        "Put the cauliflower & gnocchi back in the hot pot & stir in ¾ cup (70 g) of the Parmesan plus the butter, olive oil, several grinds of black pepper & a couple pinches of salt.",
+        "Spread the mixture into an 8×8-in (20×20-cm) casserole dish. Sprinkle the remaining ¼ cup (30 g) Parmesan on top, plus a bit more salt & pepper.",
+        "Broil for 3 minutes, or until the top is golden. Serve hot."
+      ],
+      "ingredients": [
+        { "id": "cauliflower", "qty": 1 },
+        { "id": "gnocchi", "qty": 1 },
+        { "id": "parmesan", "qty": 4 },
+        { "id": "butter", "qty": 2 }
+      ]
+    },
+    {
+      "id": "mini-artichoke-lasagnas",
+      "name": "Mini Artichoke Lasagnas by The Forest Feast",
+      "url": "/recipes/mini-artichoke-lasagnas",
+      "image": "/images/recipes/mini-artichoke-lasagnas.jpg",
+      "servings": "Makes 4",
+      "activeTime": "15 min",
+      "totalTime": "45 min",
+      "displayIngredients": [
+        "1 cup (240 ml) marinara sauce",
+        "6 oz (170 g) fresh mozzarella, sliced",
+        "4 Tbsp marinated artichoke hearts, chopped",
+        "4 strips no-boil lasagna noodles, broken into pieces",
+        "½ cup (50 g) Parmesan, grated",
+        "Fresh basil, salt & pepper, to serve"
+      ],
+      "steps": [
+        "Put a spoonful of marinara in the bottom of each of 4 (3½-in / 9-cm) ramekins, then layer all other ingredients except the Parmesan, which goes on top. Try to give each ramekin 3 layers of noodles, and always make sure some sauce is covering the noodles.",
+        "Bake at 375°F (190°C) for 25–30 minutes.",
+        "Cool a bit before serving, and top each with fresh basil, salt & pepper."
+      ],
+      "ingredients": [
+        { "id": "marinara-sauce", "qty": 1 },
+        { "id": "fresh-mozzarella", "qty": 6 },
+        { "id": "marinated-artichoke-hearts", "qty": 4 },
+        { "id": "no-boil-lasagna-noodles", "qty": 4 },
+        { "id": "parmesan", "qty": 2 }
+      ]
+    },
+    {
+      "id": "charred-broccoli-with-onions",
+      "name": "Charred Broccoli with Onions by The Forest Feast",
+      "url": "/recipes/charred-broccoli-with-onions",
+      "image": "/images/recipes/charred-broccoli-with-onions.jpg",
+      "totalTime": "35 min",
+      "displayIngredients": [
+        "2 heads broccoli, broken into florets",
+        "1 large red onion, sliced into medium pieces",
+        "Olive oil, to drizzle generously (at least 2 Tbsp)",
+        "Red pepper flakes (about ¼ tsp)",
+        "2 cloves garlic, minced",
+        "Salt & pepper, to taste"
+      ],
+      "steps": [
+        "On a baking sheet, combine the broccoli florets and sliced red onion. Drizzle generously with olive oil (at least 2 Tbsp), then sprinkle with red pepper flakes (about ¼ tsp), minced garlic, and a few pinches of salt & pepper.",
+        "Bake at 425°F (220°C) for 25 minutes, tossing once, until some edges are blackened & crispy.",
+        "Enjoy right away, as the florets lose crispiness as they cool."
+      ],
+      "ingredients": [
+        { "id": "broccoli", "qty": 2 },
+        { "id": "red-onion", "qty": 1 },
+        { "id": "garlic", "qty": 2 }
       ]
     }
   ]

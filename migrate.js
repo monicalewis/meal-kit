@@ -2,9 +2,11 @@ require('dotenv').config();
 const { Pool } = require('pg');
 const bcrypt = require('bcrypt');
 
+// Render's managed Postgres requires SSL; a local Postgres does not offer it.
+const isLocalDb = /@(localhost|127\.0\.0\.1)[:/]/.test(process.env.DATABASE_URL || '');
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
+  ssl: isLocalDb ? false : { rejectUnauthorized: false }
 });
 
 const DDL = `
