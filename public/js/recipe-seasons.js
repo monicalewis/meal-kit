@@ -33,8 +33,7 @@
         "Winter"
     ],
     "baked-farro-with-summer-vegetables-by-smitten-kitchen": [
-        "Summer",
-        "Fall"
+        "Summer"
     ],
     "baked-mediterranean-veggies": [
         "Spring",
